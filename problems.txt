@@ -1,4 +1,4 @@
-# (P) -> Problem    (U) -> Uncertainity/may be a problem or not
+# (P) -> Problem    (U) -> Uncertainity/may be a problem or not (UI) Unimportant for now
 
 - (P) Powerlaw does not fit the data well in the script's current version, it tries to fit the lower energies only.
 
@@ -14,3 +14,5 @@ reduced chi squared is bigger than 2. This part probably needs a revision
 - (U) Finding the global minimum: When I change the initialization values for parameters (or when I switch between restartModels = True/False
 while running the script multiple times for same observations), although slightly, the fit results change from time to time, which
 means that the script has some problems finding the true global minimum. Maybe revise the fitting method in future
+
+- (UI) Why does the script create a folder named "1" under the directory that it is run??

@@ -26,7 +26,7 @@ modelList = [
     ["tbabs*(diskbb+powerlaw+gauss)", {"gaussian.LineE": "6.95,1e-3,6.5,6.5,7.2,7.2", "gaussian.Sigma": "0.03,1e-3,0.001,0.001,0.5,0.5", "gaussian.norm":"-1e-3,1e-4,-1e12,-1e12,-1e-12,-1e-12"}, "mod_diskpowgauss.xcm", {"chi":0, "dof":0}]
 ]
 
-energyFilter = "1.5 10."    #Do not forget to put . after an integer to spesify enregy instead of channel
+energyFilter = "1.5 10."    #Do not forget to put . after an integer to spesify energy (in keV) instead of channel
 #===================================================================================================================================
 # Functions
 def shakefit(modelIndex, resultsFile):
@@ -57,6 +57,7 @@ def shakefit(modelIndex, resultsFile):
                 # Could not find a new minimum
                 continueError = False
             elif errorString[1] == "T":
+                # Non-monotonicity detected
                 delChi += 2
 
             if continueError == False:
@@ -259,7 +260,7 @@ for obsid in allDir:
         file.write("Alternative model: " + modelList[alternativeIdx][0] + "\n")
         comparedModelFile = commonDirectory + "/" + modelList[alternativeIdx][2]
 
-        # Define the comparison model
+        # Define the alternative model
         m = Model(modelList[alternativeIdx][0])
         modelPath = Path(comparedModelFile)
         if modelPath.exists():
@@ -298,8 +299,13 @@ for obsid in allDir:
     shakefit(bestIdx, file)
     writeBestFittingModel(bestIdx, file)
     saveModel(modelList[bestIdx][2])
-    saveModel("best_" + modelList[bestIdx][2])
     saveModel(modelList[bestIdx][2], commonDirectory)
+
+    for eachFile in allFiles:
+        # Remove any existing "best model" files
+        if "best_" in eachFile:
+            os.system("rm " + eachFile)
+    saveModel("best_" + modelList[bestIdx][2])
 
     file.close()
     Xset.closeLog()

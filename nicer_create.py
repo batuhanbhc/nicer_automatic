@@ -59,7 +59,7 @@ for obs in obsList:
     nicerl2 = "nicerl2 indir=" + obs + " clobber=yes chatter=1 history=yes filtcolumns=NICERV4 cldir=" + outObsDir
     os.system(nicerl2)
 
-    nicerl3spect = "nicerl3-spect " + outObsDir + " grouptype=optmin groupscale=25 bkgmodeltype=3c50 suffix=3c50 clobber=YES mkfile=" + obs + "/auxil/*.mkf"
+    nicerl3spect = "nicerl3-spect " + outObsDir + " grouptype=optmin groupscale=10 bkgmodeltype=3c50 suffix=3c50 clobber=YES mkfile=" + obs + "/auxil/*.mkf"
     os.system(nicerl3spect)
 
     nicerl3lc = "nicerl3-lc " + outObsDir + " pirange=50-1000 timebin=1 clobber=YES mkfile=" + obs + "/auxil/*.mkf"

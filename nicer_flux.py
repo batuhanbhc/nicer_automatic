@@ -6,7 +6,7 @@ from xspec import *
 import matplotlib.pyplot as plt
 
 #===================================================================================================================================
-# The location of obseravtions
+# The location of the observation folders
 outputDir = "/home/batuhanbahceci/NICER/analysis"
 
 # Name of the log file
@@ -119,6 +119,7 @@ iteration = 0
 
 for obsid in allDir:
     if obsid.isnumeric():
+        # If the file name is all numerical, assume it is an observation. If not, you may need to change this part
         outObsDir = outputDir + "/" + obsid      # e.g. ~/NICER/analysis/6130010120   
         os.chdir(outObsDir)
     else:
@@ -127,7 +128,7 @@ for obsid in allDir:
     iteration += 1
     allFiles = os.listdir(outObsDir)
 
-    # Find the spectrum, background, arf and response files
+    # Find the data file and the best fitting model file for the current observation
     counter = 0
     for file in allFiles:
         if "best_" in file:
@@ -205,14 +206,14 @@ fluxKeys = list(observationFluxes.keys())
 fluxKeys.sort()
 sorted_fluxes = {i: observationFluxes[i] for i in fluxKeys}
 
-tbabsnH = []
+diskbbTin= []
 powIndex = []
 diskFlux = []
 powFlux = []
 observations = []
 for key, values in sorted_fluxes.items():
     observations.append(key)
-    tbabsnH.append(values[0][1][0])
+    diskbbTin.append(values[0][1][0])
     powIndex.append(values[1][1][0])
     diskFlux.append(values[2][1])
     powFlux.append(values[3][1])
@@ -220,8 +221,8 @@ for key, values in sorted_fluxes.items():
 fig, axs = plt.subplots(2, 2, figsize=(12,8))
 
 # Plot the first graph (diskbb.Tin)
-axs[0, 0].plot(observations, tbabsnH, label="diskbb.Tin values")
-axs[0, 0].scatter(observations, tbabsnH, marker="o")
+axs[0, 0].plot(observations, diskbbTin, label="diskbb.Tin values")
+axs[0, 0].scatter(observations, diskbbTin, marker="o")
 axs[0, 0].set_xlabel('Observation IDs')
 axs[0, 0].set_ylabel('keV')
 axs[0, 0].legend()
