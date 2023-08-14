@@ -1,0 +1,3 @@
+- Fit the powerlaw to the part of data where delta chi-squared is low.
+- After solving powerlaw issue, try to add a couple absorption gaussians for the low energy region
+- Find a way to link certain variables (energyFilter, script names, log file name etc.) instead of manually changing them in each script
