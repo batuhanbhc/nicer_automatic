@@ -9,7 +9,7 @@ fit_script = "nicer_fit.py"
 flux_script = "nicer_flux.py"
 
 # Script switches
-createSwitch = True
+createSwitch = False
 fitSwitch = True
 fluxSwitch = True
 

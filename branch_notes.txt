@@ -1,0 +1,20 @@
+-Added powerlaw region checking part:
+The script removes the powerlaw from the expression and reloads the other components with the same parameter values. Then it stores the x-axis y-axis values of
+"chi" plot and regroups x-axis values by size 5, overlapping the last 3 bins for each upcoming group. Then it checks whether there is any group whose energy is below
+2 keV and whose mean delta chi value is bigger than 50: If so, it assumes the powerlaw is trying to fit the lower energies, so it takes out the powerlaw out from the
+model expression permenantly from the best fitting model.
+
+-Flux calculation disabled:
+As I haven't found a way to fit the lower energies the powerlaw used to fit, the script does not do anything after removing the powerlaw, including fitting and applying
+shakefit. Since the script does not try to fit the new expression, the delta chi value happens to be quite big, thus the cflux error calculation part does not function. This is 
+why, the flux calculation file is currently not working with the latest version of other files in this branch.
+
+-Changes in some functions:
+writeBestFitting function does not take the parameters from the modelList anymore. It directly accesses the parameters of the currently assigned model, assuming it is the
+best model. Shakefit does not update the parameters back to the modelLists. Added a new function called "extractModFileName", which takes the first three letters of each model
+component to create model files automatically in the form of "model_mo1mo2mo3.xcm" in a sorted way.
+
+-Other changes:
+As mentioned above, the names for model files have been changed. modelList has been updated so that the model file name element has been deleted.
+
+# THIS BRANCH IS NOT READY TO BE MERGES UNTIL FINDING A PROPER WAY TO FIT LOWER ENERGIES AFTER REMOVING POWERLOW

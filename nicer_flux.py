@@ -207,16 +207,16 @@ fluxKeys.sort()
 sorted_fluxes = {i: observationFluxes[i] for i in fluxKeys}
 
 diskbbTin= []
-powIndex = []
+#powIndex = []
 diskFlux = []
-powFlux = []
+#powFlux = []
 observations = []
 for key, values in sorted_fluxes.items():
     observations.append(key)
     diskbbTin.append(values[0][1][0])
-    powIndex.append(values[1][1][0])
+    #powIndex.append(values[1][1][0])
     diskFlux.append(values[2][1])
-    powFlux.append(values[3][1])
+    #powFlux.append(values[3][1])
 
 fig, axs = plt.subplots(2, 2, figsize=(12,8))
 
@@ -227,12 +227,14 @@ axs[0, 0].set_xlabel('Observation IDs')
 axs[0, 0].set_ylabel('keV')
 axs[0, 0].legend()
 
+"""
 # Plot the second graph (powerlaw.PhoIndex)
 axs[0, 1].plot(observations, powIndex, label="powerlaw.PhoIndex values")
 axs[0, 1].scatter(observations, powIndex, marker="o")
 axs[0, 1].set_xlabel('Observation IDs')
 axs[0, 1].set_ylabel('Photon Index')
 axs[0, 1].legend()
+"""
 
 # Plot the third graph (Diskbb flux)
 axs[1, 0].plot(observations, diskFlux, label="Diskbb fluxes")
@@ -241,12 +243,14 @@ axs[1, 0].set_xlabel('Observation IDs')
 axs[1, 0].set_ylabel('Flux (ergs/cm^2/s)')
 axs[1, 0].legend()
 
+"""
 # Plot the fourth graph (Powerlaw flux)
 axs[1, 1].plot(observations, powFlux, label="Powerlaw fluxes")
 axs[1, 1].scatter(observations, powFlux, marker="o")
 axs[1, 1].set_xlabel('Observation IDs')
 axs[1, 1].set_ylabel('Flux (ergs/cm^2/s)')
 axs[1, 1].legend()
+"""
 
 # Adjust layout and save the figure
 plt.tight_layout()
