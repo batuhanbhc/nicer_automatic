@@ -17,4 +17,4 @@ component to create model files automatically in the form of "model_mo1mo2mo3.xc
 -Other changes:
 As mentioned above, the names for model files have been changed. modelList has been updated so that the model file name element has been deleted.
 
-# THIS BRANCH IS NOT READY TO BE MERGES UNTIL FINDING A PROPER WAY TO FIT LOWER ENERGIES AFTER REMOVING POWERLOW
+# THIS BRANCH IS NOT READY TO BE MERGED UNTIL A PROPER WAY TO FIT LOWER ENERGIES AFTER REMOVING POWERLAW IS FOUND
