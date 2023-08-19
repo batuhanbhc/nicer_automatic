@@ -175,7 +175,7 @@ def writeBestFittingModel(resultsFile):
     for comp in AllModels(1).componentNames:
         compObj = getattr(AllModels(1), comp)
         for par in compObj.parameterNames:
-            parVal = getattr(compObj, par).values[0]
+            parVal = getattr(compObj, par).values
             fullName = comp + "." + par
             parameterString += fullName + ": " + str(parVal) + "\n"
 
@@ -234,6 +234,7 @@ for obsid in allDir:
     file = open(resultsFile, "w")
     Xset.openLog("xspecOutput.log")
     #Xset.chatter = 1
+    Xset.abund = "wilm"
     Fit.query = "yes"
 
     # Load the necessary files
@@ -309,6 +310,7 @@ for obsid in allDir:
     addCompNum = Plot.nAddComps()
     
     # Check the region where the powerlaw is trying to fit, if the region is located below 2 keV, do not add powerlaw component.
+    powOut = False
     if "powerlaw" in AllModels(1).expression:
         if addCompNum == 1:
             print("There must be at least one additive component in the model.")
@@ -333,8 +335,13 @@ for obsid in allDir:
                             test = modelName.index("powerlaw*")
                             modelName = modelName.replace("powerlaw*", "", 1)
                         except:
-                            modelName = modelName.replace("*powerlaw*", "", 1)
- 
+                            try:
+                                test = modelName.index("*powerlaw")
+                                modelName = modelName.replace("*powerlaw", "", 1)
+                            except:
+                                print("Unknown powerlaw placement in model expression. Please revise and change the script accordingly.")
+                                quit()
+
             m = Model(modelName)
             enterParameters(bestIdx, bestIdx)
 
@@ -343,7 +350,9 @@ for obsid in allDir:
             residY = Plot.y()
 
             # Group every {binSize} delta chi-sq bins, start rebinning next group with the previous group's last {shiftSize} bins (overlapping groups)
-            binSize = 5; shiftSize = 3; threshold = 50
+            binSize = len(residX) * 5 // 100    # 5% length of total bin number
+            shiftSize = binSize // 2 + 1
+            threshold = 50  # Unit: delta chi-squared
             newGroupsX = []; newGroupsY = []
             # targetX and targetY will store the groups containing values bigger than the threshold
             targetX = []; targetY = []
@@ -352,7 +361,7 @@ for obsid in allDir:
             counter = 0
             while True:
                 try:
-                    counter += 1;   pointer += 1
+                    counter += 1
                     tempSumX += residX[pointer]
                     tempSumY += residY[pointer]
 
@@ -365,12 +374,15 @@ for obsid in allDir:
 
                         tempSumY = 0;   tempSumX = 0
                 except:
-                    if tempSumX != 0 and tempSumY != 0:
+                    if counter != 1:
+                        # There is a left over group at the end that has number of bins lower than binSize
                         newGroupsX.append(tempSumX / counter);  newGroupsY.append(tempSumY / counter)
                         if tempSumY / binSize >= threshold:
                             targetX.append(tempSumX / counter);     targetY.append(tempSumY / counter)
 
                     break
+                
+                pointer += 1
             
             # Are there any region of data that is below 2 keV, and also has an average delta chi-sq value bigger than the threshold value?
             # If so, remove powerlaw component.
@@ -378,31 +390,53 @@ for obsid in allDir:
             if result == True:
                 powOut = True
 
+                modelName = AllModels(1).expression.replace("TBabs", "vphabs", 1)
+                m = Model(modelName)
+                modFileName = extractModFileName()
+                enterParameters(bestIdx, bestIdx)
+
+                AllModels(1)(8).frozen = False  # Mg
+                fitModel()
+                AllModels(1)(10).frozen = False # Si
+                fitModel()
+                AllModels(1)(11).frozen = False # S
+                fitModel()
+                AllModels(1)(5).frozen = False  # O
+                fitModel()
+                AllModels(1)(6).frozen = False  # Ne
+                fitModel()
+                AllModels(1)(16).frozen = False # Fe
+                fitModel()
+
                 file.write("\n===============================================================================\n")
                 file.write("Powerlaw has been taken out due to trying to fit lower energies (> 2 keV).\n")
                 file.write("===============================================================================\n")
-            else:
-                powOut = False
      
     if powOut == False:
+        # Restore the best model
         Xset.restore(mainModelFile)
 
-    modFileName = extractModFileName()
-    #fitModel()
-    #shakefit(file)
-    writeBestFittingModel(file)
-    saveModel(modFileName)
-    saveModel(modFileName, commonDirectory)
+        modFileName = extractModFileName()
+        fitModel()
+        shakefit(file)
+        writeBestFittingModel(file)
+        saveModel(modFileName)
+        saveModel(modFileName, commonDirectory)
+    else:
+        # Continue without powerlaw
+        modFileName = extractModFileName()
+        fitModel()
+        writeBestFittingModel(file)
+        saveModel(modFileName)
+        saveModel(modFileName, commonDirectory)
 
+    # Remove any existing best model files and save the new one
     for eachFile in allFiles:
-        # Remove any existing "best model" files
         if "best_" in eachFile:
             os.system("rm " + eachFile)
-
     saveModel("best_" + modFileName)
-
+    
     file.close()
     Xset.closeLog()
     AllModels.clear()
     AllData.clear()
-    
