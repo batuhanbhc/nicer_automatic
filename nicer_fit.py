@@ -28,6 +28,12 @@ modelList = [
 ]
 
 energyFilter = "1.5 10."    #Do not forget to put . after an integer to spesify energy (in keV) instead of channel
+
+chatterOn = True
+
+refitVphabs = True          # If set to True, the script will go through all observations that have vphabs model instead of after taking out powerlaw,
+                            # take vphabs parameters and calculate the weighted average value for each parameter, then refit those observations with
+                            # new parameters
 #===================================================================================================================================
 # Functions
 def shakefit(resultsFile):
@@ -128,16 +134,16 @@ def updateParameters(modelIndex):
     modelStats["dof"] = Fit.dof
     modelStats["nullhyp"] = Fit.nullhyp
 
-def saveModel(fileName, location = "default"):
+def saveModel(fileName, obs, location = "default"):
     # This function saves the model file (.xcm) under spesified location. If no location has been given, 
     # the model file will be saved under default (outObsDir) directory
-
+    
     if location == "default":
-        xcmPath = Path(outObsDir + "/" + fileName)
+        xcmPath = Path(outputDir + "/" + obs + "/" + fileName)
         if xcmPath.exists():
-            subprocess.run(["rm", outObsDir + "/" + fileName])
+            subprocess.run(["rm", outputDir + "/" + obs + "/" + fileName])
 
-        Xset.save(outObsDir + "/" + fileName, "m")
+        Xset.save(outputDir + "/" + obs + "/" + fileName, "m")
     else:
         xcmPath = Path(location + "/" + fileName)
         if xcmPath.exists():
@@ -195,6 +201,8 @@ def extractModFileName():
 allDir = os.listdir(outputDir)
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
 iteration = 0
+vphabsPars = {}
+vphabsObs = []
 for obsid in allDir:
     if obsid.isnumeric():
         outObsDir = outputDir + "/" + obsid      # e.g. ~/NICER/analysis/6130010120   
@@ -233,7 +241,7 @@ for obsid in allDir:
     # From now on, PyXspec will be utilized for fitting and comparing models
     file = open(resultsFile, "w")
     Xset.openLog("xspecOutput.log")
-    #Xset.chatter = 1
+    if chatterOn == False: Xset.chatter = 0
     Xset.abund = "wilm"
     Fit.query = "yes"
 
@@ -265,8 +273,8 @@ for obsid in allDir:
 
         fitModel()
         updateParameters(mainIdx)
-        saveModel(modFileName)
-        saveModel(modFileName, commonDirectory)
+        saveModel(modFileName, obsid)
+        saveModel(modFileName, obsid, commonDirectory)
 
         file.write("Alternative model: " + modelList[alternativeIdx][0] + "\n")
 
@@ -282,8 +290,8 @@ for obsid in allDir:
 
         fitModel()
         updateParameters(alternativeIdx)
-        saveModel(modFileName)
-        saveModel(modFileName, commonDirectory)
+        saveModel(modFileName, obsid)
+        saveModel(modFileName, obsid, commonDirectory)
 
         # Apply the f-test
         newChi = modelList[alternativeIdx][2]["chi"]
@@ -314,7 +322,7 @@ for obsid in allDir:
     if "powerlaw" in AllModels(1).expression:
         if addCompNum == 1:
             print("There must be at least one additive component in the model.")
-            print("Powerlaw cannot be tried to be taken out of model expression for testing its fitting region.")
+            print("Powerlaw cannot be taken out of model expression.")
         else:
             modelName = AllModels(1).expression.replace(" ", "")
             # This part tries to find the location of the powerlaw component in the model expression by manually checking its surrounding characters
@@ -411,32 +419,110 @@ for obsid in allDir:
                 file.write("\n===============================================================================\n")
                 file.write("Powerlaw has been taken out due to trying to fit lower energies (> 2 keV).\n")
                 file.write("===============================================================================\n")
+
+                # Saving vphabs parameter values with their weights (currently, arithmetic mean calculation)
+                comps = AllModels(1).componentNames
+                for comp in comps:
+                    if comp == "vphabs":
+                        compObj = getattr(AllModels(1), comp)
+                        pars = compObj.parameterNames
+                        for par in pars:
+                            parObj = getattr(compObj, par)
+                            fullName = comp + "." + par
+                            if parObj.values[1] > 0:   # Non-frozen parameter
+                                val = parObj.values[0]
+                                weight = 1  # Change it the weight according to your needs
+                                if fullName in vphabsPars:
+                                    vphabsPars[fullName].append((val, weight))
+                                else:
+                                    vphabsPars[fullName] = [(val, weight)]
+                
+                vphabsObs.append(obsid)
      
     if powOut == False:
-        # Restore the best model
+        # Restore the best-fitting model back
         Xset.restore(mainModelFile)
 
         modFileName = extractModFileName()
         fitModel()
         shakefit(file)
         writeBestFittingModel(file)
-        saveModel(modFileName)
-        saveModel(modFileName, commonDirectory)
+        saveModel(modFileName, obsid)
+        saveModel(modFileName, obsid, commonDirectory)
     else:
         # Continue without powerlaw
         modFileName = extractModFileName()
-        fitModel()
-        writeBestFittingModel(file)
-        saveModel(modFileName)
-        saveModel(modFileName, commonDirectory)
+        saveModel(modFileName, obsid)
+        saveModel(modFileName, obsid, commonDirectory)
 
     # Remove any existing best model files and save the new one
     for eachFile in allFiles:
         if "best_" in eachFile:
             os.system("rm " + eachFile)
-    saveModel("best_" + modFileName)
+    saveModel("best_" + modFileName, obsid)
     
     file.close()
     Xset.closeLog()
     AllModels.clear()
     AllData.clear()
+
+if refitVphabs:
+    # Calculate the weighted average of parameter values
+    weightedAvg = {}
+    for key,val in vphabsPars.items():
+        tempSum = 0
+        tempWeight = 0
+        for i in val:
+            tempSum += i[0]
+            tempWeight += i[1]
+        weightedAvg[key] = tempSum / tempWeight
+
+    #Re-fit the observations that have "vphabs" component in their best-fitting model with weighted-parameters.
+    for obsid in vphabsObs:
+        os.chdir(outputDir + "/" + obsid)
+        allFiles = os.listdir(outputDir + "/" + obsid)
+
+        # Find the data file and the best fitting model file for the current observation
+        counter = 0
+        for file in allFiles:
+            if "best_" in file:
+                modFile = file
+                counter += 1
+            elif "data_" in file:
+                dataFile = file
+                counter += 1
+
+            if counter == 2:
+                # All necessary files have been found
+                break
+        
+        Xset.restore(modFile)
+        Xset.restore(dataFile)
+        file = open(resultsFile, "a")
+
+        comps = AllModels(1).componentNames
+        for comp in comps:
+            compObj = getattr(AllModels(1), comp)
+            pars = compObj.parameterNames
+            for par in pars:
+                parObj = getattr(compObj, par)
+                fullName = comp + "." + par
+                if fullName in weightedAvg:
+                    parObj.values = weightedAvg[fullName]
+                    parObj.frozen = False
+        
+        modFileName = extractModFileName()
+        fitModel()
+        writeBestFittingModel(file)
+        saveModel(modFileName, obsid)
+        saveModel(modFileName, obsid, commonDirectory)
+        
+        # Remove any existing best model files and save the new one
+        for eachFile in allFiles:
+            if "best_" in eachFile:
+                os.system("rm " + eachFile)
+        saveModel("best_" + modFileName, obsid)
+
+        file.close()
+        AllModels.clear()
+        AllData.clear()
