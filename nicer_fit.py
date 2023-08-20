@@ -24,7 +24,7 @@ ftestCrit = 0.005
 modelList = [
     ["tbabs*diskbb", {"TBabs.nH": 8}, {}],
     ["tbabs*(diskbb+powerlaw)", {"powerlaw.PhoIndex": 2}, {}],
-    ["tbabs*(diskbb+powerlaw+gauss)", {"gaussian.LineE": "6.95,1e-3,6.5,6.5,7.2,7.2", "gaussian.Sigma": "0.03,1e-3,0.001,0.001,0.5,0.5", "gaussian.norm":"-1e-3,1e-4,-1e12,-1e12,-1e-12,-1e-12"}, {}]
+    ["tbabs*(diskbb+powerlaw+gauss)", {"gaussian.LineE": "6.98,1e-3,6.95,6.95,7.1,7.1", "gaussian.Sigma": "0.03,1e-3,0.001,0.001,0.1,0.1", "gaussian.norm":"-1e-3,1e-4,-1e12,-1e12,-1e-12,-1e-12"}, {}]
 ]
 
 energyFilter = "1.5 10."    #Do not forget to put . after an integer to spesify energy (in keV) instead of channel
@@ -37,6 +37,8 @@ switchVphabs = False        # If powerlaw is taken out due to fitting lower ener
 refitVphabs = True          # If set to True, the script will go through all observations that have vphabs model instead of after taking out powerlaw,
                             # take vphabs parameters and calculate the weighted average value for each parameter, then refit those observations with
                             # new parameters (Only works if switchVphabs = True)
+
+makeXspecScript = True
 #===================================================================================================================================
 # Functions
 def shakefit(resultsFile):
@@ -243,7 +245,7 @@ for obsid in allDir:
     #-------------------------------------------------------------------------------------    
     # From now on, PyXspec will be utilized for fitting and comparing models
     file = open(resultsFile, "w")
-    Xset.openLog("xspecOutput.log")
+    Xset.openLog("xspec_output.log")
     if chatterOn == False: Xset.chatter = 0
     Xset.abund = "wilm"
     Fit.query = "yes"
@@ -490,6 +492,19 @@ for obsid in allDir:
     Xset.closeLog()
     AllModels.clear()
     AllData.clear()
+
+    if makeXspecScript:
+        if Path("xspec_bestmod_script.xcm").exists():
+            os.system("rm -rf xspec_bestmod_script.xcm")
+        os.system("touch xspec_bestmod_script.xcm")
+
+        file = open("xspec_bestmod_script.xcm", "w")
+        file.write("@data_" + obsid + ".xcm\n")
+        file.write("@best_" + modFileName + "\n")
+        file.write("cpd /xw\n")
+        file.write("setpl e\n")
+        file.write("pl ld chi")
+        file.close()
     
 if switchVphabs and refitVphabs:
     # Calculate the weighted average of parameter values
