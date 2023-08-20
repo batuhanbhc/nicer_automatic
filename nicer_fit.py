@@ -31,9 +31,12 @@ energyFilter = "1.5 10."    #Do not forget to put . after an integer to spesify 
 
 chatterOn = True
 
+switchVphabs = False        # If powerlaw is taken out due to fitting lower energies, switchVphabs = True will replace TBabs with vphabs to look
+                            # for elemental abundances. If set to False, the script will add absorption gausses to account for the low energy region phenomenologically.
+
 refitVphabs = True          # If set to True, the script will go through all observations that have vphabs model instead of after taking out powerlaw,
                             # take vphabs parameters and calculate the weighted average value for each parameter, then refit those observations with
-                            # new parameters
+                            # new parameters (Only works if switchVphabs = True)
 #===================================================================================================================================
 # Functions
 def shakefit(resultsFile):
@@ -398,47 +401,69 @@ for obsid in allDir:
             if result == True:
                 powOut = True
 
-                modelName = AllModels(1).expression.replace("TBabs", "vphabs", 1)
-                m = Model(modelName)
-                modFileName = extractModFileName()
-                enterParameters(bestIdx, bestIdx)
-
-                AllModels(1)(8).frozen = False  # Mg
-                fitModel()
-                AllModels(1)(10).frozen = False # Si
-                fitModel()
-                AllModels(1)(11).frozen = False # S
-                fitModel()
-                AllModels(1)(5).frozen = False  # O
-                fitModel()
-                AllModels(1)(6).frozen = False  # Ne
-                fitModel()
-                AllModels(1)(16).frozen = False # Fe
-                fitModel()
-
                 file.write("\n===============================================================================\n")
                 file.write("Powerlaw has been taken out due to trying to fit lower energies (> 2 keV).\n")
                 file.write("===============================================================================\n")
 
-                # Saving vphabs parameter values with their weights (currently, arithmetic mean calculation)
-                comps = AllModels(1).componentNames
-                for comp in comps:
-                    if comp == "vphabs":
-                        compObj = getattr(AllModels(1), comp)
-                        pars = compObj.parameterNames
-                        for par in pars:
-                            parObj = getattr(compObj, par)
-                            fullName = comp + "." + par
-                            if parObj.values[1] > 0:   # Non-frozen parameter
-                                val = parObj.values[0]
-                                weight = 1  # Change it the weight according to your needs
-                                if fullName in vphabsPars:
-                                    vphabsPars[fullName].append((val, weight))
-                                else:
-                                    vphabsPars[fullName] = [(val, weight)]
-                
-                vphabsObs.append(obsid)
-     
+                if switchVphabs:
+                    modelName = AllModels(1).expression.replace("TBabs", "vphabs", 1)
+                    m = Model(modelName)
+                    modFileName = extractModFileName()
+                    enterParameters(bestIdx, bestIdx)
+
+                    AllModels(1)(8).frozen = False  # Mg
+                    fitModel()
+                    AllModels(1)(10).frozen = False # Si
+                    fitModel()
+                    AllModels(1)(11).frozen = False # S
+                    fitModel()
+                    AllModels(1)(5).frozen = False  # O
+                    fitModel()
+                    AllModels(1)(6).frozen = False  # Ne
+                    fitModel()
+                    AllModels(1)(16).frozen = False # Fe
+                    fitModel()
+
+                    # Saving vphabs parameter values with their weights (currently, arithmetic mean calculation)
+                    comps = AllModels(1).componentNames
+                    for comp in comps:
+                        if comp == "vphabs":
+                            compObj = getattr(AllModels(1), comp)
+                            pars = compObj.parameterNames
+                            for par in pars:
+                                parObj = getattr(compObj, par)
+                                fullName = comp + "." + par
+                                if parObj.values[1] > 0:   # Non-frozen parameter
+                                    val = parObj.values[0]
+                                    weight = 1  # Change the weight according to your needs
+                                    if fullName in vphabsPars:
+                                        vphabsPars[fullName].append((val, weight))
+                                    else:
+                                        vphabsPars[fullName] = [(val, weight)]
+                    
+                    vphabsObs.append(obsid)
+                else:
+                    modelNamev1 =AllModels(1).expression + "+gauss+gauss"
+                    modelNamev2 = AllModels(1).expression[:AllModels(1).expression.find("diskbb") + 6] + "+gauss+gauss" + AllModels(1).expression[AllModels(1).expression.find("diskbb") + 6:]
+                    m = Model(modelNamev2)
+                    enterParameters(bestIdx, bestIdx)
+                    gabsEnergies = ["1.55 -1", "1.8 -1"]
+                    gabsCounter = 0
+                    comps = AllModels(1).componentNames[::-1]
+                    for comp in comps:
+                        if gabsCounter < 2 and "gauss" in comp:
+                            compObj = getattr(AllModels(1), comp)
+                            pars = compObj.parameterNames
+                            for par in pars:
+                                if par == "LineE":
+                                    parObj = getattr(compObj, par)
+                                    parObj.values = gabsEnergies[gabsCounter]
+                                    gabsCounter += 1
+
+                    fitModel()
+                    shakefit(file)
+                    writeBestFittingModel(file)
+
     if powOut == False:
         # Restore the best-fitting model back
         Xset.restore(mainModelFile)
@@ -450,7 +475,7 @@ for obsid in allDir:
         saveModel(modFileName, obsid)
         saveModel(modFileName, obsid, commonDirectory)
     else:
-        # Continue without powerlaw
+        # Save the new model without powerlaw
         modFileName = extractModFileName()
         saveModel(modFileName, obsid)
         saveModel(modFileName, obsid, commonDirectory)
@@ -465,8 +490,8 @@ for obsid in allDir:
     Xset.closeLog()
     AllModels.clear()
     AllData.clear()
-
-if refitVphabs:
+    
+if switchVphabs and refitVphabs:
     # Calculate the weighted average of parameter values
     weightedAvg = {}
     for key,val in vphabsPars.items():
@@ -477,7 +502,7 @@ if refitVphabs:
             tempWeight += i[1]
         weightedAvg[key] = tempSum / tempWeight
 
-    #Re-fit the observations that have "vphabs" component in their best-fitting model with weighted-parameters.
+    #Re-fit the observations with weighted-parameters (only the observations with vphabs component).
     for obsid in vphabsObs:
         os.chdir(outputDir + "/" + obsid)
         allFiles = os.listdir(outputDir + "/" + obsid)
