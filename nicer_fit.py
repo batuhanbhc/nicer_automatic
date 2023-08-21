@@ -27,18 +27,16 @@ modelList = [
     ["tbabs*(diskbb+powerlaw+gauss)", {"gaussian.LineE": "6.98,1e-3,6.95,6.95,7.1,7.1", "gaussian.Sigma": "0.03,1e-3,0.001,0.001,0.1,0.1", "gaussian.norm":"-1e-3,1e-4,-1e12,-1e12,-1e-12,-1e-12"}, {}]
 ]
 
-energyFilter = "1.5 10."    #Do not forget to put . after an integer to spesify energy (in keV) instead of channel
-
 chatterOn = True
 
-switchVphabs = False        # If powerlaw is taken out due to fitting lower energies, switchVphabs = True will replace TBabs with vphabs to look
+switchVphabs = True       # If powerlaw is taken out due to fitting lower energies, switchVphabs = True will replace TBabs with vphabs to look
                             # for elemental abundances. If set to False, the script will add absorption gausses to account for the low energy region phenomenologically.
 
-refitVphabs = True          # If set to True, the script will go through all observations that have vphabs model instead of after taking out powerlaw,
+refitVphabs = True         # If set to True, the script will go through all observations that have vphabs model instead of after taking out powerlaw,
                             # take vphabs parameters and calculate the weighted average value for each parameter, then refit those observations with
                             # new parameters (Only works if switchVphabs = True)
 
-makeXspecScript = True
+makeXspecScript = True      # If set to True, the script creates an .xcm file that loads model and data files to xspec and creates a plot automatically
 #===================================================================================================================================
 # Functions
 def shakefit(resultsFile):
@@ -86,7 +84,7 @@ def listToStr(array):
     result = result[:-1]
     return result
 
-def enterParameters(currentIndex, prevIndex, fluxPars = {}):
+def getParsFromList(currentIndex, prevIndex):
     modelName = modelList[currentIndex][0]
     mainList = modelList[currentIndex][1]
     stemList = modelList[prevIndex][1]
@@ -108,13 +106,7 @@ def enterParameters(currentIndex, prevIndex, fluxPars = {}):
                 AllModels(1)(indx).values = stemList[fullName]
             elif fullName in mainList:
                 AllModels(1)(indx).values = mainList[fullName]
-    
-    if fluxPars != {}:
-        compObj = AllModels(1).cflux
-        for key, val in fluxPars.items():
-            parObj = getattr(compObj, key)
-            parObj.values = val
-
+ 
 def fitModel():
     Fit.nIterations = 100
     Fit.delta = 0.01
@@ -203,6 +195,12 @@ def extractModFileName():
     
     return fileName
 #===================================================================================================================
+# Find the script's own path
+scriptPath = os.path.abspath(__file__)
+scriptPathRev = scriptPath[::-1]
+scriptPathRev = scriptPathRev[scriptPathRev.find("/") + 1:]
+scriptDir = scriptPathRev[::-1]
+
 allDir = os.listdir(outputDir)
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
 iteration = 0
@@ -246,15 +244,17 @@ for obsid in allDir:
     # From now on, PyXspec will be utilized for fitting and comparing models
     file = open(resultsFile, "w")
     Xset.openLog("xspec_output.log")
-    if chatterOn == False: Xset.chatter = 0
+    if chatterOn == False: 
+        Xset.chatter = 0
     Xset.abund = "wilm"
+    Xset.seed = 2
     Fit.query = "yes"
 
     # Load the necessary files
     s1 = Spectrum(dataFile=spectrumFile, arfFile=arfFile, respFile=rmfFile, backFile=backgroundFile)
     Plot.xAxis = "keV"
     AllData.ignore("bad")
-    AllData(1).ignore("**-"+energyFilter+"-**")
+    AllData(1).ignore("**-1.5 10.-**")
     saveData()
     
     # Initialize the index values of models for comparing them in a loop
@@ -270,11 +270,10 @@ for obsid in allDir:
         m = Model(modelList[mainIdx][0])
         modFileName = extractModFileName()
         mainModelFile = commonDirectory + "/" + modFileName
-        modelPath = Path(mainModelFile)
-        if modelPath.exists():
+        if Path(mainModelFile).exists():
             Xset.restore(mainModelFile)
         else:
-            enterParameters(mainIdx, prevIdx)
+            getParsFromList(mainIdx, prevIdx)
 
         fitModel()
         updateParameters(mainIdx)
@@ -287,11 +286,10 @@ for obsid in allDir:
         m = Model(modelList[alternativeIdx][0])
         modFileName = extractModFileName()
         alternativeModelFile = commonDirectory + "/" + modFileName
-        modelPath = Path(alternativeModelFile)
-        if modelPath.exists():
+        if Path(alternativeModelFile).exists():
             Xset.restore(alternativeModelFile)
         else:
-            enterParameters(alternativeIdx, prevIdx)
+            getParsFromList(alternativeIdx, prevIdx)
 
         fitModel()
         updateParameters(alternativeIdx)
@@ -356,7 +354,7 @@ for obsid in allDir:
                                 quit()
 
             m = Model(modelName)
-            enterParameters(bestIdx, bestIdx)
+            getParsFromList(bestIdx, bestIdx)
 
             Plot("chi")
             residX = Plot.x()
@@ -366,8 +364,9 @@ for obsid in allDir:
             binSize = len(residX) * 5 // 100    # 5% length of total bin number
             shiftSize = binSize // 2 + 1
             threshold = 50  # Unit: delta chi-squared
-            newGroupsX = []; newGroupsY = []
+
             # targetX and targetY will store the groups containing values bigger than the threshold
+            newGroupsX = []; newGroupsY = []
             targetX = []; targetY = []
             tempSumX = 0; tempSumY = 0
             pointer = 0
@@ -410,8 +409,7 @@ for obsid in allDir:
                 if switchVphabs:
                     modelName = AllModels(1).expression.replace("TBabs", "vphabs", 1)
                     m = Model(modelName)
-                    modFileName = extractModFileName()
-                    enterParameters(bestIdx, bestIdx)
+                    getParsFromList(bestIdx, bestIdx)
 
                     AllModels(1)(8).frozen = False  # Mg
                     fitModel()
@@ -448,7 +446,7 @@ for obsid in allDir:
                     modelNamev1 =AllModels(1).expression + "+gauss+gauss"
                     modelNamev2 = AllModels(1).expression[:AllModels(1).expression.find("diskbb") + 6] + "+gauss+gauss" + AllModels(1).expression[AllModels(1).expression.find("diskbb") + 6:]
                     m = Model(modelNamev2)
-                    enterParameters(bestIdx, bestIdx)
+                    getParsFromList(bestIdx, bestIdx)
                     gabsEnergies = ["1.55 -1", "1.8 -1"]
                     gabsCounter = 0
                     comps = AllModels(1).componentNames[::-1]
@@ -479,6 +477,7 @@ for obsid in allDir:
     else:
         # Save the new model without powerlaw
         modFileName = extractModFileName()
+        writeBestFittingModel(file)
         saveModel(modFileName, obsid)
         saveModel(modFileName, obsid, commonDirectory)
 
@@ -553,6 +552,9 @@ if switchVphabs and refitVphabs:
         
         modFileName = extractModFileName()
         fitModel()
+        file.write("\n===========================================================\n")
+        file.write("Results after refitting vphabs with weighted average values")
+        file.write("\n===========================================================\n")
         writeBestFittingModel(file)
         saveModel(modFileName, obsid)
         saveModel(modFileName, obsid, commonDirectory)
@@ -566,3 +568,6 @@ if switchVphabs and refitVphabs:
         file.close()
         AllModels.clear()
         AllData.clear()
+
+        # Plot the changes in vhpabs values and save it under commonDirectory
+        os.system("python3 " +scriptDir +"/nicer_vphabs.py")

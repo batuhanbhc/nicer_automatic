@@ -1,4 +1,0 @@
-- Check if residuals are at lower energies (<2 keV) or higher energies. If at lower energies, do not add a power-law.
-- After solving powerlaw issue, try to add a couple absorption gaussians for the low energy region
-- Figure out how to initialize the parameters better
-- Find a way to link certain variables (energyFilter, script names, log file name etc.) inbetween scripts instead of manually changing them in each script
