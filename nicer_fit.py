@@ -186,19 +186,20 @@ def extractModFileName():
     
     return fileName
 
-def removeComp(compName, compNum, modelList):
-    iterator = 1
-    targetCounter = 1
+def removeComp(compName, compNum, modelList):   # compNum is the n'th occurence of a spesific model, it is not the component number in general
+    iteration = 1
+    targetModelCounter = 1
     deletedCompIndex = 999
-    firstEncounter = True
+    modelFirstEncounter = True
     tempDict = {}
     modelName = AllModels(1).expression.replace(" ", "")
 
+    # This loop iterates over each component, and assigns the model parameters with their values only if they do not belong to the targeted model
     for comp in AllModels(1).componentNames:
-        if  targetCounter != compNum or (compName not in comp):
+        if  targetModelCounter != compNum or (compName not in comp):
             compObj = getattr(AllModels(1), comp)
             if compName in comp:
-                if firstEncounter == True and "_" in comp:
+                if modelFirstEncounter == True and "_" in comp:
                     for par in compObj.parameterNames:
                         parObj = getattr(compObj, par)
                         newComp = comp[:comp.find("_")]
@@ -216,8 +217,8 @@ def removeComp(compName, compNum, modelList):
                         fullName = comp + "." + par
                         tempDict[fullName] = parObj.values
 
-                firstEncounter = False
-                targetCounter += 1
+                modelFirstEncounter = False
+                targetModelCounter += 1
             else:
                 for par in compObj.parameterNames:
                     parObj = getattr(compObj, par)
@@ -229,11 +230,12 @@ def removeComp(compName, compNum, modelList):
                         fullName = comp + "." + par
                         tempDict[fullName] = parObj.values
         else:
-            targetCounter += 1
-            deletedCompIndex = iterator
+            targetModelCounter += 1
+            deletedCompIndex = iteration
         
-        iterator += 1
+        iteration += 1
 
+    # Look for the position of the targeted model component, then remove it from the model expression
     try: 
         test = modelName.index("+" + compName + "+")
         modelName = modelName.replace("+" + compName + "+", "+", 1) 
@@ -254,7 +256,11 @@ def removeComp(compName, compNum, modelList):
                         test = modelName.index("*" + compName)
                         modelName = modelName.replace("*" + compName, "", 1)
                     except:
-                        modelName = modelName.replace(compName, "", 1)
+                        try:
+                            test = modelName.index("(" + compName + ")")
+                            modelName = modelName.replace("(" + compName +")", "", 1)
+                        except:
+                            modelName = modelName.replace(compName, "", 1)
 
     modelList[1] = tempDict
     m = Model(modelName)
@@ -297,6 +303,35 @@ def alter_list_add(addedIdx, bestModelList):
                 newKey = modelKeys[i].replace(compNum, str(int(compNum)-1))
                 bestModelList[1].pop(modelKeys[i])
                 bestModelList[1][newKey] = modelValues[i]
+
+def wordCounter(source, word):
+    start = 0
+    count = 0
+    while True:
+        idx = source.find(word, start)
+
+        if idx == -1:
+            break
+        else:
+            start = idx + 1
+            count += 1
+    
+    return count
+
+def assignParameters(compName, parameterList, nthOccurence):
+    startAssign = False
+    occurence = 0
+    for comp in AllModels(1).componentNames:
+        compObj = getattr(AllModels(1), comp)
+        if compName in comp:
+            occurence += 1
+            if occurence == nthOccurence:
+                print(comp)
+                listIndex = 0
+                for par in compObj.parameterNames:
+                    parObj = getattr(compObj, par)
+                    parObj.values = parameterList[listIndex]
+                    listIndex += 1
 
 #===================================================================================================================
 # Find the script's own path
@@ -368,7 +403,7 @@ for obsid in allDir:
     s1 = Spectrum(dataFile=spectrumFile, arfFile=arfFile, respFile=rmfFile, backFile=backgroundFile)
     Plot.xAxis = "keV"
     AllData.ignore("bad")
-    AllData(1).ignore("**-1.5 10.-**")
+    AllData(1).ignore("**-0.5 10.-**")
     saveData()
     
     # Initialize the index values of models for comparing them in a loop
@@ -382,8 +417,8 @@ for obsid in allDir:
 
         # Define the current main model
         m = Model(modelList[mainIdx][0])
-        modFileName = extractModFileName()
-        mainModelFile = commonDirectory + "/" + modFileName
+        mainModFileName = extractModFileName()
+        mainModelFile = commonDirectory + "/" + mainModFileName
         if Path(mainModelFile).exists():
             Xset.restore(mainModelFile)
         else:
@@ -391,15 +426,15 @@ for obsid in allDir:
 
         fitModel()
         updateParameters(modelList[mainIdx])
-        saveModel(modFileName, obsid)
-        saveModel(modFileName, obsid, commonDirectory)
+        saveModel(mainModFileName, obsid)
+        saveModel(mainModFileName, obsid, commonDirectory)
 
         file.write("Alternative model: " + modelList[alternativeIdx][0] + "\n")
 
         # Define the alternative model
         m = Model(modelList[alternativeIdx][0])
-        modFileName = extractModFileName()
-        alternativeModelFile = commonDirectory + "/" + modFileName
+        altModFileName = extractModFileName()
+        alternativeModelFile = commonDirectory + "/" + altModFileName
         if Path(alternativeModelFile).exists():
             Xset.restore(alternativeModelFile)
         else:
@@ -407,8 +442,8 @@ for obsid in allDir:
 
         fitModel()
         updateParameters(modelList[alternativeIdx])
-        saveModel(modFileName, obsid)
-        saveModel(modFileName, obsid, commonDirectory)
+        saveModel(altModFileName, obsid)
+        saveModel(altModFileName, obsid, commonDirectory)
 
         # Apply the f-test
         newChi = modelList[alternativeIdx][2]["chi"]
@@ -416,7 +451,7 @@ for obsid in allDir:
         oldChi = modelList[mainIdx][2]["chi"]
         oldDof = modelList[mainIdx][2]["dof"]
         p_value = Fit.ftest(newChi, newDof, oldChi, oldDof)
-        file.write("Ftest: " + str(newChi) +" | "+ str(newDof) +" | "+ str(oldChi) +" | "+ str(oldDof) +"\n\n")
+        file.write("Ftest parameters: " + str(newChi) +" | "+ str(newDof) +" | "+ str(oldChi) +" | "+ str(oldDof) +"\n\n")
 
         if abs(p_value) < ftestCrit:    
             # Alternative model has significantly improved the fit, set the alternative model as new main model
@@ -430,19 +465,44 @@ for obsid in allDir:
 
     # At the end of the loop, mainIdx will hold the best fitting model. Reload the model
     Xset.restore(mainModelFile)
+    mainModelName = AllModels(1).expression
 
     # Create another entry in modelList, which will carry the best model with further changes to it
     modelList.append([modelList[mainIdx][0]])
-    bestDict = {}
+
+    parsDict = {}
     for key,val in modelList[mainIdx][1].items():
-        bestDict[key] = val
-    modelList[-1].append(bestDict)
-    modelList[-1].append(modelList[mainIdx][2])
+        parsDict[key] = val
+    modelList[-1].append(parsDict)
+
+    statsDict = {}
+    for key,val in modelList[mainIdx][2].items():
+        statsDict[key] = val
+    modelList[-1].append(statsDict)
 
     bestModel = modelList[-1]
 
-    Plot("model")
-    addCompNum = Plot.nAddComps()
+    # Try to add another gauss at 6.7 keV, remove if it does not significantly improve the fit
+    gaussParList = ["6.7, 1e-3, 6.5, 6.5, 6.9, 6.9", "0.05", "-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"]
+    addComp("gauss", "diskbb", "after", "+", bestModel)
+
+    altModelName = AllModels(1).expression
+    gaussCount = wordCounter(altModelName, "gauss")
+    assignParameters("gauss", gaussParList, gaussCount)
+    fitModel()
+    updateParameters(bestModel)
+    saveModel(extractModFileName(), obsid)
+    
+    # Apply f-test
+    oldChi = modelList[mainIdx][2]["chi"]
+    oldDof = modelList[mainIdx][2]["dof"]
+    newChi = bestModel[2]["chi"]
+    newDof = bestModel[2]["dof"]
+
+    p_value = Fit.ftest(newChi, newDof, oldChi, oldDof)
+    if abs(p_value) >= ftestCrit:    
+        # Insignificant, take the last gauss out
+        removeComp("gaussian", gaussCount, bestModel)
 
     # Check the region where the powerlaw is trying to fit, if the region is located below 2 keV, do not add powerlaw component.
     powOut = False
