@@ -20,7 +20,7 @@ ftestCrit = 0.005
 
 chatterOn = True
 
-switchVphabs = True       # If powerlaw is taken out due to fitting lower energies, switchVphabs = True will replace TBabs with vphabs to look
+addPcfabs = True       # If powerlaw is taken out due to fitting lower energies, switchVphabs = True will replace TBabs with vphabs to look
                             # for elemental abundances. If set to False, the script will add absorption gausses to account for the low energy region phenomenologically.
 
 refitVphabs = True         # If set to True, the script will go through all observations that have vphabs model instead of after taking out powerlaw,
@@ -75,7 +75,7 @@ def listToStr(array):
     result = result[:-1]
     return result
 
-def getParsFromList(currentModList, prevModList):
+def getParsFromList(currentModList, prevModList, ignoreList = []):
     modelName = currentModList[0]
     mainList = currentModList[1]
     stemList = prevModList[1]
@@ -85,18 +85,21 @@ def getParsFromList(currentModList, prevModList):
     # Take the available parameters from the stemList
     components = AllModels(1).componentNames
     for comp in components:
-        compObj = getattr(AllModels(1), comp)
-        parameters = compObj.parameterNames
-        for par in parameters:
-            parObj = getattr(compObj, par)
-            indx = parObj.index
-            fullName = comp + "." + par
-            # If the parameter value is stored in previous model's list, take it from there. Otherwise, look whether
-            # it is initialized in current model's list
-            if fullName in stemList:
-                AllModels(1)(indx).values = stemList[fullName]
-            elif fullName in mainList:
-                AllModels(1)(indx).values = mainList[fullName]
+        if comp in ignoreList:
+            pass
+        else:
+            compObj = getattr(AllModels(1), comp)
+            parameters = compObj.parameterNames
+            for par in parameters:
+                parObj = getattr(compObj, par)
+                indx = parObj.index
+                fullName = comp + "." + par
+                # If the parameter value is stored in previous model's list, take it from there. Otherwise, look whether
+                # it is initialized in current model's list
+                if fullName in stemList:
+                    AllModels(1)(indx).values = stemList[fullName]
+                elif fullName in mainList:
+                    AllModels(1)(indx).values = mainList[fullName]
  
 def fitModel():
     Fit.nIterations = 100
@@ -285,22 +288,29 @@ def addComp(compName, targetComp ,before_after, calcChar, modelList):
         quit()
     
     newModelName = modelName[:targetIdx] + insertionText + modelName[targetIdx:]
+
+    alter_list_add(compName, addedCompIndex, modelList)
     m = Model(newModelName)
-    alter_list_add(addedCompIndex, modelList)
+    modelList[0] = AllModels(1).expression.replace(" ", "")
     getParsFromList(modelList, modelList)
     modelList[1] = {}
     updateParameters(modelList)
 
-def alter_list_add(addedIdx, bestModelList):
-    bestModelList[0] = AllModels(1).expression.replace(" ", "")
-    modelKeys = list(bestModelList[1].keys())
-    modelValues = list(bestModelList[1].values())
+def alter_list_add(compName, addedIdx, bestModelList):
+    modelKeys = list(bestModelList[1].keys())[::-1]
+    modelValues = list(bestModelList[1].values())[::-1]
     
     for i in range(len(modelKeys)):
         if "_" in modelKeys[i]:
             compNum = modelKeys[i][modelKeys[i].find("_") + 1: modelKeys[i].find(".")]
             if int(compNum) > addedIdx:
-                newKey = modelKeys[i].replace(compNum, str(int(compNum)-1))
+                newKey = modelKeys[i].replace(compNum, str(int(compNum)+1))
+                bestModelList[1].pop(modelKeys[i])
+                bestModelList[1][newKey] = modelValues[i]
+        elif compName in modelKeys[i]:
+            compIdx = AllModels(1).componentNames.index(compName) + 1
+            if compIdx >= addedIdx:
+                newKey = modelKeys[i][: modelKeys[i].find(".")] + "_" + str(compIdx + 1) + modelKeys[i][modelKeys[i].find(".") :]
                 bestModelList[1].pop(modelKeys[i])
                 bestModelList[1][newKey] = modelValues[i]
 
@@ -326,7 +336,6 @@ def assignParameters(compName, parameterList, nthOccurence):
         if compName in comp:
             occurence += 1
             if occurence == nthOccurence:
-                print(comp)
                 listIndex = 0
                 for par in compObj.parameterNames:
                     parObj = getattr(compObj, par)
@@ -451,7 +460,7 @@ for obsid in allDir:
         oldChi = modelList[mainIdx][2]["chi"]
         oldDof = modelList[mainIdx][2]["dof"]
         p_value = Fit.ftest(newChi, newDof, oldChi, oldDof)
-        file.write("Ftest parameters: " + str(newChi) +" | "+ str(newDof) +" | "+ str(oldChi) +" | "+ str(oldDof) +"\n\n")
+        file.write("Ftest parameters: " + str(newChi) +" | "+ str(newDof) +" | "+ str(oldChi) +" | "+ str(oldDof) +" | P-value:"+str(p_value)+"\n\n")
 
         if abs(p_value) < ftestCrit:    
             # Alternative model has significantly improved the fit, set the alternative model as new main model
@@ -465,7 +474,7 @@ for obsid in allDir:
 
     # At the end of the loop, mainIdx will hold the best fitting model. Reload the model
     Xset.restore(mainModelFile)
-    mainModelName = AllModels(1).expression
+    mainModelName = AllModels(1).expression.replace(" ", "")
 
     # Create another entry in modelList, which will carry the best model with further changes to it
     modelList.append([modelList[mainIdx][0]])
@@ -484,25 +493,27 @@ for obsid in allDir:
 
     # Try to add another gauss at 6.7 keV, remove if it does not significantly improve the fit
     gaussParList = ["6.7, 1e-3, 6.5, 6.5, 6.9, 6.9", "0.05", "-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"]
-    addComp("gauss", "diskbb", "after", "+", bestModel)
+    addComp("gaussian", "diskbb", "after", "+", bestModel)
 
-    altModelName = AllModels(1).expression
-    gaussCount = wordCounter(altModelName, "gauss")
-    assignParameters("gauss", gaussParList, gaussCount)
+    altModelName = bestModel[0].replace(" ", "")
+    assignParameters("gauss", gaussParList, 1)
+
     fitModel()
     updateParameters(bestModel)
     saveModel(extractModFileName(), obsid)
     
-    # Apply f-test
     oldChi = modelList[mainIdx][2]["chi"]
     oldDof = modelList[mainIdx][2]["dof"]
     newChi = bestModel[2]["chi"]
     newDof = bestModel[2]["dof"]
 
+    # Apply f-test
+    file.write("\nNull hypothesis model: " + mainModelName + " - Alternative model: " + altModelName + "\n")
     p_value = Fit.ftest(newChi, newDof, oldChi, oldDof)
+    file.write("Ftest parameters: " + str(newChi) +" | "+ str(newDof) +" | "+ str(oldChi) +" | "+ str(oldDof) +" | Probability:"+str(p_value)+"\n\n")
     if abs(p_value) >= ftestCrit:    
-        # Insignificant, take the last gauss out
-        removeComp("gaussian", gaussCount, bestModel)
+        # Insignificant, take the gauss out
+        removeComp("gaussian", 1, bestModel)
 
     # Check the region where the powerlaw is trying to fit, if the region is located below 2 keV, do not add powerlaw component.
     powOut = False
@@ -558,46 +569,48 @@ for obsid in allDir:
             file.write("\n===============================================================================\n")
             file.write("Powerlaw has been taken out due to trying to fit lower energies (> 2 keV).\n")
             file.write("===============================================================================\n")
+            
+            if addPcfabs:
+                addComp("pcfabs", "TBabs", "after", "*", bestModel)
 
-            if switchVphabs:
-                modelName = AllModels(1).expression.replace("TBabs", "vphabs", 1)
-                m = Model(modelName)
-                getParsFromList(bestModel, bestModel)
-
-                AllModels(1)(8).frozen = False  # Mg
-                fitModel()
-                AllModels(1)(10).frozen = False # Si
-                fitModel()
-                AllModels(1)(11).frozen = False # S
-                fitModel()
-                AllModels(1)(5).frozen = False  # O
-                fitModel()
-                AllModels(1)(6).frozen = False  # Ne
-                fitModel()
-                AllModels(1)(16).frozen = False # Fe
-                fitModel()
-
-                # Saving vphabs parameter values with their weights (currently, arithmetic mean calculation)
-                comps = AllModels(1).componentNames
-                for comp in comps:
-                    if comp == "vphabs":
-                        compObj = getattr(AllModels(1), comp)
-                        pars = compObj.parameterNames
-                        for par in pars:
-                            parObj = getattr(compObj, par)
-                            fullName = comp + "." + par
-                            if parObj.values[1] > 0:   # Non-frozen parameter
-                                val = parObj.values[0]
-                                weight = 1  # Change the weight according to your needs
-                                if fullName in vphabsPars:
-                                    vphabsPars[fullName].append((val, weight))
-                                else:
-                                    vphabsPars[fullName] = [(val, weight)]
+                mainModFileName = extractModFileName()
+                mainModelName = bestModel[0]
+                if Path(commonDirectory + "/" + mainModFileName).exists():
+                    Xset.restore(commonDirectory + "/" + mainModFileName)
+                    getParsFromList(bestModel, bestModel, ["pcfabs"])
+                else:
+                    pcfabsPars = ["7", "0.8"]
+                    assignParameters("pcfabs", pcfabsPars, 1)
                 
-                vphabsObs.append(obsid)
+                fitModel()
+                updateParameters(bestModel)
+                oldChi = bestModel[2]["chi"]
+                oldDof = bestModel[2]["dof"]
+
+                # Add an emission line at 1.8 keV (A gold line?)
+                gaussPars = ["1.8", "0.07", "0.01"]
+                addComp("gaussian", "diskbb", "after", "+", bestModel)
+
+                altModelName = bestModel[0]
+                getParsFromList(bestModel, bestModel)
+                assignParameters("gauss", gaussPars, 1)
+                
+                fitModel()
+                updateParameters(bestModel)
+                newChi = bestModel[2]["chi"]
+                newDof = bestModel[2]["dof"]
+
+                # Apply f-test
+                file.write("\nNull hypothesis model: " + mainModelName+ " - Alternative model: " + altModelName + "\n")
+                p_value = Fit.ftest(newChi, newDof, oldChi, oldDof)
+                file.write("Ftest parameters: " + str(newChi) +" | "+ str(newDof) +" | "+ str(oldChi) +" | "+ str(oldDof) +" | Probability:"+str(p_value)+"\n\n")
+                if abs(p_value) >= ftestCrit:    
+                    # Insignificant, take the gauss out
+                    removeComp("gaussian", 1, bestModel)
+
             else:
-                addComp("gauss", "diskbb", "after", "+", bestModel)
-                addComp("gauss", "diskbb", "after", "+", bestModel)
+                addComp("gaussian", "diskbb", "after", "+", bestModel)
+                addComp("gaussian", "diskbb", "after", "+", bestModel)
                 gaussEnergies = ["1.55 -1", "1.8 -1"]
                 gaussCounter = 0
                 comps = AllModels(1).componentNames[::-1]
@@ -613,7 +626,6 @@ for obsid in allDir:
 
                 fitModel()
                 shakefit(file)
-                writeBestFittingModel(file)
 
     if powOut == False:
         # Restore the best-fitting model back
@@ -656,7 +668,7 @@ for obsid in allDir:
         file.write("pl ld chi")
         file.close()
     
-if switchVphabs and refitVphabs:
+"""if switchVphabs and refitVphabs:
     # Calculate the weighted average of parameter values
     weightedAvg = {}
     for key,val in vphabsPars.items():
@@ -721,4 +733,4 @@ if switchVphabs and refitVphabs:
         AllData.clear()
 
         # Plot the changes in vhpabs values and save it under commonDirectory
-        os.system("python3 " +scriptDir +"/nicer_vphabs.py")
+        os.system("python3 " +scriptDir +"/nicer_vphabs.py")"""
