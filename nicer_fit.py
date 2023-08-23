@@ -18,15 +18,6 @@ resultsFile = "script_results.log"
 # Critical value for F-test
 ftestCrit = 0.005
 
-# The list for models for fitting. The models will be compared using ftest within a loop.
-# The structure of the list: 
-# [ 1:<model name> 2:<parameter list> 3:<Fit results>  
-modelList = [
-    ["tbabs*diskbb", {"TBabs.nH": 8}, {}],
-    ["tbabs*(diskbb+powerlaw)", {"powerlaw.PhoIndex": 2}, {}],
-    ["tbabs*(diskbb+powerlaw+gauss)", {"gaussian.LineE": "6.98,1e-3,6.95,6.95,7.1,7.1", "gaussian.Sigma": "0.03,1e-3,0.001,0.001,0.1,0.1", "gaussian.norm":"-1e-3,1e-4,-1e12,-1e12,-1e-12,-1e-12"}, {}]
-]
-
 chatterOn = True
 
 switchVphabs = True       # If powerlaw is taken out due to fitting lower energies, switchVphabs = True will replace TBabs with vphabs to look
@@ -84,10 +75,10 @@ def listToStr(array):
     result = result[:-1]
     return result
 
-def getParsFromList(currentIndex, prevIndex):
-    modelName = modelList[currentIndex][0]
-    mainList = modelList[currentIndex][1]
-    stemList = modelList[prevIndex][1]
+def getParsFromList(currentModList, prevModList):
+    modelName = currentModList[0]
+    mainList = currentModList[1]
+    stemList = prevModList[1]
 
     parNum = AllModels(1).nParameters
 
@@ -112,9 +103,9 @@ def fitModel():
     Fit.delta = 0.01
     Fit.perform()
 
-def updateParameters(modelIndex):
-    modelDict = modelList[modelIndex][1]
-    modelStats = modelList[modelIndex][2]
+def updateParameters(modList):
+    modelDict = modList[1]
+    modelStats = modList[2]
 
     # Save the parameters loaded in the xspec model to lists
     components = AllModels(1).componentNames
@@ -194,6 +185,119 @@ def extractModFileName():
     fileName += compPart + ".xcm"
     
     return fileName
+
+def removeComp(compName, compNum, modelList):
+    iterator = 1
+    targetCounter = 1
+    deletedCompIndex = 999
+    firstEncounter = True
+    tempDict = {}
+    modelName = AllModels(1).expression.replace(" ", "")
+
+    for comp in AllModels(1).componentNames:
+        if  targetCounter != compNum or (compName not in comp):
+            compObj = getattr(AllModels(1), comp)
+            if compName in comp:
+                if firstEncounter == True and "_" in comp:
+                    for par in compObj.parameterNames:
+                        parObj = getattr(compObj, par)
+                        newComp = comp[:comp.find("_")]
+                        fullName = newComp + "." + par
+                        tempDict[fullName] = parObj.values
+                elif "_" in comp and deletedCompIndex <= int(comp[comp.find("_") + 1:]):
+                    for par in compObj.parameterNames:
+                        parObj = getattr(compObj, par)
+                        newComp = comp[:comp.find("_") + 1] + str(int(comp[comp.find("_") + 1:]) - 1)
+                        fullName = newComp + "." + par
+                        tempDict[fullName] = parObj.values
+                else:
+                    for par in compObj.parameterNames:
+                        parObj = getattr(compObj, par)
+                        fullName = comp + "." + par
+                        tempDict[fullName] = parObj.values
+
+                firstEncounter = False
+                targetCounter += 1
+            else:
+                for par in compObj.parameterNames:
+                    parObj = getattr(compObj, par)
+                    if "_" in comp and deletedCompIndex <= int(comp[comp.find("_") + 1:]):
+                        newComp = comp[:comp.find("_") + 1] + str(int(comp[comp.find("_") + 1:]) - 1)
+                        fullName = newComp + "." + par
+                        tempDict[fullName] = parObj.values
+                    else:
+                        fullName = comp + "." + par
+                        tempDict[fullName] = parObj.values
+        else:
+            targetCounter += 1
+            deletedCompIndex = iterator
+        
+        iterator += 1
+
+    try: 
+        test = modelName.index("+" + compName + "+")
+        modelName = modelName.replace("+" + compName + "+", "+", 1) 
+    except:
+        try: 
+            test = modelName.index("+" + compName)
+            modelName = modelName.replace("+" + compName, "", 1) 
+        except: 
+            try: 
+                test = modelName.index(compName + "+")
+                modelName = modelName.replace(compName + "+", "", 1)
+            except: 
+                try: 
+                    test = modelName.index(compName + "*")
+                    modelName = modelName.replace(compName + "*", "", 1)
+                except:
+                    try:
+                        test = modelName.index("*" + compName)
+                        modelName = modelName.replace("*" + compName, "", 1)
+                    except:
+                        modelName = modelName.replace(compName, "", 1)
+
+    modelList[1] = tempDict
+    m = Model(modelName)
+    getParsFromList(modelList, modelList)
+
+def addComp(compName, targetComp ,before_after, calcChar, modelList):
+    modelName = AllModels(1).expression
+    if calcChar != "*" and calcChar != "+":
+        print("\nIncorrect character for model expression. Terminating the script...\n")
+        quit()
+
+    if before_after == "before":
+        targetIdx = modelName.find(targetComp)
+        insertionText = compName + calcChar
+        addedCompIndex = AllModels(1).componentNames.index(targetComp) + 1
+    elif before_after == "after":
+        targetIdx = modelName.find(targetComp) + len(targetComp)
+        insertionText = calcChar + compName
+        addedCompIndex = AllModels(1).componentNames.index(targetComp) + 2
+    else:
+        print("\nIncorrect entry for the placement of new component around the target component. Terminating the script...\n")
+        quit()
+    
+    newModelName = modelName[:targetIdx] + insertionText + modelName[targetIdx:]
+    m = Model(newModelName)
+    alter_list_add(addedCompIndex, modelList)
+    getParsFromList(modelList, modelList)
+    modelList[1] = {}
+    updateParameters(modelList)
+
+def alter_list_add(addedIdx, bestModelList):
+    bestModelList[0] = AllModels(1).expression.replace(" ", "")
+    modelKeys = list(bestModelList[1].keys())
+    modelValues = list(bestModelList[1].values())
+    
+    for i in range(len(modelKeys)):
+        if "_" in modelKeys[i]:
+            compNum = modelKeys[i][modelKeys[i].find("_") + 1: modelKeys[i].find(".")]
+            if int(compNum) > addedIdx:
+                newKey = modelKeys[i].replace(compNum, str(int(compNum)-1))
+                bestModelList[1].pop(modelKeys[i])
+                bestModelList[1][newKey] = modelValues[i]
+
 #===================================================================================================================
 # Find the script's own path
 scriptPath = os.path.abspath(__file__)
@@ -242,6 +346,16 @@ for obsid in allDir:
 
     #-------------------------------------------------------------------------------------    
     # From now on, PyXspec will be utilized for fitting and comparing models
+
+    # The list for models for fitting. The models will be compared using ftest within a loop.
+    # The structure of the list: 
+    # [ 1:<model name> 2:<parameter list> 3:<Fit results>  
+    modelList = [
+        ["TBabs*diskbb", {"TBabs.nH": 8}, {}],
+        ["TBabs*(diskbb+powerlaw)", {"powerlaw.PhoIndex": 2}, {}],
+        ["TBabs*(diskbb+powerlaw+gaussian)", {"gaussian.LineE": "6.98,1e-3,6.95,6.95,7.1,7.1", "gaussian.Sigma": "0.03,1e-3,0.001,0.001,0.1,0.1", "gaussian.norm":"-1e-3,1e-4,-1e12,-1e12,-1e-12,-1e-12"}, {}]
+    ]
+    
     file = open(resultsFile, "w")
     Xset.openLog("xspec_output.log")
     if chatterOn == False: 
@@ -273,10 +387,10 @@ for obsid in allDir:
         if Path(mainModelFile).exists():
             Xset.restore(mainModelFile)
         else:
-            getParsFromList(mainIdx, prevIdx)
+            getParsFromList(modelList[mainIdx], modelList[prevIdx])
 
         fitModel()
-        updateParameters(mainIdx)
+        updateParameters(modelList[mainIdx])
         saveModel(modFileName, obsid)
         saveModel(modFileName, obsid, commonDirectory)
 
@@ -289,10 +403,10 @@ for obsid in allDir:
         if Path(alternativeModelFile).exists():
             Xset.restore(alternativeModelFile)
         else:
-            getParsFromList(alternativeIdx, prevIdx)
+            getParsFromList(modelList[alternativeIdx], modelList[prevIdx])
 
         fitModel()
-        updateParameters(alternativeIdx)
+        updateParameters(modelList[alternativeIdx])
         saveModel(modFileName, obsid)
         saveModel(modFileName, obsid, commonDirectory)
 
@@ -313,156 +427,133 @@ for obsid in allDir:
             prevIdx = alternativeIdx
         
         alternativeIdx += 1
-    
+
     # At the end of the loop, mainIdx will hold the best fitting model. Reload the model
-    bestIdx = mainIdx
     Xset.restore(mainModelFile)
+
+    # Create another entry in modelList, which will carry the best model with further changes to it
+    modelList.append([modelList[mainIdx][0]])
+    bestDict = {}
+    for key,val in modelList[mainIdx][1].items():
+        bestDict[key] = val
+    modelList[-1].append(bestDict)
+    modelList[-1].append(modelList[mainIdx][2])
+
+    bestModel = modelList[-1]
+
     Plot("model")
     addCompNum = Plot.nAddComps()
-    
+
     # Check the region where the powerlaw is trying to fit, if the region is located below 2 keV, do not add powerlaw component.
     powOut = False
     if "powerlaw" in AllModels(1).expression:
-        if addCompNum == 1:
-            print("There must be at least one additive component in the model.")
-            print("Powerlaw cannot be taken out of model expression.")
-        else:
-            modelName = AllModels(1).expression.replace(" ", "")
-            # This part tries to find the location of the powerlaw component in the model expression by manually checking its surrounding characters
-            # When it finds the powerlaw's location, it deletes it from the expression.
-            try: 
-                test = modelName.index("+powerlaw+")
-                modelName = modelName.replace("+powerlaw+", "+", 1) 
+        removeComp("powerlaw", 1, bestModel)
+
+        Plot("chi")
+        residX = Plot.x()
+        residY = Plot.y()
+
+        # Group every {binSize} delta chi-sq bins, start rebinning next group with the previous group's last {shiftSize} bins (overlapping groups)
+        binSize = len(residX) * 5 // 100    # 5% length of total bin number
+        shiftSize = binSize // 2 + 1
+        threshold = 50  # Unit: delta chi-squared
+
+        # targetX and targetY will store the groups containing values bigger than the threshold
+        newGroupsX = []; newGroupsY = []
+        targetX = []; targetY = []
+        tempSumX = 0; tempSumY = 0
+        pointer = 0
+        counter = 0
+        while True:
+            try:
+                counter += 1
+                tempSumX += residX[pointer]
+                tempSumY += residY[pointer]
+
+                if counter == binSize:
+                    counter = 0
+                    pointer -= shiftSize
+                    newGroupsX.append(tempSumX / binSize);  newGroupsY.append(tempSumY / binSize)
+                    if tempSumY / binSize >= threshold:
+                        targetX.append(tempSumX / binSize);     targetY.append(tempSumY / binSize)
+
+                    tempSumY = 0;   tempSumX = 0
             except:
-                try: 
-                    test = modelName.index("+powerlaw")
-                    modelName = modelName.replace("+powerlaw", "", 1) 
-                except: 
-                    try: 
-                        test = modelName.index("powerlaw+")
-                        modelName = modelName.replace("powerlaw+", "", 1)
-                    except: 
-                        try: 
-                            test = modelName.index("powerlaw*")
-                            modelName = modelName.replace("powerlaw*", "", 1)
-                        except:
-                            try:
-                                test = modelName.index("*powerlaw")
-                                modelName = modelName.replace("*powerlaw", "", 1)
-                            except:
-                                print("Unknown powerlaw placement in model expression. Please revise and change the script accordingly.")
-                                quit()
+                if counter != 1:
+                    # There is a left over group at the end that has number of bins lower than binSize
+                    newGroupsX.append(tempSumX / counter);  newGroupsY.append(tempSumY / counter)
+                    if tempSumY / binSize >= threshold:
+                        targetX.append(tempSumX / counter);     targetY.append(tempSumY / counter)
 
-            m = Model(modelName)
-            getParsFromList(bestIdx, bestIdx)
-
-            Plot("chi")
-            residX = Plot.x()
-            residY = Plot.y()
-
-            # Group every {binSize} delta chi-sq bins, start rebinning next group with the previous group's last {shiftSize} bins (overlapping groups)
-            binSize = len(residX) * 5 // 100    # 5% length of total bin number
-            shiftSize = binSize // 2 + 1
-            threshold = 50  # Unit: delta chi-squared
-
-            # targetX and targetY will store the groups containing values bigger than the threshold
-            newGroupsX = []; newGroupsY = []
-            targetX = []; targetY = []
-            tempSumX = 0; tempSumY = 0
-            pointer = 0
-            counter = 0
-            while True:
-                try:
-                    counter += 1
-                    tempSumX += residX[pointer]
-                    tempSumY += residY[pointer]
-
-                    if counter == binSize:
-                        counter = 0
-                        pointer -= shiftSize
-                        newGroupsX.append(tempSumX / binSize);  newGroupsY.append(tempSumY / binSize)
-                        if tempSumY / binSize >= threshold:
-                            targetX.append(tempSumX / binSize);     targetY.append(tempSumY / binSize)
-
-                        tempSumY = 0;   tempSumX = 0
-                except:
-                    if counter != 1:
-                        # There is a left over group at the end that has number of bins lower than binSize
-                        newGroupsX.append(tempSumX / counter);  newGroupsY.append(tempSumY / counter)
-                        if tempSumY / binSize >= threshold:
-                            targetX.append(tempSumX / counter);     targetY.append(tempSumY / counter)
-
-                    break
-                
-                pointer += 1
+                break
             
-            # Are there any region of data that is below 2 keV, and also has an average delta chi-sq value bigger than the threshold value?
-            # If so, remove powerlaw component.
-            result = any(value <= 2 for value in targetX)
-            if result == True:
-                powOut = True
+            pointer += 1
+        
+        # Are there any region of data that is below 2 keV, and also has an average delta chi-sq value bigger than the threshold value?
+        # If so, remove powerlaw component.
+        result = any(value <= 2 for value in targetX)
+        if result == True:
+            powOut = True
 
-                file.write("\n===============================================================================\n")
-                file.write("Powerlaw has been taken out due to trying to fit lower energies (> 2 keV).\n")
-                file.write("===============================================================================\n")
+            file.write("\n===============================================================================\n")
+            file.write("Powerlaw has been taken out due to trying to fit lower energies (> 2 keV).\n")
+            file.write("===============================================================================\n")
 
-                if switchVphabs:
-                    modelName = AllModels(1).expression.replace("TBabs", "vphabs", 1)
-                    m = Model(modelName)
-                    getParsFromList(bestIdx, bestIdx)
+            if switchVphabs:
+                modelName = AllModels(1).expression.replace("TBabs", "vphabs", 1)
+                m = Model(modelName)
+                getParsFromList(bestModel, bestModel)
 
-                    AllModels(1)(8).frozen = False  # Mg
-                    fitModel()
-                    AllModels(1)(10).frozen = False # Si
-                    fitModel()
-                    AllModels(1)(11).frozen = False # S
-                    fitModel()
-                    AllModels(1)(5).frozen = False  # O
-                    fitModel()
-                    AllModels(1)(6).frozen = False  # Ne
-                    fitModel()
-                    AllModels(1)(16).frozen = False # Fe
-                    fitModel()
+                AllModels(1)(8).frozen = False  # Mg
+                fitModel()
+                AllModels(1)(10).frozen = False # Si
+                fitModel()
+                AllModels(1)(11).frozen = False # S
+                fitModel()
+                AllModels(1)(5).frozen = False  # O
+                fitModel()
+                AllModels(1)(6).frozen = False  # Ne
+                fitModel()
+                AllModels(1)(16).frozen = False # Fe
+                fitModel()
 
-                    # Saving vphabs parameter values with their weights (currently, arithmetic mean calculation)
-                    comps = AllModels(1).componentNames
-                    for comp in comps:
-                        if comp == "vphabs":
-                            compObj = getattr(AllModels(1), comp)
-                            pars = compObj.parameterNames
-                            for par in pars:
+                # Saving vphabs parameter values with their weights (currently, arithmetic mean calculation)
+                comps = AllModels(1).componentNames
+                for comp in comps:
+                    if comp == "vphabs":
+                        compObj = getattr(AllModels(1), comp)
+                        pars = compObj.parameterNames
+                        for par in pars:
+                            parObj = getattr(compObj, par)
+                            fullName = comp + "." + par
+                            if parObj.values[1] > 0:   # Non-frozen parameter
+                                val = parObj.values[0]
+                                weight = 1  # Change the weight according to your needs
+                                if fullName in vphabsPars:
+                                    vphabsPars[fullName].append((val, weight))
+                                else:
+                                    vphabsPars[fullName] = [(val, weight)]
+                
+                vphabsObs.append(obsid)
+            else:
+                addComp("gauss", "diskbb", "after", "+", bestModel)
+                addComp("gauss", "diskbb", "after", "+", bestModel)
+                gaussEnergies = ["1.55 -1", "1.8 -1"]
+                gaussCounter = 0
+                comps = AllModels(1).componentNames[::-1]
+                for comp in comps:
+                    if gaussCounter < 2 and "gauss" in comp:
+                        compObj = getattr(AllModels(1), comp)
+                        pars = compObj.parameterNames
+                        for par in pars:
+                            if par == "LineE":
                                 parObj = getattr(compObj, par)
-                                fullName = comp + "." + par
-                                if parObj.values[1] > 0:   # Non-frozen parameter
-                                    val = parObj.values[0]
-                                    weight = 1  # Change the weight according to your needs
-                                    if fullName in vphabsPars:
-                                        vphabsPars[fullName].append((val, weight))
-                                    else:
-                                        vphabsPars[fullName] = [(val, weight)]
-                    
-                    vphabsObs.append(obsid)
-                else:
-                    modelNamev1 =AllModels(1).expression + "+gauss+gauss"
-                    modelNamev2 = AllModels(1).expression[:AllModels(1).expression.find("diskbb") + 6] + "+gauss+gauss" + AllModels(1).expression[AllModels(1).expression.find("diskbb") + 6:]
-                    m = Model(modelNamev2)
-                    getParsFromList(bestIdx, bestIdx)
-                    gabsEnergies = ["1.55 -1", "1.8 -1"]
-                    gabsCounter = 0
-                    comps = AllModels(1).componentNames[::-1]
-                    for comp in comps:
-                        if gabsCounter < 2 and "gauss" in comp:
-                            compObj = getattr(AllModels(1), comp)
-                            pars = compObj.parameterNames
-                            for par in pars:
-                                if par == "LineE":
-                                    parObj = getattr(compObj, par)
-                                    parObj.values = gabsEnergies[gabsCounter]
-                                    gabsCounter += 1
+                                parObj.values = gaussEnergies[gaussCounter]
+                                gaussCounter += 1
 
-                    fitModel()
-                    shakefit(file)
-                    writeBestFittingModel(file)
+                fitModel()
+                shakefit(file)
+                writeBestFittingModel(file)
 
     if powOut == False:
         # Restore the best-fitting model back
