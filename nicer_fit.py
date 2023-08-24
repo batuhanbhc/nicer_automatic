@@ -23,10 +23,6 @@ chatterOn = True
 addPcfabs = True       # If powerlaw is taken out due to fitting lower energies, switchVphabs = True will replace TBabs with vphabs to look
                             # for elemental abundances. If set to False, the script will add absorption gausses to account for the low energy region phenomenologically.
 
-refitVphabs = True         # If set to True, the script will go through all observations that have vphabs model instead of after taking out powerlaw,
-                            # take vphabs parameters and calculate the weighted average value for each parameter, then refit those observations with
-                            # new parameters (Only works if switchVphabs = True)
-
 makeXspecScript = True      # If set to True, the script creates an .xcm file that loads model and data files to xspec and creates a plot automatically
 #===================================================================================================================================
 # Functions
@@ -104,6 +100,7 @@ def getParsFromList(currentModList, prevModList, ignoreList = []):
 def fitModel():
     Fit.nIterations = 100
     Fit.delta = 0.01
+    Fit.renorm()
     Fit.perform()
 
 def updateParameters(modList):
@@ -405,7 +402,6 @@ for obsid in allDir:
     if chatterOn == False: 
         Xset.chatter = 0
     Xset.abund = "wilm"
-    Xset.seed = 2
     Fit.query = "yes"
 
     # Load the necessary files
@@ -492,7 +488,7 @@ for obsid in allDir:
     bestModel = modelList[-1]
 
     # Try to add another gauss at 6.7 keV, remove if it does not significantly improve the fit
-    gaussParList = ["6.7, 1e-3, 6.5, 6.5, 6.9, 6.9", "0.05", "-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"]
+    gaussParList = ["6.7, 1e-3, 6.5, 6.5, 6.9, 6.9", "0.03,1e-3,0.001,0.001,0.1,0.1", "-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"]
     addComp("gaussian", "diskbb", "after", "+", bestModel)
 
     altModelName = bestModel[0].replace(" ", "")
@@ -501,19 +497,6 @@ for obsid in allDir:
     fitModel()
     updateParameters(bestModel)
     saveModel(extractModFileName(), obsid)
-    
-    oldChi = modelList[mainIdx][2]["chi"]
-    oldDof = modelList[mainIdx][2]["dof"]
-    newChi = bestModel[2]["chi"]
-    newDof = bestModel[2]["dof"]
-
-    # Apply f-test
-    file.write("\nNull hypothesis model: " + mainModelName + " - Alternative model: " + altModelName + "\n")
-    p_value = Fit.ftest(newChi, newDof, oldChi, oldDof)
-    file.write("Ftest parameters: " + str(newChi) +" | "+ str(newDof) +" | "+ str(oldChi) +" | "+ str(oldDof) +" | Probability:"+str(p_value)+"\n\n")
-    if abs(p_value) >= ftestCrit:    
-        # Insignificant, take the gauss out
-        removeComp("gaussian", 1, bestModel)
 
     # Check the region where the powerlaw is trying to fit, if the region is located below 2 keV, do not add powerlaw component.
     powOut = False
@@ -574,39 +557,22 @@ for obsid in allDir:
                 addComp("pcfabs", "TBabs", "after", "*", bestModel)
 
                 mainModFileName = extractModFileName()
-                mainModelName = bestModel[0]
-                if Path(commonDirectory + "/" + mainModFileName).exists():
-                    Xset.restore(commonDirectory + "/" + mainModFileName)
-                    getParsFromList(bestModel, bestModel, ["pcfabs"])
-                else:
-                    pcfabsPars = ["7", "0.8"]
-                    assignParameters("pcfabs", pcfabsPars, 1)
+
+                pcfabsPars = ["7", "0.8"]
+                assignParameters("pcfabs", pcfabsPars, 1)
                 
                 fitModel()
                 updateParameters(bestModel)
-                oldChi = bestModel[2]["chi"]
-                oldDof = bestModel[2]["dof"]
+                saveModel(mainModFileName, obsid)
+                saveModel(mainModFileName, obsid, commonDirectory)
 
                 # Add an emission line at 1.8 keV (A gold line?)
-                gaussPars = ["1.8", "0.07", "0.01"]
+                gaussPars = ["1.8", "0.03,1e-3,0.001,0.001,0.5,0.5", "0.01"]
                 addComp("gaussian", "diskbb", "after", "+", bestModel)
 
-                altModelName = bestModel[0]
-                getParsFromList(bestModel, bestModel)
                 assignParameters("gauss", gaussPars, 1)
-                
                 fitModel()
                 updateParameters(bestModel)
-                newChi = bestModel[2]["chi"]
-                newDof = bestModel[2]["dof"]
-
-                # Apply f-test
-                file.write("\nNull hypothesis model: " + mainModelName+ " - Alternative model: " + altModelName + "\n")
-                p_value = Fit.ftest(newChi, newDof, oldChi, oldDof)
-                file.write("Ftest parameters: " + str(newChi) +" | "+ str(newDof) +" | "+ str(oldChi) +" | "+ str(oldDof) +" | Probability:"+str(p_value)+"\n\n")
-                if abs(p_value) >= ftestCrit:    
-                    # Insignificant, take the gauss out
-                    removeComp("gaussian", 1, bestModel)
 
             else:
                 addComp("gaussian", "diskbb", "after", "+", bestModel)
@@ -665,72 +631,9 @@ for obsid in allDir:
         file.write("@best_" + modFileName + "\n")
         file.write("cpd /xw\n")
         file.write("setpl e\n")
-        file.write("pl ld chi")
+        file.write("fit\n")
+        file.write("pl ld chi\n")
+        file.write("show par\n")
+        file.write("show fit\n")
+        file.write("echo OBSID:" + obsid + "\n")
         file.close()
-    
-"""if switchVphabs and refitVphabs:
-    # Calculate the weighted average of parameter values
-    weightedAvg = {}
-    for key,val in vphabsPars.items():
-        tempSum = 0
-        tempWeight = 0
-        for i in val:
-            tempSum += i[0]
-            tempWeight += i[1]
-        weightedAvg[key] = tempSum / tempWeight
-
-    #Re-fit the observations with weighted-parameters (only the observations with vphabs component).
-    for obsid in vphabsObs:
-        os.chdir(outputDir + "/" + obsid)
-        allFiles = os.listdir(outputDir + "/" + obsid)
-
-        # Find the data file and the best fitting model file for the current observation
-        counter = 0
-        for file in allFiles:
-            if "best_" in file:
-                modFile = file
-                counter += 1
-            elif "data_" in file:
-                dataFile = file
-                counter += 1
-
-            if counter == 2:
-                # All necessary files have been found
-                break
-        
-        Xset.restore(modFile)
-        Xset.restore(dataFile)
-        file = open(resultsFile, "a")
-
-        comps = AllModels(1).componentNames
-        for comp in comps:
-            compObj = getattr(AllModels(1), comp)
-            pars = compObj.parameterNames
-            for par in pars:
-                parObj = getattr(compObj, par)
-                fullName = comp + "." + par
-                if fullName in weightedAvg:
-                    parObj.values = weightedAvg[fullName]
-                    parObj.frozen = False
-        
-        modFileName = extractModFileName()
-        fitModel()
-        file.write("\n===========================================================\n")
-        file.write("Results after refitting vphabs with weighted average values")
-        file.write("\n===========================================================\n")
-        writeBestFittingModel(file)
-        saveModel(modFileName, obsid)
-        saveModel(modFileName, obsid, commonDirectory)
-        
-        # Remove any existing best model files and save the new one
-        for eachFile in allFiles:
-            if "best_" in eachFile:
-                os.system("rm " + eachFile)
-        saveModel("best_" + modFileName, obsid)
-
-        file.close()
-        AllModels.clear()
-        AllData.clear()
-
-        # Plot the changes in vhpabs values and save it under commonDirectory
-        os.system("python3 " +scriptDir +"/nicer_vphabs.py")"""

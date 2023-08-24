@@ -13,8 +13,8 @@ fit_script = "nicer_fit.py"
 flux_script = "nicer_flux.py"
 
 # Script switches
-createSwitch = False
-fitSwitch = False
+createSwitch = True
+fitSwitch = True
 fluxSwitch = False
 
 if createSwitch:
