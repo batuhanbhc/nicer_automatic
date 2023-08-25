@@ -10,20 +10,25 @@ import matplotlib.pyplot as plt
 outputDir = "/home/batuhanbahceci/NICER/analysis"
 
 # Set it to True if you have made changes in models, and do not want to use any previous model files in commonDirectory
-restartModels = True
+# restartOnce only deletes model files before the first observation, restartAlways deletes model files before all observations
+restartOnce = True
+restartAlways = False
 
 # Name of the log file
 resultsFile = "script_results.log"
 
 # Critical value for F-test
-ftestCrit = 0.005
+ftestCrit = 0.05
 
 chatterOn = True
 
-addPcfabs = True       # If powerlaw is taken out due to fitting lower energies, switchVphabs = True will replace TBabs with vphabs to look
-                            # for elemental abundances. If set to False, the script will add absorption gausses to account for the low energy region phenomenologically.
+addPcfabs = True            # If powerlaw is taken out due to fitting lower energies, switchPcfabs will add pcfabs component for providing extra absorption
+                            # to account for lower energy part. If set to False, the script will add two absorption gausses instead of pcfabs.
 
-makeXspecScript = True      # If set to True, the script creates an .xcm file that loads model and data files to xspec and creates a plot automatically
+makeXspecScript = True      # If set to True, the script will create an .xcm file that loads model and data files to xspec and creates a plot automatically
+
+errorCalculations = False    # If set to True, the script will run "shakefit" function to calculate the error boundaries and possibly converge the
+                            # fit to better parameter values.
 #===================================================================================================================================
 # Functions
 def shakefit(resultsFile):
@@ -41,7 +46,7 @@ def shakefit(resultsFile):
         counter = 0
         while continueError and counter < 100:
             counter += 1
-            Fit.error("stop 10 0.1 maximum 50 " + str(delChi) + " " + str(i))
+            Fit.error("stopat 10 0.1 maximum 50 " + str(delChi) + " " + str(i))
             errorResult = AllModels(1)(i).error
             errorString = errorResult[2]
   
@@ -339,6 +344,39 @@ def assignParameters(compName, parameterList, nthOccurence):
                     parObj.values = parameterList[listIndex]
                     listIndex += 1
 
+def transferToNewList(sourceList):
+    newList = [sourceList[0]]
+    newParDict = {}
+    newStatDict = {}
+
+    sourceParDict = sourceList[1]
+    keys = list(sourceParDict.keys())
+    values = list(sourceParDict.values())
+    for i in range(len(keys)):
+        newParDict[keys[i]] = values[i]
+    newList.append(newParDict)
+
+    sourceStatDict = sourceList[2]
+    keys = list(sourceStatDict.keys())
+    values = list(sourceStatDict.values())
+    for i in range(len(keys)):
+        newStatDict[keys[i]] = values[i]
+    newList.append(newStatDict)
+    
+    return newList
+
+def performFtest(mainModelList, altModelList, logFile = ""):
+    newChi = altModelList[2]["chi"]
+    newDof = altModelList[2]["dof"]
+    oldChi = mainModelList[2]["chi"]
+    oldDof = mainModelList[2]["dof"]
+
+    pValue = Fit.ftest(newChi, newDof, oldChi, oldDof)
+    if logFile != "":
+        logFile.write("Performing f-test: \n")
+        logFile.write("Null hypothesis model: " + mainModelList[0] + ", Alternative model: " + altModelList[0] +", p-value: " + str(pValue)+"\n\n")
+
+    return pValue
 #===================================================================================================================
 # Find the script's own path
 scriptPath = os.path.abspath(__file__)
@@ -382,7 +420,9 @@ for obsid in allDir:
             # All necessary files have been found
             break
 
-    if restartModels and iteration == 1:
+    if restartOnce and iteration == 1:
+        os.system("rm " + commonDirectory + "/mod*")
+    elif restartAlways:
         os.system("rm " + commonDirectory + "/mod*")
 
     #-------------------------------------------------------------------------------------    
@@ -399,9 +439,9 @@ for obsid in allDir:
     
     file = open(resultsFile, "w")
     Xset.openLog("xspec_output.log")
+    Xset.abund = "wilm"
     if chatterOn == False: 
         Xset.chatter = 0
-    Xset.abund = "wilm"
     Fit.query = "yes"
 
     # Load the necessary files
@@ -417,9 +457,6 @@ for obsid in allDir:
     alternativeIdx = 1
     prevIdx = 0
     for i in range(modelNumber-1):
-        file.write("Null hypothesis model: ")
-        file.write(modelList[mainIdx][0] + " - ")
-
         # Define the current main model
         m = Model(modelList[mainIdx][0])
         mainModFileName = extractModFileName()
@@ -433,8 +470,7 @@ for obsid in allDir:
         updateParameters(modelList[mainIdx])
         saveModel(mainModFileName, obsid)
         saveModel(mainModFileName, obsid, commonDirectory)
-
-        file.write("Alternative model: " + modelList[alternativeIdx][0] + "\n")
+        nullhypModelList = transferToNewList(modelList[mainIdx])
 
         # Define the alternative model
         m = Model(modelList[alternativeIdx][0])
@@ -449,16 +485,12 @@ for obsid in allDir:
         updateParameters(modelList[alternativeIdx])
         saveModel(altModFileName, obsid)
         saveModel(altModFileName, obsid, commonDirectory)
+        altModelList = transferToNewList(modelList[alternativeIdx])
 
         # Apply the f-test
-        newChi = modelList[alternativeIdx][2]["chi"]
-        newDof = modelList[alternativeIdx][2]["dof"]
-        oldChi = modelList[mainIdx][2]["chi"]
-        oldDof = modelList[mainIdx][2]["dof"]
-        p_value = Fit.ftest(newChi, newDof, oldChi, oldDof)
-        file.write("Ftest parameters: " + str(newChi) +" | "+ str(newDof) +" | "+ str(oldChi) +" | "+ str(oldDof) +" | P-value:"+str(p_value)+"\n\n")
+        pValue = performFtest(nullhypModelList, altModelList, file)
 
-        if abs(p_value) < ftestCrit:    
+        if abs(pValue) < ftestCrit:    
             # Alternative model has significantly improved the fit, set the alternative model as new main model
             mainModelFile = alternativeModelFile
             prevIdx = alternativeIdx
@@ -467,11 +499,13 @@ for obsid in allDir:
             prevIdx = alternativeIdx
         
         alternativeIdx += 1
+    
 
     # At the end of the loop, mainIdx will hold the best fitting model. Reload the model
     Xset.restore(mainModelFile)
     mainModelName = AllModels(1).expression.replace(" ", "")
 
+    #==============================================================================================
     # Create another entry in modelList, which will carry the best model with further changes to it
     modelList.append([modelList[mainIdx][0]])
 
@@ -486,18 +520,30 @@ for obsid in allDir:
     modelList[-1].append(statsDict)
 
     bestModel = modelList[-1]
+    #===============================================================================================
+    nullhypModelList = transferToNewList(bestModel)
 
-    # Try to add another gauss at 6.7 keV, remove if it does not significantly improve the fit
+    # Try to add another gauss at 6.7 keV, remove if it does not improve the fit significant enough.
     gaussParList = ["6.7, 1e-3, 6.5, 6.5, 6.9, 6.9", "0.03,1e-3,0.001,0.001,0.1,0.1", "-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"]
     addComp("gaussian", "diskbb", "after", "+", bestModel)
-
-    altModelName = bestModel[0].replace(" ", "")
     assignParameters("gauss", gaussParList, 1)
-
     fitModel()
     updateParameters(bestModel)
-    saveModel(extractModFileName(), obsid)
 
+    altModelList = bestModel
+
+    # Apply f-test
+    pValue = performFtest(nullhypModelList, altModelList, file)
+    
+    if abs(pValue) >= ftestCrit:
+        removeComp("gaussian", 1, bestModel)
+        fitModel()
+        updateParameters(bestModel)
+
+        file.write("\n====================================================================================\n")
+        file.write("6.7 keV gauss is taken out from the model due to not improving the fit significantly.")
+        file.write("\n====================================================================================\n")
+    
     # Check the region where the powerlaw is trying to fit, if the region is located below 2 keV, do not add powerlaw component.
     powOut = False
     if "powerlaw" in AllModels(1).expression:
@@ -554,26 +600,37 @@ for obsid in allDir:
             file.write("===============================================================================\n")
             
             if addPcfabs:
-                addComp("pcfabs", "TBabs", "after", "*", bestModel)
-
-                mainModFileName = extractModFileName()
-
                 pcfabsPars = ["7", "0.8"]
+                addComp("pcfabs", "TBabs", "after", "*", bestModel)
                 assignParameters("pcfabs", pcfabsPars, 1)
-                
                 fitModel()
                 updateParameters(bestModel)
-                saveModel(mainModFileName, obsid)
-                saveModel(mainModFileName, obsid, commonDirectory)
+        
+                nullhypModelList = transferToNewList(bestModel)
 
                 # Add an emission line at 1.8 keV (A gold line?)
                 gaussPars = ["1.8", "0.03,1e-3,0.001,0.001,0.5,0.5", "0.01"]
                 addComp("gaussian", "diskbb", "after", "+", bestModel)
-
                 assignParameters("gauss", gaussPars, 1)
                 fitModel()
                 updateParameters(bestModel)
 
+                altModelList = bestModel
+
+                # Apply f-test
+                pValue = performFtest(nullhypModelList, altModelList, file)
+
+                if abs(pValue) >= ftestCrit:
+                    removeComp("gaussian", 1, bestModel)
+                    fitModel()
+
+                    file.write("\n====================================================================================\n")
+                    file.write("1.8 keV gauss is taken out from the model due to not improving the fit significantly.")
+                    file.write("\n====================================================================================\n")
+                
+                if errorCalculations:
+                    shakefit(file)
+                    updateParameters(bestModel)
             else:
                 addComp("gaussian", "diskbb", "after", "+", bestModel)
                 addComp("gaussian", "diskbb", "after", "+", bestModel)
@@ -591,7 +648,9 @@ for obsid in allDir:
                                 gaussCounter += 1
 
                 fitModel()
-                shakefit(file)
+                if errorCalculations:
+                    shakefit(file)
+                    updateParameters(bestModel)
 
     if powOut == False:
         # Restore the best-fitting model back
@@ -599,7 +658,8 @@ for obsid in allDir:
 
         modFileName = extractModFileName()
         fitModel()
-        shakefit(file)
+        if errorCalculations:
+            shakefit(file)
         writeBestFittingModel(file)
         saveModel(modFileName, obsid)
         saveModel(modFileName, obsid, commonDirectory)
