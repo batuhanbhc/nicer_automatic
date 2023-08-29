@@ -27,12 +27,13 @@ addPcfabs = True            # If powerlaw is taken out due to fitting lower ener
 
 makeXspecScript = True      # If set to True, the script will create an .xcm file that loads model and data files to xspec and creates a plot automatically
 
-errorCalculations = False    # If set to True, the script will run "shakefit" function to calculate the error boundaries and possibly converge the
+errorCalculations = True    # If set to True, the script will run "shakefit" function to calculate the error boundaries and possibly converge the
                             # fit to better parameter values.
 #===================================================================================================================================
 # Functions
 def shakefit(resultsFile):
-    print("\nPerforming shakefit error calculations for the model: " + AllModels(1).expression + ", obsid:" + str(obsid)+ "\n")
+    Fit.query = "no"
+    print("Performing shakefit error calculations for the model: " + AllModels(1).expression + ", obsid:" + str(obsid)+ "\n")
     resultsFile.write("========== Proceeding with shakefit error calculations ==========\n")
     paramNum = AllModels(1).nParameters
 
@@ -103,6 +104,7 @@ def getParsFromList(currentModList, prevModList, ignoreList = []):
                     AllModels(1)(indx).values = mainList[fullName]
  
 def fitModel():
+    Fit.query = "yes"
     Fit.nIterations = 100
     Fit.delta = 0.01
     Fit.renorm()
@@ -365,16 +367,20 @@ def transferToNewList(sourceList):
     
     return newList
 
-def performFtest(mainModelList, altModelList, logFile = ""):
+def performFtest(mainModelList, altModelList, logFile, infoTxt = ""):
     newChi = altModelList[2]["chi"]
     newDof = altModelList[2]["dof"]
     oldChi = mainModelList[2]["chi"]
     oldDof = mainModelList[2]["dof"]
 
     pValue = Fit.ftest(newChi, newDof, oldChi, oldDof)
-    if logFile != "":
-        logFile.write("Performing f-test: \n")
-        logFile.write("Null hypothesis model: " + mainModelList[0] + ", Alternative model: " + altModelList[0] +", p-value: " + str(pValue)+"\n\n")
+    
+    logFile.write("Performing f-test: ")
+
+    if infoTxt != "":
+        logFile.write(infoTxt)
+
+    logFile.write("\nNull hypothesis model: " + mainModelList[0] + "\nAlternative model: " + altModelList[0] +"\np-value: " + str(pValue)+"\n\n")
 
     return pValue
 #===================================================================================================================
@@ -448,7 +454,7 @@ for obsid in allDir:
     s1 = Spectrum(dataFile=spectrumFile, arfFile=arfFile, respFile=rmfFile, backFile=backgroundFile)
     Plot.xAxis = "keV"
     AllData.ignore("bad")
-    AllData(1).ignore("**-0.5 10.-**")
+    AllData(1).ignore("**-1.5 10.-**")
     saveData()
     
     # Initialize the index values of models for comparing them in a loop
@@ -533,7 +539,7 @@ for obsid in allDir:
     altModelList = bestModel
 
     # Apply f-test
-    pValue = performFtest(nullhypModelList, altModelList, file)
+    pValue = performFtest(nullhypModelList, altModelList, file, "(adding 6.7 keV absorption gauss)")
     
     if abs(pValue) >= ftestCrit:
         removeComp("gaussian", 1, bestModel)
@@ -597,7 +603,7 @@ for obsid in allDir:
 
             file.write("\n===============================================================================\n")
             file.write("Powerlaw has been taken out due to trying to fit lower energies (> 2 keV).\n")
-            file.write("===============================================================================\n")
+            file.write("===============================================================================\n\n")
             
             if addPcfabs:
                 pcfabsPars = ["7", "0.8"]
@@ -609,7 +615,7 @@ for obsid in allDir:
                 nullhypModelList = transferToNewList(bestModel)
 
                 # Add an emission line at 1.8 keV (A gold line?)
-                gaussPars = ["1.8", "0.03,1e-3,0.001,0.001,0.5,0.5", "0.01"]
+                gaussPars = ["1.8 -1", "0.03,1e-3,0.001,0.001,0.5,0.5", "0.01"]
                 addComp("gaussian", "diskbb", "after", "+", bestModel)
                 assignParameters("gauss", gaussPars, 1)
                 fitModel()
@@ -618,15 +624,16 @@ for obsid in allDir:
                 altModelList = bestModel
 
                 # Apply f-test
-                pValue = performFtest(nullhypModelList, altModelList, file)
+                pValue = performFtest(nullhypModelList, altModelList, file, "(adding 1.8 keV emission gauss)")
 
                 if abs(pValue) >= ftestCrit:
                     removeComp("gaussian", 1, bestModel)
                     fitModel()
+                    updateParameters(bestModel)
 
                     file.write("\n====================================================================================\n")
                     file.write("1.8 keV gauss is taken out from the model due to not improving the fit significantly.")
-                    file.write("\n====================================================================================\n")
+                    file.write("\n====================================================================================\n\n")
                 
                 if errorCalculations:
                     shakefit(file)
