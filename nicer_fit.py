@@ -3,7 +3,6 @@ import subprocess
 import os
 from pathlib import Path
 from xspec import *
-import matplotlib.pyplot as plt
 
 #===================================================================================================================================
 # The location of the observation folders
@@ -383,6 +382,21 @@ def performFtest(mainModelList, altModelList, logFile, infoTxt = ""):
     logFile.write("\nNull hypothesis model: " + mainModelList[0] + "\nAlternative model: " + altModelList[0] +"\np-value: " + str(pValue)+"\n\n")
 
     return pValue
+
+def calculateGaussEqw():
+    eqwList = []
+    counter = 0
+    for comp in AllModels(1).componentNames:
+        counter += 1
+        if "gaussian" in comp:
+            compName = comp
+            compObj = getattr(AllModels(1), comp)
+            energyVal = compObj.LineE.values[0]
+
+            AllModels.eqwidth(counter)
+            eqwList.append("Equivalent width: " + str(AllData(1).eqwidth[0]) + " (" + str(format(energyVal, ".2f")) + " keV gauss)\n")
+    
+    return eqwList
 #===================================================================================================================
 # Find the script's own path
 scriptPath = os.path.abspath(__file__)
@@ -449,6 +463,8 @@ for obsid in allDir:
     if chatterOn == False: 
         Xset.chatter = 0
     Fit.query = "yes"
+
+    file.write("OBSERVATION ID: " + obsid + "\n\n")
 
     # Load the necessary files
     s1 = Spectrum(dataFile=spectrumFile, arfFile=arfFile, respFile=rmfFile, backFile=backgroundFile)
@@ -682,6 +698,11 @@ for obsid in allDir:
         if "best_" in eachFile:
             os.system("rm " + eachFile)
     saveModel("best_" + modFileName, obsid)
+
+    # Write equivalent widths of gausses to log file
+    gaussEqwidthList = calculateGaussEqw()
+    for each in gaussEqwidthList:
+        file.write(each)
     
     file.close()
     Xset.closeLog()
