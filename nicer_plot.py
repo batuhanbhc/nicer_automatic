@@ -5,7 +5,6 @@ from pathlib import Path
 from xspec import *
 import matplotlib.pyplot as plt
 import math
-import tkinter as tk
 
 #===================================================================================================================================
 # The location of the observation folders
@@ -70,7 +69,7 @@ def updateParameters(parList):
 #===================================================================================================================
 allDir = os.listdir(outputDir)
 allDir.sort()
-vphabsPars = {}
+parsDict = {}
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
 iteration = 0
 
@@ -88,36 +87,51 @@ for obsid in allDir:
     # Find the data file and the best fitting model file for the current observation
     counter = 0
     for file in allFiles:
-        if "best_" in file:
+        if "parameters" in file:
+            parFile = file
+            counter += 1
+        elif "best_" in file:
             modFile = file
             counter += 1
-        elif "data_" in file:
-            dataFile = file
-            counter += 1
-
+        
         if counter == 2:
-            # All necessary files have been found
             break
     
-    file = open(resultsFile, "a")
-    Xset.restore(dataFile)
     Xset.restore(modFile)
-
-    vphabsPars[obsid] = []
-    updateParameters(vphabsPars[obsid])
     abundance = Xset.abund[:Xset.abund.find(":")]
 
-parDict = {}
-xAxis = []
-for key, val in vphabsPars.items():
-    xAxis.append(key[-4:])
-    for parTuple in val:
-        if parTuple[0] in parDict:
-            parDict[parTuple[0]].append(parTuple[1])
-        else:
-            parDict[parTuple[0]] = [parTuple[1]]
+    parsDict[obsid] = []
 
-plotNum = len(parDict.keys())
+    file = open(parFile)
+    iterator = 0
+    for line in file:
+        iterator += 1
+        if iterator == 1:
+            continue
+        line = line.strip("\n")
+        line = line.split(" ")
+        line[1] = float(line[1])
+        line[2] = line[1] - float(line[2])
+        line[3] = float(line[3]) - line[1]
+        parTuple = (line[0], line[1], line[2], line[3])
+        if "gauss" in parTuple[0]:
+            pass
+        else:
+            parsDict[obsid].append(parTuple)
+
+modelPars = {}
+xAxis = []
+for key, val in parsDict.items():
+    xAxis.append(key[-4:])
+    for tuple in val:
+        if tuple[0] in modelPars:
+            modelPars[tuple[0]][0].append(tuple[1])     # Value
+            modelPars[tuple[0]][1].append(tuple[2])     # Error lower
+            modelPars[tuple[0]][2].append(tuple[3])     # Error upper
+        else:
+            modelPars[tuple[0]] = ([tuple[1]], [tuple[2]], [tuple[3]])
+
+plotNum = len(modelPars.keys())
 rows = math.ceil(math.sqrt(plotNum))
 cols = math.ceil(plotNum / rows)
 
@@ -127,24 +141,27 @@ counter = 0
 for i in range(cols):
     for j in range(rows):
         try:
-            yAxis = list(parDict.values())[counter]
-            parName = list(parDict.keys())[counter]
-            axs[i, j].plot(xAxis, yAxis, label= parName)
-            axs[i, j].scatter(xAxis, yAxis, marker="o")
+            yAxis = list(modelPars.values())[counter][0]
+            errorLow = list(modelPars.values())[counter][1]
+            errorHigh = list(modelPars.values())[counter][2]
+            parName = list(modelPars.keys())[counter]
+
+            axs[i, j].plot(xAxis, yAxis, label= parName, color="black")
+            axs[i, j].errorbar(xAxis, yAxis, yerr=[errorLow, errorHigh], fmt='o', ecolor="black", color="black", capsize=10, label='Error Bars')
             axs[i, j].set_xlabel('Observation IDs')
-            axs[i, j].set_ylabel('Vphabs parameter units')
+            axs[i, j].set_ylabel('Parameter units with errors')
             axs[i, j].legend()
             counter += 1
         except:
             break
 
-general_title = "Vphabs model parameters" + "(Abundance: "+ abundance +")"
+general_title = "Best-fitting Model Parameters" + "(Abundance: "+ abundance +")"
 fig.suptitle(general_title, fontsize=16)
 
 # Adjust layout and save the figure
 plt.tight_layout()
 
-pngFile = commonDirectory + "/vphabs_comparison.png"
+pngFile = commonDirectory + "/par_comparison.png"
 pngPath = Path(pngFile)
 if pngPath.exists():
     subprocess.run(["rm", pngFile])
