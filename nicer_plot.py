@@ -66,6 +66,27 @@ def updateParameters(parList):
                     fullName = comp + "." + par
                     parList.append((fullName, AllModels(1)(indx).values[0]))
 
+def transferToNewList(sourceList):
+    newList = [sourceList[0]]
+    newParDict = {}
+    newStatDict = {}
+
+    sourceParDict = sourceList[1]
+    keys = list(sourceParDict.keys())
+    values = list(sourceParDict.values())
+    for i in range(len(keys)):
+        newParDict[keys[i]] = values[i]
+    newList.append(newParDict)
+
+    sourceStatDict = sourceList[2]
+    keys = list(sourceStatDict.keys())
+    values = list(sourceStatDict.values())
+    for i in range(len(keys)):
+        newStatDict[keys[i]] = values[i]
+    newList.append(newStatDict)
+    
+    return newList
+
 #===================================================================================================================
 allDir = os.listdir(outputDir)
 allDir.sort()
@@ -73,6 +94,7 @@ parsDict = {}
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
 iteration = 0
 
+memoryDict = {}
 for obsid in allDir:
     if obsid.isnumeric():
         # If the file name is all numerical, assume it is an observation. If not, you may need to change this part
@@ -108,16 +130,34 @@ for obsid in allDir:
         iterator += 1
         if iterator == 1:
             continue
+
+        # Extract the parameter values with uncertainities
         line = line.strip("\n")
         line = line.split(" ")
         line[1] = float(line[1])
         line[2] = line[1] - float(line[2])
         line[3] = float(line[3]) - line[1]
         parTuple = (line[0], line[1], line[2], line[3])
-        if "gauss" in parTuple[0]:
-            pass
+        
+        # Save each model parameter to a memory dictionary
+        if parTuple[0] not in memoryDict:
+            memoryDict[parTuple[0]] = 1
         else:
-            parsDict[obsid].append(parTuple)
+            memoryDict[parTuple[0]] += 1
+
+        parsDict[obsid].append(parTuple)
+
+tempKeys = list(parsDict.keys())
+tempValues = list(parsDict.values())
+
+for modelComp in memoryDict.keys():
+    counter = 0
+    for i in range(len(tempKeys)):
+        extractedModels = [i[0] for i in tempValues[counter]]
+        if modelComp not in extractedModels:
+            parsDict[tempKeys[counter]].append((modelComp, 0, 0, 0))
+
+        counter += 1
 
 modelPars = {}
 xAxis = []
