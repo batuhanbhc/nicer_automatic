@@ -454,7 +454,7 @@ for obsid in allDir:
     modelList = [
         ["TBabs*diskbb", {"TBabs.nH": 8}, {}],
         ["TBabs*(diskbb+powerlaw)", {"powerlaw.PhoIndex": 2}, {}],
-        ["TBabs*(diskbb+powerlaw+gaussian)", {"gaussian.LineE": "6.98,1e-3,6.95,6.95,7.1,7.1", "gaussian.Sigma": "0.03,1e-3,0.001,0.001,0.1,0.1", "gaussian.norm":"-1e-3,1e-4,-1e12,-1e12,-1e-12,-1e-12"}, {}]
+        ["TBabs*(diskbb+powerlaw+gaussian)", {"gaussian.LineE": "6.98,1e-3,6.95,6.95,7.1,7.1", "gaussian.Sigma": "0.2,,0.02,0.02,0.5,0.5", "gaussian.norm":"-1e-3,1e-4,-1e12,-1e12,-1e-12,-1e-12"}, {}]
     ]
     
     file = open(resultsFile, "w")
@@ -546,7 +546,7 @@ for obsid in allDir:
     nullhypModelList = transferToNewList(bestModel)
 
     # Try to add another gauss at 6.7 keV, remove if it does not improve the fit significant enough.
-    gaussParList = ["6.7, 1e-3, 6.5, 6.5, 6.9, 6.9", "0.03,1e-3,0.001,0.001,0.1,0.1", "-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"]
+    gaussParList = ["6.7, 1e-3, 6.5, 6.5, 6.9, 6.9", "0.2,,0.02,0.02,0.5,0.5", "-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"]
     addComp("gaussian", "diskbb", "after", "+", bestModel)
     assignParameters("gauss", gaussParList, 1)
     fitModel()
@@ -631,7 +631,7 @@ for obsid in allDir:
                 nullhypModelList = transferToNewList(bestModel)
 
                 # Add an emission line at 1.8 keV (A gold line?)
-                gaussPars = ["1.8 -1", "0.03,1e-3,0.001,0.001,0.5,0.5", "0.01"]
+                gaussPars = ["1.8 -1", "0.2,,0.02,0.02,0.5,0.5", "0.01"]
                 addComp("gaussian", "diskbb", "after", "+", bestModel)
                 assignParameters("gauss", gaussPars, 1)
                 fitModel()
