@@ -3,7 +3,6 @@ import subprocess
 import os
 from pathlib import Path
 from xspec import *
-import matplotlib.pyplot as plt
 
 #===================================================================================================================================
 # The location of the observation folders
@@ -389,21 +388,26 @@ scriptPath = os.path.abspath(__file__)
 scriptPathRev = scriptPath[::-1]
 scriptPathRev = scriptPathRev[scriptPathRev.find("/") + 1:]
 scriptDir = scriptPathRev[::-1]
+os.chdir(scriptDir)
 
 allDir = os.listdir(outputDir)
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
 iteration = 0
-vphabsPars = {}
-vphabsObs = []
-for obsid in allDir:
-    if obsid.isnumeric():
-        outObsDir = outputDir + "/" + obsid      # e.g. ~/NICER/analysis/6130010120   
-        os.chdir(outObsDir)
-    else:
-        continue 
 
+inputFile = open("nicer_obs.txt")
+for obs in inputFile.readlines():
     iteration += 1
 
+    # Extract the obsid from the path name written in nicer_obs.txt
+    obs = obs.strip("\n' ")
+    parentDir = obs[::-1]
+    obsid = parentDir[:parentDir.find("/")]         
+    parentDir = parentDir[parentDir.find("/")+1:]   
+    
+    obsid = obsid[::-1]         # e.g. 6130010120
+
+    outObsDir = outputDir + "/" + obsid
+    os.chdir(outObsDir)
     allFiles = os.listdir(outObsDir)
 
     # Find the spectrum, background, arf and response files
@@ -704,3 +708,4 @@ for obsid in allDir:
         file.write("show fit\n")
         file.write("echo OBSID:" + obsid + "\n")
         file.close()
+    quit()
