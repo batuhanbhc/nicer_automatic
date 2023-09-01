@@ -31,14 +31,32 @@ errorCalculations = True    # If set to True, the script will run "shakefit" fun
 #===================================================================================================================================
 # Functions
 def shakefit(resultsFile):
+    # Create a parameter file that will carry parameter values along with error boundaries
+    parameterFile = outObsDir + "/" + "parameters_bestmodel.txt"
+    if Path(parameterFile).exists():
+        os.system("rm " + parameterFile)
+
+    os.system("touch " + parameterFile)
+
+    parLines = []
+    parLines.append("Parameter name | Parameter Value | Parameter Uncertainity Lower Boundary | Parameter Uncertainity Upper Boundary | Extra Information\n")
+    counter = 0
+    for comp in AllModels(1).componentNames:
+        compObj = getattr(AllModels(1), comp)
+        for par in compObj.parameterNames:
+            counter += 1
+            parObj = getattr(compObj, par)
+            fullName = comp + "." + par
+            parLines.append(fullName + " ")
+
     Fit.query = "no"
     print("Performing shakefit error calculations for the model: " + AllModels(1).expression + ", obsid:" + str(obsid)+ "\n")
     resultsFile.write("========== Proceeding with shakefit error calculations ==========\n")
     paramNum = AllModels(1).nParameters
 
     for i in range(1, paramNum+1):
-        paramDelta = AllModels(1)(i).values[1]
-        if paramDelta < 0:  # Check for frozen parameters
+        parDelta = AllModels(1)(i).values[1]
+        if parDelta < 0:  # Check for frozen parameters
             continue
 
         continueError = True
@@ -49,7 +67,7 @@ def shakefit(resultsFile):
             Fit.error("stopat 10 0.1 maximum 50 " + str(delChi) + " " + str(i))
             errorResult = AllModels(1)(i).error
             errorString = errorResult[2]
-  
+
             if errorString[3] == "T" or errorString[4] == "T":
                 # Hit lower/upper limits, stop the error process for the current model parameter
                 continueError = False
@@ -62,12 +80,47 @@ def shakefit(resultsFile):
                 delChi += 2
 
             if continueError == False:
+                # Save error calculation results to the log file
                 parName = AllModels(1)(i).name
+                parValue = AllModels(1)(i).values[0]
                 errorTuple = "(" + listToStr(errorResult) + ")"
                 resultsFile.write("Par " + str(i) + ": " + parName + " " + errorTuple+"\n")
 
-    fitModel()
+    # Save parameter information to a temporary list
+    for i in range(1, AllModels(1).nParameters+1):
+        errorResult = AllModels(1)(i).error
+        errorString = errorResult[2]
+        parValue = AllModels(1)(i).values[0]
+
+        if AllModels(1)(i).values[1] < 0:
+             # Fixed parameter, handle seperately
+             parLines[i] = parLines[i] + (str(AllModels(1)(i).values[0]) + " ")*3 +" FIXED\n"
+        else:
+            lowerBound = str(errorResult[0])
+            upperBound = str(errorResult[1])
+            info = ""
+            if errorString[6] == "T" and errorString[7] == "T":
+                # Search failed in both directions
+                upperBound = str(parValue)
+                lowerBound = str(parValue)
+                info = "FAILED_BOTH_DIRECTIONS"
+            elif errorString[6] == "T":
+                # Search failed in negative direction
+                lowerBound = str(parValue)
+                info = "FAILED_NEGATIVE_DIRECTION"
+            elif errorString[7] == "T":
+                # Search failed in positive direction
+                upperBound = str(parValue)
+                info = "FAILED_POSITIVE_DIRECTION"
+            parLines[i] = parLines[i] + str(parValue) + " " + lowerBound + " " + upperBound + " " + info + "\n"
+
     resultsFile.write("=================================================================\n\n")
+
+    # Write the parameter information from temporary list to parameter file
+    parFile = open(parameterFile, "w")
+    for line in parLines:
+        parFile.write(line)
+    parFile.close()
 
 def listToStr(array):
     result = ""
@@ -393,8 +446,8 @@ def calculateGaussEqw():
             compObj = getattr(AllModels(1), comp)
             energyVal = compObj.LineE.values[0]
 
-            AllModels.eqwidth(counter)
-            eqwList.append("Equivalent width: " + str(AllData(1).eqwidth[0]) + " (" + str(format(energyVal, ".2f")) + " keV gauss)\n")
+            AllModels.eqwidth(counter, err=True, number=1000, level=90)
+            eqwList.append("Equivalent width: " + str(listToStr(AllData(1).eqwidth)) + " (" + str(format(energyVal, ".2f")) + " keV gauss)\n")
     
     return eqwList
 #===================================================================================================================
@@ -701,6 +754,7 @@ for obsid in allDir:
 
     # Write equivalent widths of gausses to log file
     gaussEqwidthList = calculateGaussEqw()
+    file.write("Gauss equivalent widths: (90% confidence intervals) \n")
     for each in gaussEqwidthList:
         file.write(each)
     
