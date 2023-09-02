@@ -32,8 +32,8 @@ errorCalculations = True    # If set to True, the script will run "shakefit" fun
 #===================================================================================================================================
 # Functions
 def shakefit(resultsFile):
-    # Create a parameter file that will carry parameter values along with error boundaries
-    parameterFile = outObsDir + "/" + "parameters_bestmodel.txt"
+    # Create a temporary parameter file that will carry parameter values along with error boundaries
+    parameterFile = outObsDir + "/" + "temp_parameters.txt"
     if Path(parameterFile).exists():
         os.system("rm " + parameterFile)
 
@@ -435,6 +435,34 @@ def performFtest(mainModelList, altModelList, logFile, infoTxt = ""):
     logFile.write("\nNull hypothesis model: " + mainModelList[0] + "\nAlternative model: " + altModelList[0] +"\np-value: " + str(pValue)+"\n\n")
 
     return pValue
+
+def findTheClosestValue(targetNum, valueList):
+    minDiff = 9999
+    closestValue = 0
+    for val in valueList:
+        tempDiff = abs(targetNum - val)
+        if tempDiff < minDiff:
+            minDiff = tempDiff
+            closestValue = val
+    
+    return closestValue
+
+def matchGaussWithEnergy(gaussGroups):
+    # Match gaussian component with their corresponding emission/absorption line in keV
+    # e.g. matchDict = {gaussian: 1.8keV_gauss, gaussian_5: 6.7keV_gauss, ...}
+    matchDict = {}
+
+    for comp in AllModels(1).componentNames:
+        if "gauss" in comp:
+            compObj = getattr(AllModels(1), comp)
+            for par in compObj.parameterNames:
+                if par == "LineE":
+                    parObj = getattr(compObj, par)
+                    value = parObj.values[0]
+                    energyGroup = findTheClosestValue(value, gaussGroups)
+                    matchDict[comp] = str(energyGroup) + "keV_gauss"
+    
+    return matchDict
 #===================================================================================================================
 # Find the script's own path
 scriptPath = os.path.abspath(__file__)
@@ -445,8 +473,6 @@ scriptDir = scriptPathRev[::-1]
 allDir = os.listdir(outputDir)
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
 iteration = 0
-vphabsPars = {}
-vphabsObs = []
 for obsid in allDir:
     if obsid.isnumeric():
         outObsDir = outputDir + "/" + obsid      # e.g. ~/NICER/analysis/6130010120   
@@ -492,8 +518,12 @@ for obsid in allDir:
     modelList = [
         ["TBabs*diskbb", {"TBabs.nH": 8}, {}],
         ["TBabs*(diskbb+powerlaw)", {"powerlaw.PhoIndex": 2}, {}],
-        ["TBabs*(diskbb+powerlaw+gaussian)", {"gaussian.LineE": "6.98,1e-3,6.95,6.95,7.1,7.1", "gaussian.Sigma": "0.02,1e-3,1e-4,1e-4,0.5,0.5", "gaussian.norm":"-1e-3,1e-4,-1e12,-1e12,-1e-12,-1e-12"}, {}]
+        ["TBabs*(diskbb+powerlaw+gaussian)", {"gaussian.LineE": "6.98,1e-3,6.95,6.95,7.1,7.1", "gaussian.Sigma": "0.03,1e-3,0.02,0.02,0.5", "gaussian.norm":"-1e-3,1e-4,-1e12,-1e12,-1e-12,-1e-12"}, {}]
     ]
+
+    # These are the energies of both emission and absorption gausses that will be tried to fit to the observation along the script.
+    # If you add/delete a gauss component along the script, make sure to update this list as well.
+    gaussEnergyList = [6.98, 6.7, 1.8]
     
     file = open(resultsFile, "w")
     Xset.openLog("xspec_output.log")
@@ -582,7 +612,7 @@ for obsid in allDir:
     nullhypModelList = transferToNewList(bestModel)
 
     # Try to add another gauss at 6.7 keV, remove if it does not improve the fit significant enough.
-    gaussParList = ["6.7, 1e-3, 6.5, 6.5, 6.9, 6.9", "0.02, 1e-4, 1e-4, 1e-4, 0.2, 0.2", "-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"]
+    gaussParList = ["6.7, 1e-3, 6.5, 6.5, 6.9, 6.9", "0.03, 1e-4, 0.02, 0.02, 0.5, 0.5", "-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"]
     addComp("gaussian", "diskbb", "after", "+", bestModel)
     assignParameters("gauss", gaussParList, 1)
     fitModel()
@@ -667,7 +697,7 @@ for obsid in allDir:
                 nullhypModelList = transferToNewList(bestModel)
 
                 # Add an emission line at 1.8 keV (A gold line?)
-                gaussPars = ["1.8 -1", "0.02, 1e-4, 1e-4, 1e-4, 0.5, 0.5", "0.01"]
+                gaussPars = ["1.8 -1", "0.03, 1e-4, 0.02, 0.02, 0.5, 0.5", "0.01"]
                 addComp("gaussian", "diskbb", "after", "+", bestModel)
                 assignParameters("gauss", gaussPars, 1)
                 fitModel()
@@ -728,8 +758,37 @@ for obsid in allDir:
         writeBestFittingModel(file)
         saveModel(modFileName, obsid)
         saveModel(modFileName, obsid, commonDirectory)
+    
+    #==========================================================================
+    if errorCalculations:
+        # Rename gauss names in the test_parameters.txt file for grouping purposes.
+        # For instance, this part changes gauss names from "gaussian_5" to "6.7keV_gauss" and so on.
+        renameDict = matchGaussWithEnergy(gaussEnergyList)
+        inputFile = open("temp_parameters.txt", "r")
+        outputFile = "parameters_bestmodel.txt"
 
-    # Remove any existing best model files and save the new one
+        if Path(outputFile).exists():
+            os.system("rm " + outputFile)
+        os.system("touch " + outputFile)
+
+        outFile = open(outputFile, "w")
+
+        for line in inputFile.readlines():
+            line = line.split(" ")
+            compName = line[0]
+            compName = compName[: compName.find(".")]
+            rest = line[0][line[0].find("."):]
+            for key, val in renameDict.items():
+                if compName == key:
+                    line[0] = val + rest
+                    break
+
+            outFile.write(listToStr(line))
+        
+        inputFile.close()
+        outFile.close()
+    #===========================================================================
+    # Remove any pre-existing best model files and save a new one
     for eachFile in allFiles:
         if "best_" in eachFile:
             os.system("rm " + eachFile)
