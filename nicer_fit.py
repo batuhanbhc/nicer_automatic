@@ -31,14 +31,32 @@ errorCalculations = True    # If set to True, the script will run "shakefit" fun
 #===================================================================================================================================
 # Functions
 def shakefit(resultsFile):
+    # Create a parameter file that will carry parameter values along with error boundaries
+    parameterFile = outObsDir + "/" + "parameters_bestmodel.txt"
+    if Path(parameterFile).exists():
+        os.system("rm " + parameterFile)
+
+    os.system("touch " + parameterFile)
+
+    parLines = []
+    parLines.append("Parameter name | Parameter Value | Parameter Uncertainity Lower Boundary | Parameter Uncertainity Upper Boundary | Extra Information\n")
+    counter = 0
+    for comp in AllModels(1).componentNames:
+        compObj = getattr(AllModels(1), comp)
+        for par in compObj.parameterNames:
+            counter += 1
+            parObj = getattr(compObj, par)
+            fullName = comp + "." + par
+            parLines.append(fullName + " ")
+
     Fit.query = "no"
     print("Performing shakefit error calculations for the model: " + AllModels(1).expression + ", obsid:" + str(obsid)+ "\n")
     resultsFile.write("========== Proceeding with shakefit error calculations ==========\n")
     paramNum = AllModels(1).nParameters
 
     for i in range(1, paramNum+1):
-        paramDelta = AllModels(1)(i).values[1]
-        if paramDelta < 0:  # Check for frozen parameters
+        parDelta = AllModels(1)(i).values[1]
+        if parDelta < 0:  # Check for frozen parameters
             continue
 
         continueError = True
@@ -49,7 +67,7 @@ def shakefit(resultsFile):
             Fit.error("stopat 10 0.1 maximum 50 " + str(delChi) + " " + str(i))
             errorResult = AllModels(1)(i).error
             errorString = errorResult[2]
-  
+
             if errorString[3] == "T" or errorString[4] == "T":
                 # Hit lower/upper limits, stop the error process for the current model parameter
                 continueError = False
@@ -62,12 +80,47 @@ def shakefit(resultsFile):
                 delChi += 2
 
             if continueError == False:
+                # Save error calculation results to the log file
                 parName = AllModels(1)(i).name
+                parValue = AllModels(1)(i).values[0]
                 errorTuple = "(" + listToStr(errorResult) + ")"
                 resultsFile.write("Par " + str(i) + ": " + parName + " " + errorTuple+"\n")
 
-    fitModel()
+    # Save parameter information to a temporary list
+    for i in range(1, AllModels(1).nParameters+1):
+        errorResult = AllModels(1)(i).error
+        errorString = errorResult[2]
+        parValue = AllModels(1)(i).values[0]
+
+        if AllModels(1)(i).values[1] < 0:
+             # Fixed parameter, handle seperately
+             parLines[i] = parLines[i] + (str(AllModels(1)(i).values[0]) + " ")*3 +" FIXED\n"
+        else:
+            lowerBound = str(errorResult[0])
+            upperBound = str(errorResult[1])
+            info = ""
+            if errorString[6] == "T" and errorString[7] == "T":
+                # Search failed in both directions
+                upperBound = str(parValue)
+                lowerBound = str(parValue)
+                info = "FAILED_BOTH_DIRECTIONS"
+            elif errorString[6] == "T":
+                # Search failed in negative direction
+                lowerBound = str(parValue)
+                info = "FAILED_NEGATIVE_DIRECTION"
+            elif errorString[7] == "T":
+                # Search failed in positive direction
+                upperBound = str(parValue)
+                info = "FAILED_POSITIVE_DIRECTION"
+            parLines[i] = parLines[i] + str(parValue) + " " + lowerBound + " " + upperBound + " " + info + "\n"
+
     resultsFile.write("=================================================================\n\n")
+
+    # Write the parameter information from temporary list to parameter file
+    parFile = open(parameterFile, "w")
+    for line in parLines:
+        parFile.write(line)
+    parFile.close()
 
 def listToStr(array):
     result = ""
@@ -382,6 +435,21 @@ def performFtest(mainModelList, altModelList, logFile, infoTxt = ""):
     logFile.write("\nNull hypothesis model: " + mainModelList[0] + "\nAlternative model: " + altModelList[0] +"\np-value: " + str(pValue)+"\n\n")
 
     return pValue
+
+def calculateGaussEqw():
+    eqwList = []
+    counter = 0
+    for comp in AllModels(1).componentNames:
+        counter += 1
+        if "gaussian" in comp:
+            compName = comp
+            compObj = getattr(AllModels(1), comp)
+            energyVal = compObj.LineE.values[0]
+
+            AllModels.eqwidth(counter, err=True, number=1000, level=90)
+            eqwList.append("Equivalent width: " + str(listToStr(AllData(1).eqwidth)) + " (" + str(format(energyVal, ".2f")) + " keV gauss)\n")
+    
+    return eqwList
 #===================================================================================================================
 # Find the script's own path
 scriptPath = os.path.abspath(__file__)
@@ -444,7 +512,7 @@ for obs in inputFile.readlines():
     modelList = [
         ["TBabs*diskbb", {"TBabs.nH": 8}, {}],
         ["TBabs*(diskbb+powerlaw)", {"powerlaw.PhoIndex": 2}, {}],
-        ["TBabs*(diskbb+powerlaw+gaussian)", {"gaussian.LineE": "6.98,1e-3,6.95,6.95,7.1,7.1", "gaussian.Sigma": "0.03,1e-3,0.001,0.001,0.1,0.1", "gaussian.norm":"-1e-3,1e-4,-1e12,-1e12,-1e-12,-1e-12"}, {}]
+        ["TBabs*(diskbb+powerlaw+gaussian)", {"gaussian.LineE": "6.98,1e-3,6.95,6.95,7.1,7.1", "gaussian.Sigma": "0.2,,0.02,0.02,0.5,0.5", "gaussian.norm":"-1e-3,1e-4,-1e12,-1e12,-1e-12,-1e-12"}, {}]
     ]
     
     file = open(resultsFile, "w")
@@ -453,6 +521,8 @@ for obs in inputFile.readlines():
     if chatterOn == False: 
         Xset.chatter = 0
     Fit.query = "yes"
+
+    file.write("OBSERVATION ID: " + obsid + "\n\n")
 
     # Load the necessary files
     s1 = Spectrum(dataFile=spectrumFile, arfFile=arfFile, respFile=rmfFile, backFile=backgroundFile)
@@ -534,7 +604,7 @@ for obs in inputFile.readlines():
     nullhypModelList = transferToNewList(bestModel)
 
     # Try to add another gauss at 6.7 keV, remove if it does not improve the fit significant enough.
-    gaussParList = ["6.7, 1e-3, 6.5, 6.5, 6.9, 6.9", "0.03,1e-3,0.001,0.001,0.1,0.1", "-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"]
+    gaussParList = ["6.7, 1e-3, 6.5, 6.5, 6.9, 6.9", "0.2,,0.02,0.02,0.5,0.5", "-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"]
     addComp("gaussian", "diskbb", "after", "+", bestModel)
     assignParameters("gauss", gaussParList, 1)
     fitModel()
@@ -619,7 +689,7 @@ for obs in inputFile.readlines():
                 nullhypModelList = transferToNewList(bestModel)
 
                 # Add an emission line at 1.8 keV (A gold line?)
-                gaussPars = ["1.8 -1", "0.03,1e-3,0.001,0.001,0.5,0.5", "0.01"]
+                gaussPars = ["1.8 -1", "0.2,,0.02,0.02,0.5,0.5", "0.01"]
                 addComp("gaussian", "diskbb", "after", "+", bestModel)
                 assignParameters("gauss", gaussPars, 1)
                 fitModel()
@@ -686,6 +756,12 @@ for obs in inputFile.readlines():
         if "best_" in eachFile:
             os.system("rm " + eachFile)
     saveModel("best_" + modFileName, obsid)
+
+    # Write equivalent widths of gausses to log file
+    gaussEqwidthList = calculateGaussEqw()
+    file.write("Gauss equivalent widths: (90% confidence intervals) \n")
+    for each in gaussEqwidthList:
+        file.write(each)
     
     file.close()
     Xset.closeLog()
