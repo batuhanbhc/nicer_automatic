@@ -15,7 +15,7 @@ flux_script = "nicer_flux.py"
 # Script switches
 createSwitch = True
 fitSwitch = True
-fluxSwitch = False
+fluxSwitch = True
 
 if createSwitch:
     os.system("python3 " + create_script)

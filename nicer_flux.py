@@ -26,19 +26,25 @@ def listToStr(array):
     return result
 
 def enterParameters(parList, fluxPars = {}):
-    # Take the available parameters from the stemList
+    checkFullName = False
     components = AllModels(1).componentNames
     for comp in components:
+        if comp == "cflux":
+            checkFullName = True
+
         compObj = getattr(AllModels(1), comp)
         parameters = compObj.parameterNames
         for par in parameters:
             parObj = getattr(compObj, par)
-            indx = parObj.index
             fullName = comp + "." + par
-            # If the parameter value is stored in previous model's list, take it from there. Otherwise, look whether
-            # it is initialized in current model's list
+
+            if checkFullName and "_" in comp:
+                compNum = comp[comp.find("_") + 1:]
+                newComp = comp[:comp.find("_") + 1] + str(int(compNum) - 1)
+                fullName = newComp + "." + par
+
             if fullName in parList:
-                AllModels(1)(indx).values = parList[fullName]
+                parObj.values = parList[fullName]
     
     if fluxPars != {}:
         compObj = AllModels(1).cflux
@@ -49,19 +55,18 @@ def enterParameters(parList, fluxPars = {}):
 def fitModel():
     Fit.nIterations = 100
     Fit.delta = 0.01
+    Fit.renorm()
     Fit.perform()
 
 def updateParameters(parList):
     # Save the parameters loaded in the xspec model to lists
-    components = AllModels(1).componentNames
-    for comp in components:
+    for comp in AllModels(1).componentNames:
         compObj = getattr(AllModels(1), comp)
         parameters = compObj.parameterNames
         for par in parameters:
             parObj = getattr(compObj, par)
-            indx = parObj.index
             fullName = comp + "." + par
-            parList[fullName] = AllModels(1)(indx).values
+            parList[fullName] = parObj.values
 
 def freezeNorm():
     # Freezes all current normalization parameters in a model, also sets new limits for parameters to vary
@@ -71,15 +76,15 @@ def freezeNorm():
         parNames = compObj.parameterNames
         for par in parNames:
             parObj = getattr(compObj, par)
-            indx = parObj.index
             if par == "norm":
-                AllModels(1)(indx).frozen = True
-            elif comp != "cflux":
-                # Noticed that for some observations, fitting the model after adding cflux componant may change parameter values drastically,
-                # (e.g. nH 8 -> 1.7, Tin 1.4 -> 0.07) which messes up the chi-sq value and a significant change in the model. Here, I force the
-                # already fitted model to not vary at all by limiting parameter values with 0.1 wide intervals from both ends
-                valString = str(parObj.values[0])+","+str(parObj.values[1])+","+str(parObj.values[0]-0.1)+","+str(parObj.values[0]-0.1)+","+str(parObj.values[0]+0.1)+","+str(parObj.values[0]+0.1)
-                AllModels(1)(indx).values = valString
+                parObj.frozen = True
+                    
+                """elif comp != "cflux":
+                    # Noticed that for some observations, fitting the model after adding cflux componant may change parameter values drastically,
+                    # (e.g. nH 8 -> 1.7, Tin 1.4 -> 0.07) which messes up the chi-sq value and a significant change in the model. Here, I force the
+                    # already fitted model to not vary at all by limiting parameter values with 0.1 wide intervals from both ends
+                    valString = str(parObj.values[0])+","+str(parObj.values[1])+","+str(parObj.values[0]-0.1)+","+str(parObj.values[0]-0.1)+","+str(parObj.values[0]+0.1)+","+str(parObj.values[0]+0.1)
+                    AllModels(1)(indx).values = valString"""
 
 def findFlux():
     parNums = AllModels(1).nParameters
@@ -93,39 +98,49 @@ def findFlux():
             upperFlux = "errHigh:" + str(10**AllModels(1)(i).error[1])
             return [flux, lowerFlux, upperFlux]
 
-def calculateFlux(component):
+def calculateFlux(component, modelName):
     if component == "unabsorbed":
-        absIndex = modelName.find("abs")
-        newName = modelName[:absIndex + 3] + "*cflux" + modelName[absIndex + 3:]
+        if "pcfabs" in modelName:
+            # Assuming TBabs also exists, and pcfabs comes after TBabs. If not, please change this part.
+            absIndex = modelName.find("pcfabs")
+            newName = modelName[:absIndex + 6] + "*cflux" + modelName[absIndex + 6:]
+        else:
+            absIndex = modelName.find("TBabs")
+            newName = modelName[:absIndex + 5] + "*cflux" + modelName[absIndex + 5:]
+        
     else:
         compIndex = modelName.find(component)
         newName = modelName[:compIndex] + "cflux*" + modelName[compIndex:]
 
     m = Model(newName)
-    
     enterParameters(parameters, {"Emin":Emin, "Emax":Emax, "lg10Flux" : -8})
     freezeNorm()
     fitModel()
     fluxVals = findFlux()
     
     return fluxVals
-
 #===================================================================================================================
-allDir = os.listdir(outputDir)
-allDir.sort()
-observationFluxes = {}
-commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
-iteration = 0
+# Find the script's own path
+scriptPath = os.path.abspath(__file__)
+scriptPathRev = scriptPath[::-1]
+scriptPathRev = scriptPathRev[scriptPathRev.find("/") + 1:]
+scriptDir = scriptPathRev[::-1]
+os.chdir(scriptDir)
 
-for obsid in allDir:
-    if obsid.isnumeric():
-        # If the file name is all numerical, assume it is an observation. If not, you may need to change this part
-        outObsDir = outputDir + "/" + obsid      # e.g. ~/NICER/analysis/6130010120   
-        os.chdir(outObsDir)
-    else:
-        continue 
+commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
+
+inputFile = open("nicer_obs.txt")
+for obs in inputFile.readlines():
+    # Extract the obsid from the path name written in nicer_obs.txt
+    obs = obs.strip("\n' ")
+    parentDir = obs[::-1]
+    obsid = parentDir[:parentDir.find("/")]         
+    parentDir = parentDir[parentDir.find("/")+1:]   
     
-    iteration += 1
+    obsid = obsid[::-1]         # e.g. 6130010120
+
+    outObsDir = outputDir + "/" + obsid
+    os.chdir(outObsDir)
     allFiles = os.listdir(outObsDir)
 
     # Find the data file and the best fitting model file for the current observation
@@ -141,123 +156,43 @@ for obsid in allDir:
         if counter == 2:
             # All necessary files have been found
             break
-    
+
     file = open(resultsFile, "a")
     Xset.restore(dataFile)
     Xset.restore(modFile)
-    Xset.chatter = 1
     Fit.query = "yes"
-    modelName = AllModels(1).expression.replace(" ", "")
 
     parameters = {}
     updateParameters(parameters)
 
-    observationFluxes[obsid] = [("diskbb.Tin", parameters["diskbb.Tin"])]
-    if "powerlaw" in modelName:
-        observationFluxes[obsid].append(("powerlaw.PhoIndex", parameters["powerlaw.PhoIndex"]))
-    else:
-        observationFluxes[obsid].append(("powerlaw.PhoIndex", 0))
-    
-    file.write("===========================================================\n")
-    file.write("Fluxes of model components (in ergs/cm^2/s)\n")
+    file.write("\n===========================================================\n")
+    file.write("Fluxes of model components (in ergs/cm^2/s) (90% confidence intervals)\n\n")
+    modelName = AllModels(1).expression.replace(" ", "")
 
     # Absorbed flux
-    absFlux = calculateFlux("TBabs")
-    file.write(energyFilter +" keV "+AllModels(1).expression+" flux: " + listToStr(absFlux) + "\n")
+    absFlux = calculateFlux("TBabs", modelName)
+    file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(absFlux) + "\n\n")
 
+    if "pcfabs" in modelName:
+        # TBabs excluded flux
+        halfAbsFlux = calculateFlux("pcfabs", modelName)
+        file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(halfAbsFlux) + "\n\n")
+        
     # Unabsorbed flux
-    unabsFlux = calculateFlux("unabsorbed")
-    file.write(energyFilter +" keV "+AllModels(1).expression+" flux: " + listToStr(unabsFlux) + "\n")
+    unabsFlux = calculateFlux("unabsorbed", modelName)
+    file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(unabsFlux) + "\n\n")
 
-    if "gaussian" in modelName:
-        # Write gabs equivalent width
-        m = Model(modelName)
-        enterParameters(parameters)
-        comps = AllModels(1).componentNames
-        gaussIdx = comps.index("gaussian") + 1
-        AllModels.eqwidth(gaussIdx)
-        eqw = AllData(1).eqwidth[0]
-        file.write("Gabs equivalent width: " + str(eqw) + "\n")
-
-    if "powerlaw" in AllModels(1).expression:
-        fluxModPow = modelName[: modelName.find("pow")] + "cflux*" + modelName[modelName.find("pow"):]
-
-        # Powerlaw flux
-        fluxPow = calculateFlux("powerlaw")
-
-        file.write(energyFilter +" keV "+AllModels(1).expression+" flux: " + listToStr(fluxPow) + "\n")
-    else:
-        fluxPow = "0"
-        file.write(energyFilter +" keV powerlaw flux: " + fluxPow +"\n")
-    
     # Diskbb flux
-    fluxDisk = calculateFlux("diskbb")
-    file.write(energyFilter +" keV "+AllModels(1).expression+" flux: " + listToStr(fluxDisk) + "\n")
-    
-    observationFluxes[obsid].append(("Diskbb flux", fluxDisk[0]))
-    observationFluxes[obsid].append(("Powerlaw flux", fluxPow[0]))
+    fluxDisk = calculateFlux("diskbb", modelName)
+    file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(fluxDisk) + "\n\n")
+
+    if "powerlaw" in modelName:
+        # Powerlaw flux
+        fluxPow = calculateFlux("powerlaw", modelName)
+        file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(fluxPow) + "\n\n")
+    else:
+        file.write("Powerlaw flux is 0. There is no powerlaw component in the model expression.\n")
 
     file.close()
     AllModels.clear()
     AllData.clear()
-    
-# Now create the graph of changes in fluxes and parameter values in between observations.
-fluxKeys = list(observationFluxes.keys())
-fluxKeys.sort()
-sorted_fluxes = {i: observationFluxes[i] for i in fluxKeys}
-
-diskbbTin= []
-#powIndex = []
-diskFlux = []
-#powFlux = []
-observations = []
-for key, values in sorted_fluxes.items():
-    observations.append(key)
-    diskbbTin.append(values[0][1][0])
-    #powIndex.append(values[1][1][0])
-    diskFlux.append(values[2][1])
-    #powFlux.append(values[3][1])
-
-fig, axs = plt.subplots(2, 2, figsize=(12,8))
-
-# Plot the first graph (diskbb.Tin)
-axs[0, 0].plot(observations, diskbbTin, label="diskbb.Tin values")
-axs[0, 0].scatter(observations, diskbbTin, marker="o")
-axs[0, 0].set_xlabel('Observation IDs')
-axs[0, 0].set_ylabel('keV')
-axs[0, 0].legend()
-
-"""
-# Plot the second graph (powerlaw.PhoIndex)
-axs[0, 1].plot(observations, powIndex, label="powerlaw.PhoIndex values")
-axs[0, 1].scatter(observations, powIndex, marker="o")
-axs[0, 1].set_xlabel('Observation IDs')
-axs[0, 1].set_ylabel('Photon Index')
-axs[0, 1].legend()
-"""
-
-# Plot the third graph (Diskbb flux)
-axs[1, 0].plot(observations, diskFlux, label="Diskbb fluxes")
-axs[1, 0].scatter(observations, diskFlux, marker="o")
-axs[1, 0].set_xlabel('Observation IDs')
-axs[1, 0].set_ylabel('Flux (ergs/cm^2/s)')
-axs[1, 0].legend()
-
-"""
-# Plot the fourth graph (Powerlaw flux)
-axs[1, 1].plot(observations, powFlux, label="Powerlaw fluxes")
-axs[1, 1].scatter(observations, powFlux, marker="o")
-axs[1, 1].set_xlabel('Observation IDs')
-axs[1, 1].set_ylabel('Flux (ergs/cm^2/s)')
-axs[1, 1].legend()
-"""
-
-# Adjust layout and save the figure
-plt.tight_layout()
-
-pngFile = commonDirectory + "/" + observations[0] + "_" + observations[-1] + ".png"
-pngPath = Path(pngFile)
-if pngPath.exists():
-    subprocess.run(["rm", pngFile])
-
-plt.savefig(commonDirectory + "/" + observations[0] + "_" + observations[-1] + ".png")
