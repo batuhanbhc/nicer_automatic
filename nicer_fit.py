@@ -31,11 +31,10 @@ errorCalculations = True    # If set to True, the script will run "shakefit" fun
 #===================================================================================================================================
 # Functions
 def shakefit(resultsFile):
-    # Create a parameter file that will carry parameter values along with error boundaries
-    parameterFile = outObsDir + "/" + "parameters_bestmodel.txt"
+    # Create a temporary parameter file that will carry parameter values along with error boundaries
+    parameterFile = outObsDir + "/" + "temp_parameters.txt"
     if Path(parameterFile).exists():
         os.system("rm " + parameterFile)
-
     os.system("touch " + parameterFile)
 
     parLines = []
@@ -86,7 +85,9 @@ def shakefit(resultsFile):
                 errorTuple = "(" + listToStr(errorResult) + ")"
                 resultsFile.write("Par " + str(i) + ": " + parName + " " + errorTuple+"\n")
 
-    # Save parameter information to a temporary list
+    resultsFile.write("=================================================================\n\n")
+    
+    # Save parameter information to a list
     for i in range(1, AllModels(1).nParameters+1):
         errorResult = AllModels(1)(i).error
         errorString = errorResult[2]
@@ -114,9 +115,7 @@ def shakefit(resultsFile):
                 info = "FAILED_POSITIVE_DIRECTION"
             parLines[i] = parLines[i] + str(parValue) + " " + lowerBound + " " + upperBound + " " + info + "\n"
 
-    resultsFile.write("=================================================================\n\n")
-
-    # Write the parameter information from temporary list to parameter file
+    # Write the parameter information from list to the temporary parameter file
     parFile = open(parameterFile, "w")
     for line in parLines:
         parFile.write(line)
@@ -450,6 +449,34 @@ def calculateGaussEqw():
             eqwList.append("Equivalent width: " + str(listToStr(AllData(1).eqwidth)) + " (" + str(format(energyVal, ".2f")) + " keV gauss)\n")
     
     return eqwList
+
+def findTheClosestValue(targetNum, valueList):
+    minDiff = 9999
+    closestValue = 0
+    for val in valueList:
+        tempDiff = abs(targetNum - val)
+        if tempDiff < minDiff:
+            minDiff = tempDiff
+            closestValue = val
+    
+    return closestValue
+
+def matchGaussWithEnergy(gaussGroups):
+    # Match gaussian component with their corresponding emission/absorption line in keV
+    # e.g. matchDict = {gaussian: 1.8keV_gauss, gaussian_5: 6.7keV_gauss, ...}
+    matchDict = {}
+
+    for comp in AllModels(1).componentNames:
+        if "gauss" in comp:
+            compObj = getattr(AllModels(1), comp)
+            for par in compObj.parameterNames:
+                if par == "LineE":
+                    parObj = getattr(compObj, par)
+                    value = parObj.values[0]
+                    energyGroup = findTheClosestValue(value, gaussGroups)
+                    matchDict[comp] = str(energyGroup) + "keV_gauss"
+    
+    return matchDict
 #===================================================================================================================
 # Find the script's own path
 scriptPath = os.path.abspath(__file__)
@@ -750,7 +777,36 @@ for obs in inputFile.readlines():
         writeBestFittingModel(file)
         saveModel(modFileName, obsid)
         saveModel(modFileName, obsid, commonDirectory)
+    #==========================================================================
+    if errorCalculations:
+        # Rename gauss names in the temp_parameters.txt file for grouping purposes.
+        # For instance, this part changes gauss names from "gaussian_5" to "6.7keV_gauss" and so on.
+        gaussEnergyList = [1.8, 6.7, 6.98]
+        renameDict = matchGaussWithEnergy(gaussEnergyList)
+        inputFile = open("temp_parameters.txt", "r")
+        outputFile = "parameters_bestmodel.txt"
 
+        if Path(outputFile).exists():
+            os.system("rm " + outputFile)
+        os.system("touch " + outputFile)
+
+        outFile = open(outputFile, "w")
+
+        for line in inputFile.readlines():
+            line = line.split(" ")
+            compName = line[0]
+            compName = compName[: compName.find(".")]
+            rest = line[0][line[0].find("."):]
+            for key, val in renameDict.items():
+                if compName == key:
+                    line[0] = val + rest
+                    break
+
+            outFile.write(listToStr(line))
+        
+        inputFile.close()
+        outFile.close()
+    #================================================================
     # Remove any existing best model files and save the new one
     for eachFile in allFiles:
         if "best_" in eachFile:
