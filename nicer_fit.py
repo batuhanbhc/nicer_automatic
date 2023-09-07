@@ -680,7 +680,7 @@ for obs in inputFile.readlines():
             file.write("===============================================================================\n\n")
             
             if addPcfabs:
-                pcfabsPars = ["7", "0.8"]
+                pcfabsPars = ["7.296 -1", "0.923 -1"]
                 addComp("pcfabs", "TBabs", "after", "*", bestModel)
                 assignParameters("pcfabs", pcfabsPars, 1)
                 fitModel()
@@ -708,7 +708,7 @@ for obs in inputFile.readlines():
                     file.write("\n====================================================================================\n")
                     file.write("1.8 keV gauss is taken out from the model due to not improving the fit significantly.")
                     file.write("\n====================================================================================\n\n")
-                
+
                 if errorCalculations:
                     shakefit(file)
                     updateParameters(bestModel)
@@ -784,4 +784,3 @@ for obs in inputFile.readlines():
         file.write("show fit\n")
         file.write("echo OBSID:" + obsid + "\n")
         file.close()
-    quit()

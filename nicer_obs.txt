@@ -3,3 +3,10 @@
 /home/batuhanbahceci/NICER/data/4u1630/6130010122
 /home/batuhanbahceci/NICER/data/4u1630/6130010123
 /home/batuhanbahceci/NICER/data/4u1630/6130010124
+/home/batuhanbahceci/NICER/data/4u1630/6588010101
+/home/batuhanbahceci/NICER/data/4u1630/6588010102
+/home/batuhanbahceci/NICER/data/4u1630/6588010103
+/home/batuhanbahceci/NICER/data/4u1630/6588010104
+/home/batuhanbahceci/NICER/data/4u1630/6588010105
+/home/batuhanbahceci/NICER/data/4u1630/6588010106
+/home/batuhanbahceci/NICER/data/4u1630/6588010107
