@@ -539,7 +539,7 @@ for obs in inputFile.readlines():
     modelList = [
         ["TBabs*diskbb", {"TBabs.nH": 8}, {}],
         ["TBabs*(diskbb+powerlaw)", {"powerlaw.PhoIndex": 2}, {}],
-        ["TBabs*(diskbb+powerlaw+gaussian)", {"gaussian.LineE": "6.98,1e-3,6.95,6.95,7.1,7.1", "gaussian.Sigma": "0.2,,0.02,0.02,0.5,0.5", "gaussian.norm":"-1e-3,1e-4,-1e12,-1e12,-1e-12,-1e-12"}, {}]
+        ["TBabs*(diskbb+powerlaw+gaussian)", {"gaussian.LineE": "6.984 -1", "gaussian.Sigma": "0.07,,0.05,0.05,0.2,0.2", "gaussian.norm":"-1e-3,1e-4,-1e12,-1e12,-1e-12,-1e-12"}, {}]
     ]
     
     file = open(resultsFile, "w")
@@ -631,7 +631,7 @@ for obs in inputFile.readlines():
     nullhypModelList = transferToNewList(bestModel)
 
     # Try to add another gauss at 6.7 keV, remove if it does not improve the fit significant enough.
-    gaussParList = ["6.7, 1e-3, 6.5, 6.5, 6.9, 6.9", "0.2,,0.02,0.02,0.5,0.5", "-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"]
+    gaussParList = ["6.7 -1", "0.07,,0.05,0.05,0.2,0.2", "-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"]
     addComp("gaussian", "diskbb", "after", "+", bestModel)
     assignParameters("gauss", gaussParList, 1)
     fitModel()
@@ -707,7 +707,7 @@ for obs in inputFile.readlines():
             file.write("===============================================================================\n\n")
             
             if addPcfabs:
-                pcfabsPars = ["7.296 -1", "0.923 -1"]
+                pcfabsPars = ["7.296", "0.923"]
                 addComp("pcfabs", "TBabs", "after", "*", bestModel)
                 assignParameters("pcfabs", pcfabsPars, 1)
                 fitModel()
@@ -716,7 +716,7 @@ for obs in inputFile.readlines():
                 nullhypModelList = transferToNewList(bestModel)
 
                 # Add an emission line at 1.8 keV (A gold line?)
-                gaussPars = ["1.8 -1", "0.2,,0.02,0.02,0.5,0.5", "0.01"]
+                gaussPars = ["1.8 -1", "0.07,,0.05,0.05,0.2,0.2", "0.01"]
                 addComp("gaussian", "diskbb", "after", "+", bestModel)
                 assignParameters("gauss", gaussPars, 1)
                 fitModel()
@@ -735,6 +735,16 @@ for obs in inputFile.readlines():
                     file.write("\n====================================================================================\n")
                     file.write("1.8 keV gauss is taken out from the model due to not improving the fit significantly.")
                     file.write("\n====================================================================================\n\n")
+                
+                for comp in AllModels(1).componentNames:
+                    if comp == "pcfabs":
+                        compObj = getattr(AllModels(1), comp)
+                        for par in compObj.parameterNames:
+                            parObj = getattr(compObj, par)
+                            parObj.frozen = True
+                            bestModel[1][comp + "." + parObj.name] = parObj.values
+                
+                fitModel()
 
                 if errorCalculations:
                     shakefit(file)
@@ -781,7 +791,7 @@ for obs in inputFile.readlines():
     if errorCalculations:
         # Rename gauss names in the temp_parameters.txt file for grouping purposes.
         # For instance, this part changes gauss names from "gaussian_5" to "6.7keV_gauss" and so on.
-        gaussEnergyList = [1.8, 6.7, 6.98]
+        gaussEnergyList = [1.8, 6.7, 6.984]
         renameDict = matchGaussWithEnergy(gaussEnergyList)
         inputFile = open("temp_parameters.txt", "r")
         outputFile = "parameters_bestmodel.txt"
