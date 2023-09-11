@@ -21,9 +21,6 @@ ftestCrit = 0.05
 
 chatterOn = True
 
-addPcfabs = True            # If powerlaw is taken out due to fitting lower energies, switchPcfabs will add pcfabs component for providing extra absorption
-                            # to account for lower energy part. If set to False, the script will add two absorption gausses instead of pcfabs.
-
 makeXspecScript = True      # If set to True, the script will create an .xcm file that loads model and data files to xspec and creates a plot automatically
 
 errorCalculations = True    # If set to True, the script will run "shakefit" function to calculate the error boundaries and possibly converge the
@@ -686,133 +683,68 @@ for obs in inputFile.readlines():
         file.write("6.7 keV gauss is taken out from the model due to not improving the fit significantly.")
         file.write("\n====================================================================================\n")
     
-    # Check the region where the powerlaw is trying to fit, if the region is located below 2 keV, do not add powerlaw component.
+    # Check whether powerlaw has positive index and steep slope (> 6, fits the lower energies only), take it out if that is the case
     powOut = False
     if "powerlaw" in AllModels(1).expression:
-        removeComp("powerlaw", 1, bestModel)
+        if AllModels(1).powerlaw.PhoIndex.values[0] > 6:
+            removeComp("powerlaw", 1, bestModel)
 
-        Plot("chi")
-        residX = Plot.x()
-        residY = Plot.y()
-
-        # Group every {binSize} delta chi-sq bins, start rebinning next group with the previous group's last {shiftSize} bins (overlapping groups)
-        binSize = len(residX) * 5 // 100    # 5% length of total bin number
-        shiftSize = binSize // 2 + 1
-        threshold = 50  # Unit: delta chi-squared
-
-        # targetX and targetY will store the groups containing values bigger than the threshold
-        newGroupsX = []; newGroupsY = []
-        targetX = []; targetY = []
-        tempSumX = 0; tempSumY = 0
-        pointer = 0
-        counter = 0
-        while True:
-            try:
-                counter += 1
-                tempSumX += residX[pointer]
-                tempSumY += residY[pointer]
-
-                if counter == binSize:
-                    counter = 0
-                    pointer -= shiftSize
-                    newGroupsX.append(tempSumX / binSize);  newGroupsY.append(tempSumY / binSize)
-                    if tempSumY / binSize >= threshold:
-                        targetX.append(tempSumX / binSize);     targetY.append(tempSumY / binSize)
-
-                    tempSumY = 0;   tempSumX = 0
-            except:
-                if counter != 1:
-                    # There is a left over group at the end that has number of bins lower than binSize
-                    newGroupsX.append(tempSumX / counter);  newGroupsY.append(tempSumY / counter)
-                    if tempSumY / binSize >= threshold:
-                        targetX.append(tempSumX / counter);     targetY.append(tempSumY / counter)
-
-                break
-            
-            pointer += 1
-        
-        # Are there any region of data that is below 2 keV, and also has an average delta chi-sq value bigger than the threshold value?
-        # If so, remove powerlaw component.
-        result = any(value <= 2 for value in targetX)
-        if result == True:
             powOut = True
-
             file.write("\n===============================================================================\n")
             file.write("Powerlaw has been taken out due to trying to fit lower energies (> 2 keV).\n")
             file.write("===============================================================================\n\n")
             
-            if addPcfabs:
-                pcfabsPars = ["7.296", "0.923"]
-                addComp("pcfabs", "TBabs", "after", "*", bestModel)
-                assignParameters("pcfabs", pcfabsPars, 1)
+            pcfabsPars = ["7.296", "0.923"]
+            addComp("pcfabs", "TBabs", "after", "*", bestModel)
+            assignParameters("pcfabs", pcfabsPars, 1)
+            fitModel()
+            updateParameters(bestModel)
+    
+            nullhypModelList = transferToNewList(bestModel)
+
+            # Add an emission line at 1.8 keV (A gold line?)
+            gaussPars = ["1.8 -1", "0.07,,0.05,0.05,0.2,0.2", "0.01"]
+            addComp("gaussian", "diskbb", "after", "+", bestModel)
+            assignParameters("gauss", gaussPars, 1)
+            fitModel()
+            updateParameters(bestModel)
+
+            altModelList = bestModel
+
+            # Apply f-test
+            pValue = performFtest(nullhypModelList, altModelList, file, "(adding 1.8 keV emission gauss)")
+
+            if abs(pValue) >= ftestCrit:
+                removeComp("gaussian", 1, bestModel)
                 fitModel()
                 updateParameters(bestModel)
-        
-                nullhypModelList = transferToNewList(bestModel)
 
-                # Add an emission line at 1.8 keV (A gold line?)
-                gaussPars = ["1.8 -1", "0.07,,0.05,0.05,0.2,0.2", "0.01"]
-                addComp("gaussian", "diskbb", "after", "+", bestModel)
-                assignParameters("gauss", gaussPars, 1)
-                fitModel()
+                file.write("\n====================================================================================\n")
+                file.write("1.8 keV gauss is taken out from the model due to not improving the fit significantly.")
+                file.write("\n====================================================================================\n\n")
+            
+            for comp in AllModels(1).componentNames:
+                if comp == "pcfabs":
+                    compObj = getattr(AllModels(1), comp)
+                    for par in compObj.parameterNames:
+                        parObj = getattr(compObj, par)
+                        parObj.frozen = True
+                        bestModel[1][comp + "." + parObj.name] = parObj.values
+            
+            fitModel()
+
+            if errorCalculations:
+                shakefit(file)
                 updateParameters(bestModel)
-
-                altModelList = bestModel
-
-                # Apply f-test
-                pValue = performFtest(nullhypModelList, altModelList, file, "(adding 1.8 keV emission gauss)")
-
-                if abs(pValue) >= ftestCrit:
-                    removeComp("gaussian", 1, bestModel)
-                    fitModel()
-                    updateParameters(bestModel)
-
-                    file.write("\n====================================================================================\n")
-                    file.write("1.8 keV gauss is taken out from the model due to not improving the fit significantly.")
-                    file.write("\n====================================================================================\n\n")
-                
-                for comp in AllModels(1).componentNames:
-                    if comp == "pcfabs":
-                        compObj = getattr(AllModels(1), comp)
-                        for par in compObj.parameterNames:
-                            parObj = getattr(compObj, par)
-                            parObj.frozen = True
-                            bestModel[1][comp + "." + parObj.name] = parObj.values
-                
-                fitModel()
-
-                if errorCalculations:
-                    shakefit(file)
-                    updateParameters(bestModel)
-            else:
-                addComp("gaussian", "diskbb", "after", "+", bestModel)
-                addComp("gaussian", "diskbb", "after", "+", bestModel)
-                gaussEnergies = ["1.55 -1", "1.8 -1"]
-                gaussCounter = 0
-                comps = AllModels(1).componentNames[::-1]
-                for comp in comps:
-                    if gaussCounter < 2 and "gauss" in comp:
-                        compObj = getattr(AllModels(1), comp)
-                        pars = compObj.parameterNames
-                        for par in pars:
-                            if par == "LineE":
-                                parObj = getattr(compObj, par)
-                                parObj.values = gaussEnergies[gaussCounter]
-                                gaussCounter += 1
-
-                fitModel()
-                if errorCalculations:
-                    shakefit(file)
-                    updateParameters(bestModel)
 
     if powOut == False:
         # Restore the best-fitting model back
         Xset.restore(mainModelFile)
-
         modFileName = extractModFileName()
         fitModel()
         if errorCalculations:
             shakefit(file)
+            
         writeBestFittingModel(file)
         saveModel(modFileName, obsid)
         saveModel(modFileName, obsid, commonDirectory)
@@ -822,40 +754,12 @@ for obs in inputFile.readlines():
         writeBestFittingModel(file)
         saveModel(modFileName, obsid)
         saveModel(modFileName, obsid, commonDirectory)
-        #==========================================================================
+
+    #==========================================================================
     if errorCalculations:
         # Rename gauss names in the temp_parameters.txt file for grouping purposes.
         # For instance, this part changes gauss names from "gaussian_5" to "6.7keV_gauss" and so on.
         gaussEnergyList = [1.8, 6.7, 6.984]
-        renameDict = matchGaussWithEnergy(gaussEnergyList)
-        inputFile = open("temp_parameters.txt", "r")
-        outputFile = "parameters_bestmodel.txt"
-
-        if Path(outputFile).exists():
-            os.system("rm " + outputFile)
-        os.system("touch " + outputFile)
-
-        outFile = open(outputFile, "w")
-
-        for line in inputFile.readlines():
-            line = line.split(" ")
-            compName = line[0]
-            compName = compName[: compName.find(".")]
-            rest = line[0][line[0].find("."):]
-            for key, val in renameDict.items():
-                if compName == key:
-                    line[0] = val + rest
-                    break
-
-            outFile.write(listToStr(line))
-        
-        inputFile.close()
-        outFile.close()
-    #================================================================
-    #==========================================================================
-    if errorCalculations:
-        # Rename gauss names in the test_parameters.txt file for grouping purposes.
-        # For instance, this part changes gauss names from "gaussian_5" to "6.7keV_gauss" and so on.
         renameDict = matchGaussWithEnergy(gaussEnergyList)
         inputFile = open("temp_parameters.txt", "r")
         outputFile = "parameters_bestmodel.txt"
