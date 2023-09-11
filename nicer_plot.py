@@ -5,6 +5,7 @@ from pathlib import Path
 from xspec import *
 import matplotlib.pyplot as plt
 import math
+from astropy.io import fits
 
 #===================================================================================================================================
 # The location of the observation folders
@@ -12,6 +13,9 @@ outputDir = "/home/batuhanbahceci/NICER/analysis"
 
 # Name of the log file
 resultsFile = "script_results.log"
+
+# If set to True, the plot will use the dates of observations in MJD format for x axis values as opposed to using observation IDs.
+plotMJD = True
 
 energyFilter = "1.5 10."
 energyLimits = energyFilter.split(" ")
@@ -98,13 +102,9 @@ os.chdir(scriptDir)
 gaussParsDict = {}
 otherParsDict = {}
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
-iteration = 0
 
-memoryDict = {}
 inputFile = open("nicer_obs.txt")
 for obs in inputFile.readlines():
-    iteration += 1
-
     # Extract the obsid from the path name written in nicer_obs.txt
     obs = obs.strip("\n' ")
     parentDir = obs[::-1]
@@ -126,15 +126,28 @@ for obs in inputFile.readlines():
         elif "best_" in file:
             modFile = file
             counter += 1
+        elif file == "ni" + obsid + "mpu7_sr3c50.pha":
+            spectrumFile = file
+            counter += 1
         
-        if counter == 2:
+        if counter == 3:
             break
+    
+    # Extract MJD
+    hdu = fits.open(spectrumFile)
+    date = str(int(hdu[1].header["MJD-OBS"]))
+    hdu.close()
 
     Xset.restore(modFile)
     abundance = Xset.abund[:Xset.abund.find(":")]
-
-    gaussParsDict[obsid] = []
-    otherParsDict[obsid] = []
+    
+    # Initialize the values of keys as lists
+    if plotMJD:
+        gaussParsDict[date] = []
+        otherParsDict[date] = []
+    else:
+        gaussParsDict[obsid] = []
+        otherParsDict[obsid] = []
 
     file = open(parFile)
     iterator = 0
@@ -151,10 +164,16 @@ for obs in inputFile.readlines():
         line[3] = float(line[3]) - line[1]
         parTuple = (line[0], line[1], line[2], line[3])
 
-        if "gauss" in parTuple[0]:
-            gaussParsDict[obsid].append(parTuple)
+        if plotMJD:
+            if "gauss" in parTuple[0]:
+                gaussParsDict[date].append(parTuple)
+            else:
+                otherParsDict[date].append(parTuple)
         else:
-            otherParsDict[obsid].append(parTuple)
+            if "gauss" in parTuple[0]:
+                gaussParsDict[obsid].append(parTuple)
+            else:
+                otherParsDict[obsid].append(parTuple)
 
 dictList = [gaussParsDict, otherParsDict]
 for eachDict in dictList:
@@ -165,7 +184,7 @@ for eachDict in dictList:
                 modelPars[tuple[0]][0].append(tuple[1])     # Value
                 modelPars[tuple[0]][1].append(tuple[2])     # Error lower
                 modelPars[tuple[0]][2].append(tuple[3])     # Error upper
-                modelPars[tuple[0]][3].append(key)          # Observation ID
+                modelPars[tuple[0]][3].append(key)          # Observation ID / MJD
             else:
                 modelPars[tuple[0]] = ([tuple[1]], [tuple[2]], [tuple[3]], [key])
 
@@ -173,7 +192,7 @@ for eachDict in dictList:
     rows = math.ceil(math.sqrt(plotNum))
     cols = math.ceil(plotNum / rows)
 
-    fig, axs = plt.subplots(cols, rows, figsize=(16, 10))
+    fig, axs = plt.subplots(cols, rows, figsize=(18, 10))
 
     counter = 0
     for i in range(cols):
@@ -188,15 +207,18 @@ for eachDict in dictList:
 
                 axs[i, j].plot(xAxis, yAxis, label= parName, color="black")
                 axs[i, j].errorbar(xAxis, yAxis, yerr=[errorLow, errorHigh], fmt='o', ecolor="black", color="black", capsize=10)
-                axs[i, j].set_xlabel('Observation IDs')
+                if plotMJD:
+                    axs[i, j].set_xlabel('Modified Julian Date (MJD)')
+                else:
+                    axs[i, j].set_xlabel('Observation IDs')
                 axs[i, j].set_ylabel('Xspec model units')
                 axs[i, j].legend()
-                axs[i, j].set_xticks(ticks, xAxis, rotation=45, ha='right')
+                axs[i, j].set_xticks(ticks, xAxis, rotation=60, ha='right')
                 counter += 1
             except:
                 break
 
-    general_title = "Best-fitting Model Parameters" + "(Abundance: "+ abundance +")"
+    general_title = "Best-fitting Model Parameters " + "(Abundance: "+ abundance +")"
     fig.suptitle(general_title, fontsize=16)
 
     # Adjust layout and save the figure
