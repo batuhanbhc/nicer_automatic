@@ -55,6 +55,7 @@ def shakefit(resultsFile):
 
     for i in range(1, paramNum+1):
         parDelta = AllModels(1)(i).values[1]
+
         if parDelta < 0:  # Check for frozen parameters
             continue
 
@@ -66,6 +67,7 @@ def shakefit(resultsFile):
             Fit.error("stopat 10 0.1 maximum 50 " + str(delChi) + " " + str(i))
             errorResult = AllModels(1)(i).error
             errorString = errorResult[2]
+
 
             if errorString[3] == "T" or errorString[4] == "T":
                 # Hit lower/upper limits, stop the error process for the current model parameter
@@ -80,7 +82,9 @@ def shakefit(resultsFile):
 
             if continueError == False:
                 # Save error calculation results to the log file
+                # Save error calculation results to the log file
                 parName = AllModels(1)(i).name
+                parValue = AllModels(1)(i).values[0]
                 parValue = AllModels(1)(i).values[0]
                 errorTuple = "(" + listToStr(errorResult) + ")"
                 resultsFile.write("Par " + str(i) + ": " + parName + " " + errorTuple+"\n")
@@ -172,9 +176,8 @@ def updateParameters(modList):
         parameters = compObj.parameterNames
         for par in parameters:
             parObj = getattr(compObj, par)
-            indx = parObj.index
             fullName = comp + "." + par
-            modelDict[fullName] = AllModels(1)(indx).values
+            modelDict[fullName] = parObj.values
     
     modelStats["chi"] = Fit.statistic
     modelStats["dof"] = Fit.dof
@@ -477,6 +480,34 @@ def matchGaussWithEnergy(gaussGroups):
                     matchDict[comp] = str(energyGroup) + "keV_gauss"
     
     return matchDict
+
+def findTheClosestValue(targetNum, valueList):
+    minDiff = 9999
+    closestValue = 0
+    for val in valueList:
+        tempDiff = abs(targetNum - val)
+        if tempDiff < minDiff:
+            minDiff = tempDiff
+            closestValue = val
+    
+    return closestValue
+
+def matchGaussWithEnergy(gaussGroups):
+    # Match gaussian component with their corresponding emission/absorption line in keV
+    # e.g. matchDict = {gaussian: 1.8keV_gauss, gaussian_5: 6.7keV_gauss, ...}
+    matchDict = {}
+
+    for comp in AllModels(1).componentNames:
+        if "gauss" in comp:
+            compObj = getattr(AllModels(1), comp)
+            for par in compObj.parameterNames:
+                if par == "LineE":
+                    parObj = getattr(compObj, par)
+                    value = parObj.values[0]
+                    energyGroup = findTheClosestValue(value, gaussGroups)
+                    matchDict[comp] = str(energyGroup) + "keV_gauss"
+    
+    return matchDict
 #===================================================================================================================
 # Find the script's own path
 scriptPath = os.path.abspath(__file__)
@@ -541,6 +572,10 @@ for obs in inputFile.readlines():
         ["TBabs*(diskbb+powerlaw)", {"powerlaw.PhoIndex": 2}, {}],
         ["TBabs*(diskbb+powerlaw+gaussian)", {"gaussian.LineE": "6.984 -1", "gaussian.Sigma": "0.07,,0.05,0.05,0.2,0.2", "gaussian.norm":"-1e-3,1e-4,-1e12,-1e12,-1e-12,-1e-12"}, {}]
     ]
+
+    # These are the energies of both emission and absorption gausses that will be tried to fit to the observation along the script.
+    # If you add/delete a gauss component along the script, make sure to update this list as well.
+    gaussEnergyList = [6.98, 6.7, 1.8]
     
     file = open(resultsFile, "w")
     Xset.openLog("xspec_output.log")
@@ -787,7 +822,7 @@ for obs in inputFile.readlines():
         writeBestFittingModel(file)
         saveModel(modFileName, obsid)
         saveModel(modFileName, obsid, commonDirectory)
-    #==========================================================================
+        #==========================================================================
     if errorCalculations:
         # Rename gauss names in the temp_parameters.txt file for grouping purposes.
         # For instance, this part changes gauss names from "gaussian_5" to "6.7keV_gauss" and so on.
@@ -817,7 +852,36 @@ for obs in inputFile.readlines():
         inputFile.close()
         outFile.close()
     #================================================================
-    # Remove any existing best model files and save the new one
+    #==========================================================================
+    if errorCalculations:
+        # Rename gauss names in the test_parameters.txt file for grouping purposes.
+        # For instance, this part changes gauss names from "gaussian_5" to "6.7keV_gauss" and so on.
+        renameDict = matchGaussWithEnergy(gaussEnergyList)
+        inputFile = open("temp_parameters.txt", "r")
+        outputFile = "parameters_bestmodel.txt"
+
+        if Path(outputFile).exists():
+            os.system("rm " + outputFile)
+        os.system("touch " + outputFile)
+
+        outFile = open(outputFile, "w")
+
+        for line in inputFile.readlines():
+            line = line.split(" ")
+            compName = line[0]
+            compName = compName[: compName.find(".")]
+            rest = line[0][line[0].find("."):]
+            for key, val in renameDict.items():
+                if compName == key:
+                    line[0] = val + rest
+                    break
+
+            outFile.write(listToStr(line))
+        
+        inputFile.close()
+        outFile.close()
+    #===========================================================================
+    # Remove any pre-existing best model files and save a new one
     for eachFile in allFiles:
         if "best_" in eachFile:
             os.system("rm " + eachFile)
