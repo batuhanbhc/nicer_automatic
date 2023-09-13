@@ -772,64 +772,72 @@ for x in range(2):
                     file.write("\n====================================================================================\n")
                     file.write("1.8 keV gauss is taken out from the model due to not improving the fit significantly.")
                     file.write("\n====================================================================================\n\n")
-                
-                if iteration < iterationMax and takeAverages:
-                    # Save tbabs.nH and pcfabs.nH values after finding the best fitting model (before calculating errors)
-                    # These values will be used to calculate average nH values, which then will be used to refit all observations by fixing nH parameters
-                    tbabsNH = AllModels(1).TBabs.nH.values[0]
-                    pcfabsNH = AllModels(1).pcfabs.nH.values[0]
+        
+        #========================================================================================================================================
+        # Start recording nH values if fixNH is set to True.
+        if iteration < iterationMax and takeAverages:
+            # Save tbabs.nH and pcfabs.nH values after finding the best fitting model (before calculating errors)
+            # These values will be used to calculate average nH values, which then will be used to refit all observations by fixing nH parameters
+            if "TBabs" in AllModels(1).expression:
+                tbabsNH = AllModels(1).TBabs.nH.values[0]
+                if "TBabs.nH" not in fixedValuesNH:
+                    fixedValuesNH["TBabs.nH"] = [tbabsNH]
+                else:
+                    fixedValuesNH["TBabs.nH"].append(tbabsNH)
+            
+            if "pcfabs" in AllModels(1).expression:
+                pcfabsNH = AllModels(1).pcfabs.nH.values[0]
+                if "pcfabs.nH" not in fixedValuesNH:
+                    fixedValuesNH["pcfabs.nH"] = [pcfabsNH]
+                else:
+                    fixedValuesNH["pcfabs.nH"].append(pcfabsNH)
 
-                    if "TBabs.nH" not in fixedValuesNH:
-                        fixedValuesNH["TBabs.nH"] = [tbabsNH]
-                        fixedValuesNH["pcfabs.nH"] = [pcfabsNH]
-                    else:
-                        fixedValuesNH["TBabs.nH"].append(tbabsNH)
-                        fixedValuesNH["pcfabs.nH"].append(pcfabsNH)
-                    
-                    # Close all log files
-                    closeAllFiles()
+            # Close all log files
+            closeAllFiles()
 
-                    continue
+            continue
 
-                elif iteration == iterationMax and takeAverages:
-                    # The maximum sample size for calculating average nH values has been reached.
-                    # Terminate the first iteration of fitting observations, calculate average nH values and refit all observations again.
-                    startFixingNH = True
-                    takeAverages = False
+        elif iteration == iterationMax and takeAverages:
+            # The maximum sample size for calculating average nH values has been reached.
+            # Terminate the first iteration of fitting observations, calculate average nH values and refit all observations again.
+            startFixingNH = True
+            takeAverages = False
 
-                    totalTBabsNH = 0
-                    totalPcfabsNH = 0
-                    fixedValuesNH["TBabs.nH"] = filterOutliers(fixedValuesNH["TBabs.nH"])
-                    fixedValuesNH["pcfabs.nH"] = filterOutliers(fixedValuesNH["pcfabs.nH"])
-                    tbabsNum = len(fixedValuesNH["TBabs.nH"])
-                    pcfabsNum = len(fixedValuesNH["pcfabs.nH"])
+            if "TBabs" in AllModels(1).expression:
+                totalTBabsNH = 0
+                fixedValuesNH["TBabs.nH"] = filterOutliers(fixedValuesNH["TBabs.nH"])
+                tbabsNum = len(fixedValuesNH["TBabs.nH"])
+                for val in fixedValuesNH["TBabs.nH"]:
+                    totalTBabsNH += val
 
-                    for val in fixedValuesNH["TBabs.nH"]:
-                        totalTBabsNH += val
-                    
-                    for val in fixedValuesNH["pcfabs.nH"]:
-                        totalPcfabsNH += val
-                    
-                    avgTBabs = totalTBabsNH / tbabsNum
-                    avgPcfabs = totalPcfabsNH / pcfabsNH
-                    
-                    fixedValuesNH["TBabs.nH"] = str(avgTBabs) + " -1"
-                    fixedValuesNH["pcfabs.nH"] = str(avgPcfabs) + " -1"
+                avgTBabs = totalTBabsNH / tbabsNum
+                fixedValuesNH["TBabs.nH"] = str(avgTBabs) + " -1"
+            
+            if "pcfabs" in AllModels(1).expression:
+                totalPcfabsNH = 0
+                fixedValuesNH["pcfabs.nH"] = filterOutliers(fixedValuesNH["pcfabs.nH"])
+                pcfabsNum = len(fixedValuesNH["pcfabs.nH"])
+                for val in fixedValuesNH["pcfabs.nH"]:
+                    totalPcfabsNH += val
+            
+                avgPcfabs = totalPcfabsNH / pcfabsNH
+                fixedValuesNH["pcfabs.nH"] = str(avgPcfabs) + " -1"
 
-                    # Close all log files
-                    closeAllFiles()
-                    
-                    break
-
-                if errorCalculations and fixNH:
-                    shakefit(file)
-                    updateParameters(bestModel)
-
+            # Close all log files
+            closeAllFiles()
+            
+            break
+        #========================================================================================================================================
+        
         if powOut == False:
             # Restore the best-fitting model back
             Xset.restore(mainModelFile)
             modFileName = extractModFileName()
+
+            if fixNH:
+                fixAllNH(fixedValuesNH)
             fitModel()
+
             if errorCalculations:
                 shakefit(file)
                 
@@ -838,6 +846,9 @@ for x in range(2):
             saveModel(modFileName, obsid, commonDirectory)
         else:
             # Save the new model without powerlaw
+            if errorCalculations:
+                    shakefit(file)
+
             modFileName = extractModFileName()
             writeBestFittingModel(file)
             saveModel(modFileName, obsid)
@@ -912,24 +923,28 @@ for x in range(2):
         startFixingNH = True
         takeAverages = False
 
-        totalTBabsNH = 0
-        totalPcfabsNH = 0
-        fixedValuesNH["TBabs.nH"] = filterOutliers(fixedValuesNH["TBabs.nH"])
-        fixedValuesNH["pcfabs.nH"] = filterOutliers(fixedValuesNH["pcfabs.nH"])
-        tbabsNum = len(fixedValuesNH["TBabs.nH"])
-        pcfabsNum = len(fixedValuesNH["pcfabs.nH"])
+        if "TBabs" in AllModels(1).expression:
+            totalTBabsNH = 0
+            fixedValuesNH["TBabs.nH"] = filterOutliers(fixedValuesNH["TBabs.nH"])
+            tbabsNum = len(fixedValuesNH["TBabs.nH"])
+            for val in fixedValuesNH["TBabs.nH"]:
+                totalTBabsNH += val
 
-        for val in fixedValuesNH["TBabs.nH"]:
-            totalTBabsNH += val
+            avgTBabs = totalTBabsNH / tbabsNum
+            fixedValuesNH["TBabs.nH"] = str(avgTBabs) + " -1"
         
-        for val in fixedValuesNH["pcfabs.nH"]:
-            totalPcfabsNH += val
+        if "pcfabs" in AllModels(1).expression:
+            totalPcfabsNH = 0
+            fixedValuesNH["pcfabs.nH"] = filterOutliers(fixedValuesNH["pcfabs.nH"])
+            pcfabsNum = len(fixedValuesNH["pcfabs.nH"])
+            for val in fixedValuesNH["pcfabs.nH"]:
+                totalPcfabsNH += val
         
-        avgTBabs = totalTBabsNH / tbabsNum
-        avgPcfabs = totalPcfabsNH / pcfabsNH
-        
-        fixedValuesNH["TBabs.nH"] = str(avgTBabs) + " -1"
-        fixedValuesNH["pcfabs.nH"] = str(avgPcfabs) + " -1"
+            avgPcfabs = totalPcfabsNH / pcfabsNH
+            fixedValuesNH["pcfabs.nH"] = str(avgPcfabs) + " -1"
+
+        # Close all log files
+        closeAllFiles()
 
     if fixNH == False:
         # The whole fitting process is looped twice for refitting purposes. If fixing nH option is False, do not try to refit
