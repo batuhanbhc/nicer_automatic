@@ -135,9 +135,10 @@ for obs in inputFile.readlines():
     
     # Extract MJD
     hdu = fits.open(spectrumFile)
-    date = str(int(hdu[1].header["MJD-OBS"]))
+    date = str(format(hdu[1].header["MJD-OBS"], ".1f"))
     hdu.close()
 
+    Xset.chatter = 0
     Xset.restore(modFile)
     abundance = Xset.abund[:Xset.abund.find(":")]
     
@@ -175,8 +176,17 @@ for obs in inputFile.readlines():
             else:
                 otherParsDict[obsid].append(parTuple)
 
+counter = 0
 dictList = [gaussParsDict, otherParsDict]
+print("=============================================================================================================")
 for eachDict in dictList:
+    counter += 1
+
+    if counter == 1:
+        print("Plotting the graph: gauss parameters")
+    else:
+        print("Plotting the graph: non-gauss parameters")
+
     modelPars = {}
     for key, val in eachDict.items():
         for tuple in val:
@@ -189,6 +199,17 @@ for eachDict in dictList:
                 modelPars[tuple[0]] = ([tuple[1]], [tuple[2]], [tuple[3]], [key])
 
     plotNum = len(modelPars.keys())
+    
+    if plotNum == 0:
+        if counter == 1:
+            problematicGraph = "gauss parameters"
+        else:
+            problematicGraph = "non-gauss parameters"
+
+        print("WARNING: The script is trying to create graphs without any parameters. Skipping the following graph: " + problematicGraph + "\n")
+
+        continue
+
     rows = math.ceil(math.sqrt(plotNum))
     cols = math.ceil(plotNum / rows)
 
@@ -238,3 +259,5 @@ for eachDict in dictList:
             subprocess.run(["rm", pngFile])
 
         plt.savefig(pngFile)
+
+    print("Plotting the graph was successful.\n")
