@@ -820,7 +820,7 @@ for x in range(2):
                 for val in fixedValuesNH["pcfabs.nH"]:
                     totalPcfabsNH += val
             
-                avgPcfabs = totalPcfabsNH / pcfabsNH
+                avgPcfabs = totalPcfabsNH / pcfabsNum
                 fixedValuesNH["pcfabs.nH"] = str(avgPcfabs) + " -1"
 
             # Close all log files
@@ -949,3 +949,8 @@ for x in range(2):
     if fixNH == False:
         # The whole fitting process is looped twice for refitting purposes. If fixing nH option is False, do not try to refit
         break
+
+os.chdir(scriptDir)
+
+# Run the plot script
+os.system("python3 nicer_plot.py")
