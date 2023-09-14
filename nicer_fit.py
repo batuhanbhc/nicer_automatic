@@ -121,6 +121,8 @@ def shakefit(resultsFile):
                 info = "FAILED_POSITIVE_DIRECTION"
             parLines[i] = parLines[i] + str(parValue) + " " + lowerBound + " " + upperBound + " " + info + "\n"
 
+    updateParameters(bestModel)
+
     # Write the parameter information from list to the temporary parameter file
     parFile = open(parameterFile, "w")
     for line in parLines:
@@ -134,10 +136,9 @@ def listToStr(array):
     result = result[:-1]
     return result
 
-def getParsFromList(currentModList, prevModList, ignoreList = []):
-    modelName = currentModList[0]
-    mainList = currentModList[1]
-    stemList = prevModList[1]
+def getParsFromList(modList, ignoreList = []):
+    modelName = modList[0]
+    parameterList = modList[1]
 
     parNum = AllModels(1).nParameters
 
@@ -153,12 +154,9 @@ def getParsFromList(currentModList, prevModList, ignoreList = []):
                 parObj = getattr(compObj, par)
                 indx = parObj.index
                 fullName = comp + "." + par
-                # If the parameter value is stored in previous model's list, take it from there. Otherwise, look whether
-                # it is initialized in current model's list
-                if fullName in stemList:
-                    AllModels(1)(indx).values = stemList[fullName]
-                elif fullName in mainList:
-                    AllModels(1)(indx).values = mainList[fullName]
+
+                if fullName in parameterList:
+                    AllModels(1)(indx).values = parameterList[fullName]
  
 def fitModel():
     Fit.query = "yes"
@@ -326,11 +324,12 @@ def removeComp(compName, compNum, modelList):   # compNum is the n'th occurence 
                             modelName = modelName.replace(compName, "", 1)
 
     modelList[1] = tempDict
+    modelList[0] = modelName
     m = Model(modelName)
-    getParsFromList(modelList, modelList)
+    getParsFromList(modelList)
 
 def addComp(compName, targetComp ,before_after, calcChar, modelList):
-    modelName = AllModels(1).expression
+    modelName = modelList[0]
     if calcChar != "*" and calcChar != "+":
         print("\nIncorrect character for model expression. Terminating the script...\n")
         quit()
@@ -352,7 +351,7 @@ def addComp(compName, targetComp ,before_after, calcChar, modelList):
     alter_list_add(compName, addedCompIndex, modelList)
     m = Model(newModelName)
     modelList[0] = AllModels(1).expression.replace(" ", "")
-    getParsFromList(modelList, modelList)
+    getParsFromList(modelList)
     modelList[1] = {}
     updateParameters(modelList)
 
@@ -609,19 +608,11 @@ for x in range(2):
         #-------------------------------------------------------------------------------------    
         # From now on, PyXspec will be utilized for fitting and comparing models
 
-        # The list for models for fitting. The models will be compared using ftest within a loop.
-        # The structure of the list: 
-        # [ 1:<model name> 2:<parameter list> 3:<Fit results>  
-        modelList = [
-            ["TBabs*diskbb", {"TBabs.nH": 8}, {}],
-            ["TBabs*(diskbb+powerlaw)", {"powerlaw.PhoIndex": 2}, {}],
-            ["TBabs*(diskbb+powerlaw+gaussian)", {"gaussian.LineE": "6.984 -1", "gaussian.Sigma": "0.07,,0.05,0.05,0.2,0.2", "gaussian.norm":"-1e-3,1e-4,-1e12,-1e12,-1e-12,-1e-12"}, {}]
-        ]
-
         # These are the energies of both emission and absorption gausses that will be tried to fit to the observation along the script.
         # If you add/delete a gauss component along the script, make sure to update this list as well.
         gaussEnergyList = [6.98, 6.7, 1.8]
         
+        # Set some Xspec settings
         file = open(resultsFile, "w")
         Xset.openLog("xspec_output.log")
         Xset.abund = "wilm"
@@ -638,88 +629,89 @@ for x in range(2):
         AllData(1).ignore("**-1.5 10.-**")
         saveData()
         
-        # Initialize the index values of models for comparing them in a loop
-        modelNumber = len(modelList)
-        mainIdx = 0
-        alternativeIdx = 1
-        prevIdx = 0
-        for i in range(modelNumber-1):
-            # Define the current main model
-            m = Model(modelList[mainIdx][0])
-            mainModFileName = extractModFileName()
-            mainModelFile = commonDirectory + "/" + mainModFileName
-            if Path(mainModelFile).exists():
-                Xset.restore(mainModelFile)
-            else:
-                getParsFromList(modelList[mainIdx], modelList[prevIdx])
+        # This list will carry the model name, model parameters and fit statistics for the best model throughout the script.
+        # First element is the model name, second element is the dictionary for parameter name-value pairs, third element is the dictionary for fit statistics
+        # such as chi-squared, degrees of freedom and null hypothesis probability.
+        bestModel = ["TBabs*(diskbb)", {}, {}]
 
-            fitModel()
-            updateParameters(modelList[mainIdx])
-            saveModel(mainModFileName, obsid)
-            saveModel(mainModFileName, obsid, commonDirectory)
-            nullhypModelList = transferToNewList(modelList[mainIdx])
+        #=================================================================================
+        # Load the first model (TBabs*diskbb) and fit
+        m = Model(bestModel[0])  
 
-            # Define the alternative model
-            m = Model(modelList[alternativeIdx][0])
-            altModFileName = extractModFileName()
-            alternativeModelFile = commonDirectory + "/" + altModFileName
-            if Path(alternativeModelFile).exists():
-                Xset.restore(alternativeModelFile)
-            else:
-                getParsFromList(modelList[alternativeIdx], modelList[prevIdx])
+        modelFile = extractModFileName()
+        if Path(commonDirectory + "/" + modelFile).exists():
+            # Load the model file to PyXspec
+            Xset.restore(commonDirectory + "/" + modelFile)
 
-            fitModel()
-            updateParameters(modelList[alternativeIdx])
-            saveModel(altModFileName, obsid)
-            saveModel(altModFileName, obsid, commonDirectory)
-            altModelList = transferToNewList(modelList[alternativeIdx])
-
-            # Apply the f-test
-            pValue = performFtest(nullhypModelList, altModelList, file)
-
-            if abs(pValue) < ftestCrit:    
-                # Alternative model has significantly improved the fit, set the alternative model as new main model
-                mainModelFile = alternativeModelFile
-                prevIdx = alternativeIdx
-                mainIdx = alternativeIdx
-            else:
-                prevIdx = alternativeIdx
-            
-            alternativeIdx += 1
-        
-
-        # At the end of the loop, mainIdx will hold the best fitting model. Reload the model
-        Xset.restore(mainModelFile)
-        mainModelName = AllModels(1).expression.replace(" ", "")
-
-        #==============================================================================================
-        # Create another entry in modelList, which will carry the best model with further changes to it
-        modelList.append([modelList[mainIdx][0]])
-
-        parsDict = {}
-        for key,val in modelList[mainIdx][1].items():
-            parsDict[key] = val
-        modelList[-1].append(parsDict)
-
-        statsDict = {}
-        for key,val in modelList[mainIdx][2].items():
-            statsDict[key] = val
-        modelList[-1].append(statsDict)
-
-        bestModel = modelList[-1]
-        #===============================================================================================
+        fitModel()
+        updateParameters(bestModel)
+        saveModel(modelFile, obsid)
+        saveModel(modelFile, obsid, commonDirectory)
         nullhypModelList = transferToNewList(bestModel)
+        #=================================================================================
+        # Add powerlaw to the previous model and fit
+        addComp("powerlaw", "diskbb", "after", "+", bestModel)
 
-        # Try to add another gauss at 6.7 keV, remove if it does not improve the fit significant enough.
-        gaussParList = ["6.7 -1", "0.07,,0.05,0.05,0.2,0.2", "-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"]
-        addComp("gaussian", "diskbb", "after", "+", bestModel)
-        assignParameters("gauss", gaussParList, 1)
+        modelFile = extractModFileName()
+        if Path(commonDirectory + "/" + modelFile).exists():
+            Xset.restore(commonDirectory + "/" + modelFile)
+        else:
+            getParsFromList(bestModel)
+            powerlawPars = ["3", "1e-3"]
+            assignParameters("powerlaw", powerlawPars, 1)
+        
+        fitModel()
+        updateParameters(bestModel)
+        saveModel(modelFile, obsid)
+        saveModel(modelFile, obsid, commonDirectory)
+        altModelList = bestModel
+        
+        #=================================================================================
+        # Apply f-test and check whether powerlaw improves the fit significantly or not
+        pValue = performFtest(nullhypModelList, altModelList, file, "Adding powerlaw")
+
+        if abs(pValue) >= ftestCrit:
+            removeComp("powerlaw", 1, bestModel)
+            fitModel()
+            updateParameters(bestModel)
+
+        nullhypModelList = transferToNewList(bestModel)
+        #=================================================================================
+        # Add 6.98 keV absorption gauss and fit
+        gaussPars_1 = ["6.98,,6.95,6.95,7.05,7.05", "7e-2,,0.05,0.05,0.2,0.2", "-1e-3,,-1e12,-1e12,-1e-12,-1e-12"]
+        addComp("gaussian", "diskbb", "before", "+", bestModel)
+        getParsFromList(bestModel)
+        assignParameters("gaussian", gaussPars_1, 1)
+
+        fitModel()
+        updateParameters(bestModel)
+        saveModel(modelFile, obsid)
+        altModelList = bestModel
+
+        #=================================================================================
+        # Apply f-test and check whether last gaussian improves the fit significantly or not
+        pValue = performFtest(nullhypModelList, altModelList, file, "Adding 6.98 keV absorption gauss")
+
+        if abs(pValue) >= ftestCrit:
+            removeComp("gaussian", 1, bestModel)
+            fitModel()
+            updateParameters(bestModel)
+
+        nullhypModelList = transferToNewList(bestModel)
+        #===============================================================================================
+        # Add 6.7 keV absorption gauss and fit
+        gaussPars_2 = ["6.7,,6.65,6.65,6.75,6.75", "0.07,,0.05,0.05,0.2,0.2", "-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"]
+        addComp("gaussian", "diskbb", "before", "+", bestModel)
+        gaussCount = wordCounter(AllModels(1).expression, "gaussian")
+        assignParameters("gauss", gaussPars_2, gaussCount)
+
         fitModel()
         updateParameters(bestModel)
 
         altModelList = bestModel
 
-        # Apply f-test
+        #===============================================================================================
+        # Apply f-test and check whether last gaussian improves the fit significantly or not
         pValue = performFtest(nullhypModelList, altModelList, file, "(adding 6.7 keV absorption gauss)")
         
         if abs(pValue) >= ftestCrit:
@@ -732,6 +724,9 @@ for x in range(2):
             file.write("\n====================================================================================\n")
         
         # Check whether powerlaw has positive index and steep slope (> 6, pretty much fits the lower energies only), take it out if that is the case
+        modelBeforePowerlaw = extractModFileName()
+        saveModel(modelBeforePowerlaw, obsid)
+
         powOut = False
         if "powerlaw" in AllModels(1).expression:
             if AllModels(1).powerlaw.PhoIndex.values[0] > 6:
@@ -753,9 +748,11 @@ for x in range(2):
                 nullhypModelList = transferToNewList(bestModel)
 
                 # Add an emission line at 1.8 keV (A gold line?)
-                gaussPars = ["1.8 -1", "0.07,,0.05,0.05,0.2,0.2", "0.01"]
+                gaussPars_3 = ["1.8 -1", "0.07,,0.05,0.05,0.2,0.2", "0.01"]
                 addComp("gaussian", "diskbb", "after", "+", bestModel)
-                assignParameters("gauss", gaussPars, 1)
+                gaussCount = wordCounter(AllModels(1).expression, "gaussian")
+                assignParameters("gauss", gaussPars_3, gaussCount)
+
                 fitModel()
                 updateParameters(bestModel)
 
@@ -772,7 +769,7 @@ for x in range(2):
                     file.write("\n====================================================================================\n")
                     file.write("1.8 keV gauss is taken out from the model due to not improving the fit significantly.")
                     file.write("\n====================================================================================\n\n")
-        
+
         #========================================================================================================================================
         # Start recording nH values if fixNH is set to True.
         if iteration < iterationMax and takeAverages:
@@ -831,7 +828,7 @@ for x in range(2):
         
         if powOut == False:
             # Restore the best-fitting model back
-            Xset.restore(mainModelFile)
+            Xset.restore(modelBeforePowerlaw)
             modFileName = extractModFileName()
 
             if fixNH:
@@ -890,6 +887,11 @@ for x in range(2):
                 os.system("rm " + eachFile)
         saveModel("best_" + modFileName, obsid)
 
+        """for key,val in bestModel[1].items():
+            print(key, val)
+        print(AllModels(1).expression)
+        file.close()
+        quit()"""
         # Write equivalent widths of gausses to log file
         gaussEqwidthList = calculateGaussEqw()
         file.write("Gauss equivalent widths: (90% confidence intervals) \n")
