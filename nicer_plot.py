@@ -6,21 +6,10 @@ from xspec import *
 import matplotlib.pyplot as plt
 import math
 from astropy.io import fits
-
+from nicer_variables import energyFilter, resultsFile, outputDir
 #===================================================================================================================================
-# The location of the observation folders
-outputDir = "/home/batuhanbahceci/NICER/analysis"
-
-# Name of the log file
-resultsFile = "script_results.log"
-
 # If set to True, the plot will use the dates of observations in MJD format for x axis values as opposed to using observation IDs.
 plotMJD = True
-
-energyFilter = "1.5 10."
-energyLimits = energyFilter.split(" ")
-Emin = energyLimits[0]
-Emax = energyLimits[1]
 #===================================================================================================================================
 # Functions
 def listToStr(array):
@@ -92,6 +81,10 @@ def transferToNewList(sourceList):
     return newList
 
 #===================================================================================================================
+energyLimits = energyFilter.split(" ")
+Emin = energyLimits[0]
+Emax = energyLimits[1]
+
 # Find the script's own path
 scriptPath = os.path.abspath(__file__)
 scriptPathRev = scriptPath[::-1]
@@ -261,3 +254,7 @@ for eachDict in dictList:
         plt.savefig(pngFile)
 
     print("Plotting the graph was successful.\n")
+
+# This file is created after importing variables from another python file
+if Path("__pycache__").exists():
+    os.system("rm -rf __pycache__")

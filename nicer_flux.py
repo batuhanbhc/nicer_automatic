@@ -4,18 +4,8 @@ import os
 from pathlib import Path
 from xspec import *
 import matplotlib.pyplot as plt
+from nicer_variables import outputDir, resultsFile, energyFilter
 
-#===================================================================================================================================
-# The location of the observation folders
-outputDir = "/home/batuhanbahceci/NICER/analysis"
-
-# Name of the log file
-resultsFile = "script_results.log"
-
-energyFilter = "1.5 10."
-energyLimits = energyFilter.split(" ")
-Emin = energyLimits[0]
-Emax = energyLimits[1]
 #===================================================================================================================================
 # Functions
 def listToStr(array):
@@ -120,6 +110,10 @@ def calculateFlux(component, modelName):
     
     return fluxVals
 #===================================================================================================================
+energyLimits = energyFilter.split(" ")
+Emin = energyLimits[0]
+Emax = energyLimits[1]
+
 # Find the script's own path
 scriptPath = os.path.abspath(__file__)
 scriptPathRev = scriptPath[::-1]
@@ -196,3 +190,7 @@ for obs in inputFile.readlines():
     file.close()
     AllModels.clear()
     AllData.clear()
+
+# This file is created after importing variables from another python file
+if Path("__pycache__").exists():
+    os.system("rm -rf __pycache__")

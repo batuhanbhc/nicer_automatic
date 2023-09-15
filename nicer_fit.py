@@ -689,7 +689,7 @@ for x in range(2):
         nullhypModelList = transferToNewList(bestModel)
         #=================================================================================
         # Add 6.98 keV absorption gauss and fit
-        gaussPars_1 = ["6.98,,6.95,6.95,7.05,7.05", "7e-2,,0.05,0.05,0.2,0.2", "-1e-3,,-1e12,-1e12,-1e-12,-1e-12"]
+        gaussPars_1 = ["6.98 -1", "7e-2,,0.05,0.05,0.2,0.2", "-1e-3,,-1e12,-1e12,-1e-12,-1e-12"]
         addComp("gaussian", "diskbb", "before", "+", bestModel)
         getParsFromList(bestModel)
         assignParameters("gaussian", gaussPars_1, 1)
@@ -711,7 +711,7 @@ for x in range(2):
         nullhypModelList = transferToNewList(bestModel)
         #===============================================================================================
         # Add 6.7 keV absorption gauss and fit
-        gaussPars_2 = ["6.7,,6.65,6.65,6.75,6.75", "0.07,,0.05,0.05,0.2,0.2", "-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"]
+        gaussPars_2 = ["6.7 -1", "0.07,,0.05,0.05,0.2,0.2", "-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"]
         addComp("gaussian", "diskbb", "before", "+", bestModel)
         gaussCount = wordCounter(AllModels(1).expression, "gaussian")
         assignParameters("gauss", gaussPars_2, gaussCount)
