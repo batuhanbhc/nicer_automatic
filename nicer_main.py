@@ -1,4 +1,7 @@
+# Change the script switches below to select which files you would like to run
+
 import os
+from pathlib import Path
 
 # Find the script's own path
 scriptPath = os.path.abspath(__file__)
@@ -24,5 +27,9 @@ if fitSwitch:
 if fluxSwitch:
     os.system("python3 " + flux_script)
 
-# Sometimes, a file named "1" gets created for reasons I haven't figured out yet
-os.system("rm 1")
+if Path("__pycache__").exists():
+    os.system("rm -rf __pycache__")
+
+if Path("1").exists():
+    # Sometimes, a file named "1" is created for reasons I haven't figured out yet
+    os.system("rm 1")

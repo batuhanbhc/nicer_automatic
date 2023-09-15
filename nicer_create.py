@@ -4,25 +4,17 @@
 import subprocess
 import os
 from pathlib import Path
-
-#===================================================================================================================================
-# Where do you want the event files to be created at (make sure you have this folder exists before running the script)
-outputDir = "/home/batuhanbahceci/NICER/analysis"
-
-# The name of the file that contains paths of the observation folders
-inputTxtFile = "nicer_obs.txt"
-
-# Where do you want the fit results to be recorded
-resultsFile = "script_results.log"
-#====================================================================================================================================
-
-cwd = os.getcwd()
+from nicer_variables import outputDir, inputTxtFile, resultsFile
 
 # Find the script's own path
 scriptPath = os.path.abspath(__file__)
 scriptPathRev = scriptPath[::-1]
 scriptPathRev = scriptPathRev[scriptPathRev.find("/") + 1:]
 scriptPath = scriptPathRev[::-1]
+
+# Check if outputDir has been assigned to be a spesific directory or not
+if outputDir == "":
+    outputDir = scriptPath
 
 # Open the txt file located within the same directory as the script.
 try:
@@ -69,3 +61,7 @@ for obs in obsList:
     logPath = Path(outObsDir +"/" + resultsFile)
     if not logPath.exists():
         subprocess.run(["touch", outObsDir + "/" + resultsFile])
+
+# This file is created after importing variables from another python file
+if Path("__pycache__").exists():
+    os.system("rm -rf __pycache__")
