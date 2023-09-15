@@ -10,3 +10,6 @@ inputTxtFile = "nicer_obs.txt"
 
 # The log file where the fit results will be saved
 resultsFile = "script_results.log"
+
+# Write it in XSpec format
+energyFilter = "1.5 10."

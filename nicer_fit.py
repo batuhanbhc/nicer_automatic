@@ -4,18 +4,13 @@ import os
 from pathlib import Path
 from xspec import *
 import numpy as np
+from nicer_variables import outputDir, resultsFile, energyFilter
 
 #===================================================================================================================================
-# The location of the observation folders
-outputDir = "/home/batuhanbahceci/NICER/analysis"
-
 # Set it to True if you have made changes in models, and do not want to use any previous model files in commonDirectory
 # restartOnce only deletes model files before the first observation, restartAlways deletes model files before all observations
 restartOnce = True
 restartAlways = False
-
-# Name of the log file
-resultsFile = "script_results.log"
 
 # Critical value for F-test
 ftestCrit = 0.05
@@ -30,6 +25,10 @@ errorCalculations = True    # If set to True, the script will run "shakefit" fun
 fixNH = True                # If set to True, the script will fit "sampleSize" amount of observations, and take average values for nH parameters, then
                             # refit all observations by freezing nH parameters to the average values.
 sampleSize = 10
+
+energyLimits = energyFilter.split(" ")
+Emin = energyLimits[0]
+Emax = energyLimits[1]
 #===================================================================================================================================
 # Functions
 def shakefit(resultsFile):
@@ -548,6 +547,10 @@ scriptPathRev = scriptPathRev[scriptPathRev.find("/") + 1:]
 scriptDir = scriptPathRev[::-1]
 os.chdir(scriptDir)
 
+# Check if outputDir has been assigned to be a spesific directory or not
+if outputDir == "":
+    outputDir = scriptDir
+
 allDir = os.listdir(outputDir)
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
 
@@ -632,7 +635,7 @@ for x in range(2):
         s1 = Spectrum(dataFile=spectrumFile, arfFile=arfFile, respFile=rmfFile, backFile=backgroundFile)
         Plot.xAxis = "keV"
         AllData.ignore("bad")
-        AllData(1).ignore("**-1.5 10.-**")
+        AllData(1).ignore("**-" + Emin + " " + Emax +"-**")
         saveData()
         
         # This list will carry the model name, model parameters and fit statistics for the best model throughout the script.
@@ -782,14 +785,14 @@ for x in range(2):
         # Start recording nH values if fixNH is set to True.
         if iteration < iterationMax and takeAverages:
             # Save tbabs.nH and pcfabs.nH values after finding the best fitting model (before calculating errors)
-            # These values will be used to calculate average nH values, which then will be used to refit all observations by fixing nH parameters
+            # These values will be used to calculate average nH values, which then will be used to refit all observations by fixing nH parameters    
             if "TBabs" in AllModels(1).expression:
                 tbabsNH = AllModels(1).TBabs.nH.values[0]
                 if "TBabs.nH" not in fixedValuesNH:
                     fixedValuesNH["TBabs.nH"] = [tbabsNH]
                 else:
                     fixedValuesNH["TBabs.nH"].append(tbabsNH)
-            
+
             if "pcfabs" in AllModels(1).expression:
                 pcfabsNH = AllModels(1).pcfabs.nH.values[0]
                 if "pcfabs.nH" not in fixedValuesNH:
@@ -805,6 +808,22 @@ for x in range(2):
         elif iteration == iterationMax and takeAverages:
             # The maximum sample size for calculating average nH values has been reached.
             # Terminate the first iteration of fitting observations, calculate average nH values and refit all observations again.
+
+            # Save the nH values for calculating average one last time for the last observation
+            if "TBabs" in AllModels(1).expression:
+                tbabsNH = AllModels(1).TBabs.nH.values[0]
+                if "TBabs.nH" not in fixedValuesNH:
+                    fixedValuesNH["TBabs.nH"] = [tbabsNH]
+                else:
+                    fixedValuesNH["TBabs.nH"].append(tbabsNH)
+
+            if "pcfabs" in AllModels(1).expression:
+                pcfabsNH = AllModels(1).pcfabs.nH.values[0]
+                if "pcfabs.nH" not in fixedValuesNH:
+                    fixedValuesNH["pcfabs.nH"] = [pcfabsNH]
+                else:
+                    fixedValuesNH["pcfabs.nH"].append(pcfabsNH)
+
             startFixingNH = True
             takeAverages = False
 
@@ -920,35 +939,6 @@ for x in range(2):
             file.write("show fit\n")
             file.write("echo OBSID:" + obsid + "\n")
             file.close()
-    
-    if fixNH == True and takeAverages == True:
-        # This part calculates and records average nH values in case the script did not have a chance to do so previously especially if 
-        # there were no "iterationMax" amount of observations
-        startFixingNH = True
-        takeAverages = False
-
-        if "TBabs" in AllModels(1).expression:
-            totalTBabsNH = 0
-            fixedValuesNH["TBabs.nH"] = filterOutliers(fixedValuesNH["TBabs.nH"])
-            tbabsNum = len(fixedValuesNH["TBabs.nH"])
-            for val in fixedValuesNH["TBabs.nH"]:
-                totalTBabsNH += val
-
-            avgTBabs = totalTBabsNH / tbabsNum
-            fixedValuesNH["TBabs.nH"] = str(avgTBabs) + " -1"
-        
-        if "pcfabs" in AllModels(1).expression:
-            totalPcfabsNH = 0
-            fixedValuesNH["pcfabs.nH"] = filterOutliers(fixedValuesNH["pcfabs.nH"])
-            pcfabsNum = len(fixedValuesNH["pcfabs.nH"])
-            for val in fixedValuesNH["pcfabs.nH"]:
-                totalPcfabsNH += val
-        
-            avgPcfabs = totalPcfabsNH / pcfabsNH
-            fixedValuesNH["pcfabs.nH"] = str(avgPcfabs) + " -1"
-
-        # Close all log files
-        closeAllFiles()
 
     if fixNH == False:
         # The whole fitting process is looped twice for refitting purposes. If fixing nH option is False, do not try to refit
@@ -958,3 +948,7 @@ os.chdir(scriptDir)
 
 # Run the plot script
 os.system("python3 nicer_plot.py")
+
+# This file is created after importing variables from another python file
+if Path("__pycache__").exists():
+    os.system("rm -rf __pycache__")
