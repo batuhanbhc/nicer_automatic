@@ -439,7 +439,7 @@ def performFtest(mainModelList, altModelList, logFile, infoTxt = ""):
 
     return pValue
 
-def calculateGaussEqw():
+def calculateGaussEqw(logFile):
     eqwList = []
     counter = 0
     for comp in AllModels(1).componentNames:
@@ -449,10 +449,16 @@ def calculateGaussEqw():
             compObj = getattr(AllModels(1), comp)
             energyVal = compObj.LineE.values[0]
 
-            AllModels.eqwidth(counter, err=True, number=1000, level=90)
-            eqwList.append("Equivalent width: " + str(listToStr(AllData(1).eqwidth)) + " (" + str(format(energyVal, ".2f")) + " keV gauss)\n")
+            try:
+                AllModels.eqwidth(counter, err=True, number=1000, level=90)
+                eqwList.append("Equivalent width: " + str(listToStr(AllData(1).eqwidth)) + " (" + str(format(energyVal, ".2f")) + " keV gauss)\n")
+            except:
+                eqwList.append("Calculating eqw failed for component: " + comp + "\n")
     
-    return eqwList
+    if eqwList != []:
+        logFile.write("Gauss equivalent widths: (90% confidence intervals) \n")
+        for each in eqwList:
+            logFile.write(each)
 
 def findTheClosestValue(targetNum, valueList):
     minDiff = 9999
@@ -530,7 +536,7 @@ def filterOutliers(dataset):
     return filtered_dataset
 
 def closeAllFiles():
-    file.close()
+    logFile.close()
     Xset.closeLog()
     AllModels.clear()
     AllData.clear()
@@ -613,14 +619,14 @@ for x in range(2):
         gaussEnergyList = [6.98, 6.7, 1.8]
         
         # Set some Xspec settings
-        file = open(resultsFile, "w")
+        logFile = open(resultsFile, "w")
         Xset.openLog("xspec_output.log")
         Xset.abund = "wilm"
         if chatterOn == False: 
             Xset.chatter = 0
         Fit.query = "yes"
 
-        file.write("OBSERVATION ID: " + obsid + "\n\n")
+        logFile.write("OBSERVATION ID: " + obsid + "\n\n")
 
         # Load the necessary files
         s1 = Spectrum(dataFile=spectrumFile, arfFile=arfFile, respFile=rmfFile, backFile=backgroundFile)
@@ -642,6 +648,8 @@ for x in range(2):
         if Path(commonDirectory + "/" + modelFile).exists():
             # Load the model file to PyXspec
             Xset.restore(commonDirectory + "/" + modelFile)
+        else:
+            getParsFromList(bestModel)
 
         fitModel()
         updateParameters(bestModel)
@@ -668,7 +676,7 @@ for x in range(2):
         
         #=================================================================================
         # Apply f-test and check whether powerlaw improves the fit significantly or not
-        pValue = performFtest(nullhypModelList, altModelList, file, "Adding powerlaw")
+        pValue = performFtest(nullhypModelList, altModelList, logFile, "Adding powerlaw")
 
         if abs(pValue) >= ftestCrit:
             removeComp("powerlaw", 1, bestModel)
@@ -690,7 +698,7 @@ for x in range(2):
 
         #=================================================================================
         # Apply f-test and check whether last gaussian improves the fit significantly or not
-        pValue = performFtest(nullhypModelList, altModelList, file, "Adding 6.98 keV absorption gauss")
+        pValue = performFtest(nullhypModelList, altModelList, logFile, "Adding 6.98 keV absorption gauss")
 
         if abs(pValue) >= ftestCrit:
             removeComp("gaussian", 1, bestModel)
@@ -712,16 +720,16 @@ for x in range(2):
 
         #===============================================================================================
         # Apply f-test and check whether last gaussian improves the fit significantly or not
-        pValue = performFtest(nullhypModelList, altModelList, file, "(adding 6.7 keV absorption gauss)")
+        pValue = performFtest(nullhypModelList, altModelList, logFile, "(adding 6.7 keV absorption gauss)")
         
         if abs(pValue) >= ftestCrit:
             removeComp("gaussian", 1, bestModel)
             fitModel()
             updateParameters(bestModel)
 
-            file.write("\n====================================================================================\n")
-            file.write("6.7 keV gauss is taken out from the model due to not improving the fit significantly.")
-            file.write("\n====================================================================================\n")
+            logFile.write("\n====================================================================================\n")
+            logFile.write("6.7 keV gauss is taken out from the model due to not improving the fit significantly.")
+            logFile.write("\n====================================================================================\n")
         
         # Check whether powerlaw has positive index and steep slope (> 6, pretty much fits the lower energies only), take it out if that is the case
         modelBeforePowerlaw = extractModFileName()
@@ -733,9 +741,9 @@ for x in range(2):
                 removeComp("powerlaw", 1, bestModel)
 
                 powOut = True
-                file.write("\n===============================================================================\n")
-                file.write("Powerlaw has been taken out due to trying to fit lower energies (> 2 keV).\n")
-                file.write("===============================================================================\n\n")
+                logFile.write("\n===============================================================================\n")
+                logFile.write("Powerlaw has been taken out due to trying to fit lower energies (> 2 keV).\n")
+                logFile.write("===============================================================================\n\n")
                 
                 pcfabsPars = ["7.296", "0.923"]
                 addComp("pcfabs", "TBabs", "after", "*", bestModel)
@@ -759,16 +767,16 @@ for x in range(2):
                 altModelList = bestModel
 
                 # Apply f-test
-                pValue = performFtest(nullhypModelList, altModelList, file, "(adding 1.8 keV emission gauss)")
+                pValue = performFtest(nullhypModelList, altModelList, logFile, "(adding 1.8 keV emission gauss)")
 
                 if abs(pValue) >= ftestCrit:
                     removeComp("gaussian", 1, bestModel)
                     fitModel()
                     updateParameters(bestModel)
 
-                    file.write("\n====================================================================================\n")
-                    file.write("1.8 keV gauss is taken out from the model due to not improving the fit significantly.")
-                    file.write("\n====================================================================================\n\n")
+                    logFile.write("\n====================================================================================\n")
+                    logFile.write("1.8 keV gauss is taken out from the model due to not improving the fit significantly.")
+                    logFile.write("\n====================================================================================\n\n")
 
         #========================================================================================================================================
         # Start recording nH values if fixNH is set to True.
@@ -833,21 +841,23 @@ for x in range(2):
 
             if fixNH:
                 fixAllNH(fixedValuesNH)
+
             fitModel()
+            updateParameters(bestModel)
 
             if errorCalculations:
-                shakefit(file)
+                shakefit(logFile)
                 
-            writeBestFittingModel(file)
+            writeBestFittingModel(logFile)
             saveModel(modFileName, obsid)
             saveModel(modFileName, obsid, commonDirectory)
         else:
             # Save the new model without powerlaw
             if errorCalculations:
-                    shakefit(file)
+                    shakefit(logFile)
 
             modFileName = extractModFileName()
-            writeBestFittingModel(file)
+            writeBestFittingModel(logFile)
             saveModel(modFileName, obsid)
             saveModel(modFileName, obsid, commonDirectory)
 
@@ -887,16 +897,8 @@ for x in range(2):
                 os.system("rm " + eachFile)
         saveModel("best_" + modFileName, obsid)
 
-        """for key,val in bestModel[1].items():
-            print(key, val)
-        print(AllModels(1).expression)
-        file.close()
-        quit()"""
-        # Write equivalent widths of gausses to log file
-        gaussEqwidthList = calculateGaussEqw()
-        file.write("Gauss equivalent widths: (90% confidence intervals) \n")
-        for each in gaussEqwidthList:
-            file.write(each)
+        # Calculate and write equivalent widths of gausses to log file
+        calculateGaussEqw(logFile)
         
         # Close all log files
         closeAllFiles()
