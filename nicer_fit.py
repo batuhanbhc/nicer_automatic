@@ -10,7 +10,7 @@ from nicer_variables import outputDir, resultsFile, energyFilter
 # Set it to True if you have made changes in models, and do not want to use any previous model files in commonDirectory
 # restartOnce only deletes model files before the first observation, restartAlways deletes model files before all observations
 restartOnce = True
-restartAlways = False
+restartAlways = True
 
 # Critical value for F-test
 ftestCrit = 0.05
@@ -434,7 +434,7 @@ def performFtest(mainModelList, altModelList, logFile, infoTxt = ""):
     if infoTxt != "":
         logFile.write(infoTxt)
 
-    logFile.write("\nNull hypothesis model: " + mainModelList[0] + "\nAlternative model: " + altModelList[0] +"\np-value: " + str(pValue)+"\n\n")
+    logFile.write("\nNull hypothesis model: " + mainModelList[0] + "\nAlternative model: " + altModelList[0] +"\np-value: " + str(pValue)+"\n")
 
     return pValue
 
@@ -530,7 +530,10 @@ def filterOutliers(dataset):
     std_dev = np.std(dataset)
     threshold = 2 
 
-    filtered_dataset = [x for x in dataset if abs(x - mean) / std_dev <= threshold]
+    filtered_dataset = []
+    for i in dataset:
+        if std_dev == 0 or (abs(i - mean) / std_dev <= threshold):
+            filtered_dataset.append(i)
     
     return filtered_dataset
 
@@ -686,6 +689,10 @@ for x in range(2):
             fitModel()
             updateParameters(bestModel)
 
+            logFile.write("\n====================================================================================\n")
+            logFile.write("Powerlaw is taken out from the model due to not improving the fit significantly.")
+            logFile.write("\n====================================================================================\n")
+
         nullhypModelList = transferToNewList(bestModel)
         #=================================================================================
         # Add 6.98 keV absorption gauss and fit
@@ -707,6 +714,10 @@ for x in range(2):
             removeComp("gaussian", 1, bestModel)
             fitModel()
             updateParameters(bestModel)
+
+            logFile.write("\n====================================================================================\n")
+            logFile.write("6.98 keV gauss is taken out from the model due to not improving the fit significantly.")
+            logFile.write("\n====================================================================================\n")
 
         nullhypModelList = transferToNewList(bestModel)
         #===============================================================================================
@@ -739,14 +750,25 @@ for x in range(2):
         saveModel(modelBeforePowerlaw, obsid)
 
         powOut = False
-        if "powerlaw" in AllModels(1).expression:
-            if AllModels(1).powerlaw.PhoIndex.values[0] > 6:
+        if "powerlaw" not in AllModels(1).expression:
+            powOut = True
+
+            pcfabsPars = ["7.296", "0.923"]
+            addComp("pcfabs", "TBabs", "after", "*", bestModel)
+            assignParameters("pcfabs", pcfabsPars, 1)
+            if startFixingNH:
+                fixAllNH(fixedValuesNH)
+            fitModel()
+            updateParameters(bestModel)
+
+        elif "powerlaw" in AllModels(1).expression:
+            if AllModels(1).powerlaw.PhoIndex.values[0] > 7:
                 removeComp("powerlaw", 1, bestModel)
 
                 powOut = True
                 logFile.write("\n===============================================================================\n")
                 logFile.write("Powerlaw has been taken out due to trying to fit lower energies (> 2 keV).\n")
-                logFile.write("===============================================================================\n\n")
+                logFile.write("===============================================================================\n")
                 
                 pcfabsPars = ["7.296", "0.923"]
                 addComp("pcfabs", "TBabs", "after", "*", bestModel)
@@ -756,34 +778,39 @@ for x in range(2):
                 fitModel()
                 updateParameters(bestModel)
         
-                nullhypModelList = transferToNewList(bestModel)
+        if powOut == False:
+            # Restore the best-fitting model back
+            Xset.restore(modelBeforePowerlaw)
+            modFileName = extractModFileName()
+        
+        nullhypModelList = transferToNewList(bestModel)
 
-                # Add an emission line at 1.8 keV (A gold line?)
-                gaussPars_3 = ["1.8 -1", "0.07,,0.05,0.05,0.2,0.2", "0.01"]
-                addComp("gaussian", "diskbb", "after", "+", bestModel)
-                gaussCount = wordCounter(AllModels(1).expression, "gaussian")
-                assignParameters("gauss", gaussPars_3, gaussCount)
+        # Add an emission line at 1.8 keV (A gold line?)
+        gaussPars_3 = ["1.8 -1", "0.07,,0.05,0.05,0.2,0.2", "0.01"]
+        addComp("gaussian", "diskbb", "after", "+", bestModel)
+        gaussCount = wordCounter(AllModels(1).expression, "gaussian")
+        assignParameters("gauss", gaussPars_3, gaussCount)
 
-                fitModel()
-                updateParameters(bestModel)
+        fitModel()
+        updateParameters(bestModel)
 
-                altModelList = bestModel
+        altModelList = bestModel
 
-                # Apply f-test
-                pValue = performFtest(nullhypModelList, altModelList, logFile, "(adding 1.8 keV emission gauss)")
+        # Apply f-test
+        pValue = performFtest(nullhypModelList, altModelList, logFile, "(adding 1.8 keV emission gauss)")
 
-                if abs(pValue) >= ftestCrit:
-                    removeComp("gaussian", 1, bestModel)
-                    fitModel()
-                    updateParameters(bestModel)
+        if abs(pValue) >= ftestCrit:
+            removeComp("gaussian", 1, bestModel)
+            fitModel()
+            updateParameters(bestModel)
 
-                    logFile.write("\n====================================================================================\n")
-                    logFile.write("1.8 keV gauss is taken out from the model due to not improving the fit significantly.")
-                    logFile.write("\n====================================================================================\n\n")
+            logFile.write("\n====================================================================================\n")
+            logFile.write("1.8 keV gauss is taken out from the model due to not improving the fit significantly.")
+            logFile.write("\n====================================================================================\n\n")
 
         #========================================================================================================================================
         # Start recording nH values if fixNH is set to True.
-        if iteration < iterationMax and takeAverages:
+        if iteration < iterationMax and takeAverages and "pcfabs" in AllModels(1).expression:
             # Save tbabs.nH and pcfabs.nH values after finding the best fitting model (before calculating errors)
             # These values will be used to calculate average nH values, which then will be used to refit all observations by fixing nH parameters    
             if "TBabs" in AllModels(1).expression:
@@ -805,7 +832,7 @@ for x in range(2):
 
             continue
 
-        elif iteration == iterationMax and takeAverages:
+        elif iteration == iterationMax and takeAverages and "pcfabs" in AllModels(1).expression:
             # The maximum sample size for calculating average nH values has been reached.
             # Terminate the first iteration of fitting observations, calculate average nH values and refit all observations again.
 
@@ -823,10 +850,9 @@ for x in range(2):
                     fixedValuesNH["pcfabs.nH"] = [pcfabsNH]
                 else:
                     fixedValuesNH["pcfabs.nH"].append(pcfabsNH)
-
+           
             startFixingNH = True
             takeAverages = False
-
             if "TBabs" in AllModels(1).expression:
                 totalTBabsNH = 0
                 fixedValuesNH["TBabs.nH"] = filterOutliers(fixedValuesNH["TBabs.nH"])
@@ -852,33 +878,14 @@ for x in range(2):
             
             break
         #========================================================================================================================================
-        
-        if powOut == False:
-            # Restore the best-fitting model back
-            Xset.restore(modelBeforePowerlaw)
-            modFileName = extractModFileName()
-
-            if fixNH:
-                fixAllNH(fixedValuesNH)
-
-            fitModel()
-            updateParameters(bestModel)
-
-            if errorCalculations:
+        # Save the last model
+        if errorCalculations:
                 shakefit(logFile)
-                
-            writeBestFittingModel(logFile)
-            saveModel(modFileName, obsid)
-            saveModel(modFileName, obsid, commonDirectory)
-        else:
-            # Save the new model without powerlaw
-            if errorCalculations:
-                    shakefit(logFile)
 
-            modFileName = extractModFileName()
-            writeBestFittingModel(logFile)
-            saveModel(modFileName, obsid)
-            saveModel(modFileName, obsid, commonDirectory)
+        modFileName = extractModFileName()
+        writeBestFittingModel(logFile)
+        saveModel(modFileName, obsid)
+        saveModel(modFileName, obsid, commonDirectory)
 
         #==========================================================================
         if errorCalculations:
