@@ -10,6 +10,7 @@ from nicer_variables import energyFilter, resultsFile, outputDir
 #===================================================================================================================================
 # If set to True, the plot will use the dates of observations in MJD format for x axis values as opposed to using observation IDs.
 plotMJD = True
+startDateMJD = 60000
 #===================================================================================================================================
 # Functions
 def listToStr(array):
@@ -126,10 +127,17 @@ for obs in inputFile.readlines():
         if counter == 3:
             break
     
-    # Extract MJD
-    hdu = fits.open(spectrumFile)
-    date = str(format(hdu[1].header["MJD-OBS"], ".1f"))
-    hdu.close()
+    if plotMJD:
+        # Extract MJD
+        hdu = fits.open(spectrumFile)
+        date = float(format(hdu[1].header["MJD-OBS"], ".3f"))
+
+        if date < startDateMJD:
+            print("MJD smaller than " + str(startDateMJD)+" has been detected. The graphs are plotted starting from MJD "+str(startDateMJD)+". Please change 'startDateMJD' variable to account for older MJD.")
+            quit()
+        else:
+            date = date - startDateMJD
+        hdu.close()
 
     Xset.chatter = 0
     Xset.restore(modFile)
@@ -217,20 +225,43 @@ for eachDict in dictList:
                 errorLow = list(modelPars.values())[counter][1]
                 errorHigh = list(modelPars.values())[counter][2]
                 parName = list(modelPars.keys())[counter]
-                ticks = [i for i in range(len(xAxis))]
 
-                axs[i, j].plot(xAxis, yAxis, label= parName, color="black")
-                axs[i, j].errorbar(xAxis, yAxis, yerr=[errorLow, errorHigh], fmt='o', ecolor="black", color="black", capsize=10)
                 if plotMJD:
-                    axs[i, j].set_xlabel('Modified Julian Date (MJD)')
+                    xMin = int(min(xAxis)) - 1
+                    xMax = int(max(xAxis)) + 1
+                    
+                    if (xMax - xMin) < 20:
+                        tickInterval = 1
+                    elif 20 <= (xMax - xMin) < 100:
+                        tickInterval = 5
+                    elif 100 <= (xMax - xMin) < 200:
+                        tickInterval = 10
+                    else:
+                        tickInterval = 20
+                        
+                    ticks = []
+                    for k in range(xMin, xMax + tickInterval, tickInterval):
+                        ticks.append(k)
+                else:
+                    ticks = xAxis
+
+                #axs[i, j].plot(xAxis, yAxis, label= parName, color="black")
+                axs[i, j].errorbar(xAxis, yAxis, yerr=[errorLow, errorHigh], fmt='.', ecolor="black", color="black", capsize=3, label=parName)
+                if plotMJD:
+                    axs[i, j].set_xlabel("Date (MJD "+str(startDateMJD)+ ")")
                 else:
                     axs[i, j].set_xlabel('Observation IDs')
                 axs[i, j].set_ylabel('Xspec model units')
+
+                axs[i, j].set_xticks(ticks)
+                axs[i, j].set_xticklabels(ticks, rotation=60, ha='right')
+
                 axs[i, j].legend()
-                axs[i, j].set_xticks(ticks, xAxis, rotation=60, ha='right')
+
                 counter += 1
             except:
                 break
+            
 
     general_title = "Best-fitting Model Parameters " + "(Abundance: "+ abundance +")"
     fig.suptitle(general_title, fontsize=16)
