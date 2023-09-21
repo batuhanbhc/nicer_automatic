@@ -24,7 +24,7 @@ errorCalculations = True    # If set to True, the script will run "shakefit" fun
 
 fixNH = True                # If set to True, the script will fit "sampleSize" amount of observations, and take average values for nH parameters, then
                             # refit all observations by freezing nH parameters to the average values.
-sampleSize = 10
+sampleSize = 15
 
 energyLimits = energyFilter.split(" ")
 Emin = energyLimits[0]
@@ -52,43 +52,62 @@ def shakefit(resultsFile):
     Fit.query = "no"
     print("Performing shakefit error calculations for the model: " + AllModels(1).expression + ", obsid:" + str(obsid)+ "\n")
     resultsFile.write("========== Proceeding with shakefit error calculations ==========\n")
+
     paramNum = AllModels(1).nParameters
+    rerunShakefit = False
+    for k in range(2):
+        if k == 1 and rerunShakefit == False:
+            break
 
-    for i in range(1, paramNum+1):
-        parDelta = AllModels(1)(i).values[1]
+        print("Performing shakefit error calculations for the model: " + AllModels(1).expression + ", obsid:" + str(obsid)+ ", shakefit count: " + str(k+1)+"\n")
+        fitModel()
+        for i in range(1, paramNum+1):
+            parDelta = AllModels(1)(i).values[1]
 
-        if parDelta < 0:  # Check for frozen parameters
-            continue
+            if parDelta < 0:  # Check for frozen parameters
+                continue
 
-        continueError = True
-        delChi = 2.706
-        counter = 0
-        while continueError and counter < 100:
-            counter += 1
-            Fit.error("stopat 10 0.1 maximum 50 " + str(delChi) + " " + str(i))
-            errorResult = AllModels(1)(i).error
-            errorString = errorResult[2]
+            continueError = True
+            delChi = 2.706
+            counter = 0
+            while continueError and counter < 100:
+                counter += 1
+                Fit.error("stopat 10 0.1 maximum 50 " + str(delChi) + " " + str(i))
+                errorResult = AllModels(1)(i).error
+                errorString = errorResult[2]
 
 
-            if errorString[3] == "T" or errorString[4] == "T":
-                # Hit lower/upper limits, stop the error process for the current model parameter
-                continueError = False
+                if errorString[3] == "T" or errorString[4] == "T":
+                    # Hit lower/upper limits, stop the error process for the current model parameter
+                    continueError = False
 
-            if errorString[0] == "F":
-                # Could not find a new minimum
-                continueError = False
-            elif errorString[1] == "T":
-                # Non-monotonicity detected
-                delChi += 2
+                if errorString[0] == "F":
+                    # Could not find a new minimum
+                    continueError = False
+                elif errorString[1] == "T":
+                    # Non-monotonicity detected
+                    delChi += 2
 
-            if continueError == False:
-                # Save error calculation results to the log file
-                # Save error calculation results to the log file
-                parName = AllModels(1)(i).name
-                parValue = AllModels(1)(i).values[0]
-                parValue = AllModels(1)(i).values[0]
-                errorTuple = "(" + listToStr(errorResult) + ")"
-                resultsFile.write("Par " + str(i) + ": " + parName + " " + errorTuple+"\n")
+                if continueError == False:
+                    # Save error calculation results to the log file
+                    # Save error calculation results to the log file
+                    parName = AllModels(1)(i).name
+                    parValue = AllModels(1)(i).values[0]
+                    parValue = AllModels(1)(i).values[0]
+                    errorTuple = "(" + listToStr(errorResult) + ")"
+                    resultsFile.write("Par " + str(i) + ": " + parName + " " + errorTuple+"\n")
+            
+        # Check if any parameter value has gotten outside their initially calculated confidence interval
+        rerunShakefit = False
+        for m in range(1, AllModels(1).nParameters+1):
+            parValue = AllModels(1)(m).values[0]
+            errorString = AllModels(1)(m).error
+            if errorString[0] != 0 and parValue < errorString[0]:
+                rerunShakefit = True
+                break
+            elif errorString[1] != 0 and parValue > errorString[1]:
+                rerunShakefit = True
+                break
 
     resultsFile.write("=================================================================\n\n")
     
@@ -534,7 +553,7 @@ def filterOutliers(dataset):
     # that drastically, I narrowed down the interval and set the z-score as 2 sigma.
     mean = np.mean(dataset)
     std_dev = np.std(dataset)
-    threshold = 2 
+    threshold = 3
 
     filtered_dataset = []
     for i in dataset:
@@ -548,6 +567,7 @@ def closeAllFiles():
     Xset.closeLog()
     AllModels.clear()
     AllData.clear()
+
 def checkResults():
     for i in range(1, AllModels(1).nParameters+1):
         print(AllModels(1)(i).name, AllModels(1)(i).values[0])
@@ -658,7 +678,7 @@ for x in range(2):
         # This list will carry the model name, model parameters and fit statistics for the best model throughout the script.
         # First element is the model name, second element is the dictionary for parameter name-value pairs, third element is the dictionary for fit statistics
         # such as chi-squared, degrees of freedom and null hypothesis probability.
-        bestModel = ["TBabs*(diskbb)", {}, {}]
+        bestModel = ["TBabs*(diskbb)", {"diskbb.norm":",,0.1,0.1"}, {}]
 
         #=================================================================================
         # Load the first model and fit
@@ -672,13 +692,14 @@ for x in range(2):
 
         fitModel()
         updateParameters(bestModel)
+        
         saveModel(modelFile, obsid)
         saveModel(modelFile, obsid, commonDirectory)
 
         nullhypModelList = transferToNewList(bestModel)
-        #=================================================================================
-        # Add partial covarage model and fit
-        pcfabsPars = ["7.296", "0.923"] 
+        #===============================================================================================
+        # Add partial covarage model to fit lower energies
+        pcfabsPars = ["6", "0.95"]
         addComp("pcfabs", "TBabs", "after", "*", bestModel)
 
         modelFile = extractModFileName()
@@ -688,90 +709,28 @@ for x in range(2):
             getParsFromList(bestModel)
             assignParameters("pcfabs", pcfabsPars, 1)
 
-        fitModel()
-        updateParameters(bestModel)
+        AllModels(1).TBabs.nH.values = AllModels(1).TBabs.nH.values[0] / 5 * 3
 
         if startFixingNH:
             fixAllNH(fixedValuesNH)
-            fitModel()
-            updateParameters(bestModel)
 
-        saveModel(modelFile, obsid)
-        saveModel(modelFile, obsid, commonDirectory)
-
-        altModelList = bestModel
-        #=================================================================================
-        # Apply f-test and check whether powerlaw improves the fit significantly or not
-        pValue = performFtest(nullhypModelList, altModelList, logFile, "Adding pcfabs")
-
-        if abs(pValue) >= ftestCrit:
-            removeComp("pcfabs", 1, bestModel)
-            fitModel()
-            updateParameters(bestModel)
-
-            logFile.write("\n====================================================================================\n")
-            logFile.write("Pcfabs is taken out from the model due to not improving the fit significantly.")
-            logFile.write("\n====================================================================================\n")
-        
-        nullhypModelList = transferToNewList(bestModel)
-        #===============================================================================================
-        # Add an edge around 1.8 keV
-        edgePars = ["1.8", "0.3"]
-        addComp("edge", "TBabs", "after", "*", bestModel)
-
-        modelFile = extractModFileName()
-        if Path(modelFile + "/" + commonDirectory).exists():
-            Xset.restore(modelFile + "/" + commonDirectory)
-        else:
-            getParsFromList(bestModel)
-            assignParameters("edge", edgePars, 1)
-        
         fitModel()
         updateParameters(bestModel)
 
-        if startFixingNH:
-            fixAllNH(fixedValuesNH)
-            fitModel()
-            updateParameters(bestModel)
-
         saveModel(modelFile, obsid)
         saveModel(modelFile, obsid, commonDirectory)
-
-        altModelList = bestModel
-        #===============================================================================================
-         # Apply f-test
-        pValue = performFtest(nullhypModelList, altModelList, logFile, "(adding absorption edge around 1.8 keV)")
-
-        if abs(pValue) >= ftestCrit:
-            removeComp("edge", 1, bestModel)
-            fitModel()
-            updateParameters(bestModel)
-
-            logFile.write("\n====================================================================================\n")
-            logFile.write("Edge is taken out from the model due to not improving the fit significantly.")
-            logFile.write("\n====================================================================================\n\n")
 
         nullhypModelList = transferToNewList(bestModel)
         #=================================================================================
         # Add powerlaw to the previous model and fit
-        powerlawPars = ["1.9,,0.1,0.1", "1"]
+        powerlawPars = ["1.9,,0.1,0.1", "1.5,,1e-5,1e-5"]
         addComp("powerlaw", "diskbb", "after", "+", bestModel)
-
-        modelFile = extractModFileName()
-        if Path(modelFile + "/" + commonDirectory).exists():
-            Xset.restore(modelFile + "/" + commonDirectory)
-        else:
-            getParsFromList(bestModel)
-            assignParameters("powerlaw", powerlawPars, 1)
+        assignParameters("powerlaw", powerlawPars, 1)
 
         fitModel()
         updateParameters(bestModel)
 
-        if startFixingNH:
-            fixAllNH(fixedValuesNH)
-            fitModel()
-            updateParameters(bestModel)
-
+        modelFile = extractModFileName()
         saveModel(modelFile, obsid)
         saveModel(modelFile, obsid, commonDirectory)
 
@@ -789,24 +748,23 @@ for x in range(2):
             logFile.write("Powerlaw is taken out from the model due to not improving the fit significantly.")
             logFile.write("\n====================================================================================\n")
 
-        nullhypModelList = transferToNewList(bestModel)
         #=================================================================================
         # Check whether powerlaw has negative index or positive high index, take it out if that is the case
-        modelBeforePowerlaw = extractModFileName()
-        saveModel(modelBeforePowerlaw, obsid)
+        modelBeforePowerlawTest = extractModFileName()
+        saveModel(modelBeforePowerlawTest, obsid)
         
         powOut = False
         if "powerlaw" not in AllModels(1).expression:
             powOut = True
 
         elif "powerlaw" in AllModels(1).expression:
-            if AllModels(1).powerlaw.PhoIndex.values[0] > 6:
+            if AllModels(1).powerlaw.PhoIndex.values[0] > 7 or AllModels(1).powerlaw.PhoIndex.values[0] < 0:
                 phoIndex = str(AllModels(1).powerlaw.PhoIndex.values[0])
                 removeComp("powerlaw", 1, bestModel)
 
                 powOut = True
                 logFile.write("\n===============================================================================\n")
-                logFile.write("Powerlaw has been taken out from the model expression due to unphysical photon index. Photon index: "+phoIndex+"\n")
+                logFile.write("Powerlaw has been taken out from the model expression due to unusual photon index. Photon index: "+phoIndex+"\n")
                 logFile.write("===============================================================================\n")
 
                 fitModel()
@@ -814,24 +772,53 @@ for x in range(2):
         
         if powOut == False:
             # Restore the best-fitting model back
-            Xset.restore(modelBeforePowerlaw)
-            modFileName = extractModFileName()
+            Xset.restore(modelBeforePowerlawTest)
+
+        nullhypModelList = transferToNewList(bestModel)
+        #===============================================================================================
+        # Add an edge around 1.8 keV
+        edgePars = ["1.8,,1.75,1.75,1.9,1.9", "0.3"]
+        addComp("edge", "TBabs", "after", "*", bestModel)
+        assignParameters("edge", edgePars, 1)
         
+        fitModel()
+        updateParameters(bestModel)
+
+        modelFile = extractModFileName()
+        saveModel(modelFile, obsid)
+        saveModel(modelFile, obsid, commonDirectory)
+
+        altModelList = bestModel
+        #===============================================================================================
+         # Apply f-test
+        pValue = performFtest(nullhypModelList, altModelList, logFile, "    (adding absorption edge around 1.8 keV)")
+
+        if abs(pValue) >= ftestCrit:
+            removeComp("edge", 1, bestModel)
+            fitModel()
+            updateParameters(bestModel)
+
+            logFile.write("\n====================================================================================\n")
+            logFile.write("Edge is taken out from the model due to not improving the fit significantly.")
+            logFile.write("\n====================================================================================\n\n")
+
         nullhypModelList = transferToNewList(bestModel)
         #=================================================================================
         # Add 6.98 keV absorption gauss and fit
-        gaussPars_1 = ["6.98,,6.95,6.95,7.01,7.01", "7e-2,,0.05,0.05,0.2,0.2", "-1e-3,,-1e12,-1e12,-1e-12,-1e-12"]
+        gaussPars_1 = ["6.98 -1", "7e-2,,0.05,0.05,0.2,0.2", "-1e-3,,-1e12,-1e12,-1e-12,-1e-12"]
         addComp("gaussian", "diskbb", "before", "+", bestModel)
-        getParsFromList(bestModel)
         assignParameters("gaussian", gaussPars_1, 1)
 
         fitModel()
         updateParameters(bestModel)
+
+        modelFile = extractModFileName()
         saveModel(modelFile, obsid)
+
         altModelList = bestModel
         #=================================================================================
         # Apply f-test and check whether last gaussian improves the fit significantly or not
-        pValue = performFtest(nullhypModelList, altModelList, logFile, "Adding 6.98 keV absorption gauss")
+        pValue = performFtest(nullhypModelList, altModelList, logFile, "    (Adding 6.98 keV absorption gauss)")
 
         if abs(pValue) >= ftestCrit:
             removeComp("gaussian", 1, bestModel)
@@ -845,7 +832,7 @@ for x in range(2):
         nullhypModelList = transferToNewList(bestModel)
         #===============================================================================================
         # Add 6.7 keV absorption gauss and fit
-        gaussPars_2 = ["6.7,,6.67,6.67,6.72,6.72", "0.07,,0.05,0.05,0.2,0.2", "-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"]
+        gaussPars_2 = ["6.7 -1", "0.07,,0.05,0.05,0.2,0.2", "-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"]
         addComp("gaussian", "diskbb", "before", "+", bestModel)
         gaussCount = wordCounter(AllModels(1).expression, "gaussian")
         assignParameters("gauss", gaussPars_2, gaussCount)
@@ -853,11 +840,13 @@ for x in range(2):
         fitModel()
         updateParameters(bestModel)
 
-        altModelList = bestModel
+        modelFile = extractModFileName()
+        saveModel(modelFile, obsid)
 
+        altModelList = bestModel
         #===============================================================================================
         # Apply f-test and check whether last gaussian improves the fit significantly or not
-        pValue = performFtest(nullhypModelList, altModelList, logFile, "(adding 6.7 keV absorption gauss)")
+        pValue = performFtest(nullhypModelList, altModelList, logFile, "    (adding 6.7 keV absorption gauss)")
         
         if abs(pValue) >= ftestCrit:
             removeComp("gaussian", gaussCount, bestModel)
@@ -938,20 +927,20 @@ for x in range(2):
             
             break
         #========================================================================================================================================
-        # Save the last model
+        # Calculate uncertainity boundaries
         if errorCalculations:
                 shakefit(logFile)
 
+        # Save the last model
         modFileName = extractModFileName()
         writeBestFittingModel(logFile)
         saveModel(modFileName, obsid)
         saveModel(modFileName, obsid, commonDirectory)
-
         #==========================================================================
         if errorCalculations:
             # Rename gauss names in the temp_parameters.txt file for grouping purposes.
             # For instance, this part changes gauss names from "gaussian_5" to "6.7keV_gauss" and so on.
-            gaussEnergyList = [1.8, 6.7, 6.98]
+            gaussEnergyList = [6.7, 6.98]
             renameDict = matchGaussWithEnergy(gaussEnergyList)
             inputFile = open("temp_parameters.txt", "r")
             outputFile = "parameters_bestmodel.txt"
