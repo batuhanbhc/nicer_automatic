@@ -661,7 +661,7 @@ for x in range(2):
         # Set some Xspec settings
         logFile = open(resultsFile, "w")
         Xset.openLog("xspec_output.log")
-        Xset.abund = "wilm"
+        Xset.abund = "angr"
         if chatterOn == False: 
             Xset.chatter = 0
         Fit.query = "yes"
@@ -699,7 +699,7 @@ for x in range(2):
         nullhypModelList = transferToNewList(bestModel)
         #===============================================================================================
         # Add partial covarage model to fit lower energies
-        pcfabsPars = ["6", "0.95"]
+        pcfabsPars = [AllModels(1).TBabs.nH.values[0] / 2, "0.95"]
         addComp("pcfabs", "TBabs", "after", "*", bestModel)
 
         modelFile = extractModFileName()
@@ -709,7 +709,7 @@ for x in range(2):
             getParsFromList(bestModel)
             assignParameters("pcfabs", pcfabsPars, 1)
 
-        AllModels(1).TBabs.nH.values = AllModels(1).TBabs.nH.values[0] / 5 * 3
+        AllModels(1).TBabs.nH.values = AllModels(1).TBabs.nH.values[0] / 2
 
         if startFixingNH:
             fixAllNH(fixedValuesNH)
@@ -723,7 +723,7 @@ for x in range(2):
         nullhypModelList = transferToNewList(bestModel)
         #=================================================================================
         # Add powerlaw to the previous model and fit
-        powerlawPars = ["1.9,,0.1,0.1", "1.5,,1e-5,1e-5"]
+        powerlawPars = ["1.9,,0,0", "1.5,,1e-5,1e-5"]
         addComp("powerlaw", "diskbb", "after", "+", bestModel)
         assignParameters("powerlaw", powerlawPars, 1)
 
@@ -777,7 +777,7 @@ for x in range(2):
         nullhypModelList = transferToNewList(bestModel)
         #===============================================================================================
         # Add an edge around 1.8 keV
-        edgePars = ["1.8,,1.75,1.75,1.9,1.9", "0.3"]
+        edgePars = ["1.8", "0.3"]
         addComp("edge", "TBabs", "after", "*", bestModel)
         assignParameters("edge", edgePars, 1)
         

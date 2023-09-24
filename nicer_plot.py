@@ -9,7 +9,7 @@ from astropy.io import fits
 from nicer_variables import energyFilter, resultsFile, outputDir
 #===================================================================================================================================
 # If set to True, the plot will use the dates of observations in MJD format for x axis values as opposed to using observation IDs.
-plotMJD = True
+plotMJD = False
 startDateMJD = 60000
 #===================================================================================================================================
 # Functions

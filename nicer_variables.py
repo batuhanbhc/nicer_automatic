@@ -12,4 +12,4 @@ inputTxtFile = "nicer_obs.txt"
 resultsFile = "script_results.log"
 
 # Write it in XSpec format
-energyFilter = "0.5 10."
+energyFilter = "1.5 10."

@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 from nicer_variables import outputDir, resultsFile, energyFilter
 
 #===================================================================================================================================
+writeParValuesAfterCflux = True
+#===================================================================================================================================
 # Functions
 def listToStr(array):
     result = ""
@@ -66,15 +68,16 @@ def freezeNorm():
         parNames = compObj.parameterNames
         for par in parNames:
             parObj = getattr(compObj, par)
+            indx = parObj.index
             if par == "norm":
                 parObj.frozen = True
                     
-                """elif comp != "cflux":
-                    # Noticed that for some observations, fitting the model after adding cflux componant may change parameter values drastically,
-                    # (e.g. nH 8 -> 1.7, Tin 1.4 -> 0.07) which messes up the chi-sq value and a significant change in the model. Here, I force the
-                    # already fitted model to not vary at all by limiting parameter values with 0.1 wide intervals from both ends
-                    valString = str(parObj.values[0])+","+str(parObj.values[1])+","+str(parObj.values[0]-0.1)+","+str(parObj.values[0]-0.1)+","+str(parObj.values[0]+0.1)+","+str(parObj.values[0]+0.1)
-                    AllModels(1)(indx).values = valString"""
+            elif comp != "cflux":
+                # Noticed that for some observations, fitting the model after adding cflux componant may change parameter values drastically,
+                # (e.g. nH 8 -> 1.7, Tin 1.4 -> 0.07) which messes up the chi-sq value and a significant change in the model. Here, I force the
+                # already fitted model to not vary at all by limiting parameter values with 0.1 wide intervals from both ends
+                valString = str(parObj.values[0])+","+str(parObj.values[1])+","+str(parObj.values[0]-0.1)+","+str(parObj.values[0]-0.1)+","+str(parObj.values[0]+0.1)+","+str(parObj.values[0]+0.1)
+                AllModels(1)(indx).values = valString
 
 def findFlux():
     parNums = AllModels(1).nParameters
@@ -88,7 +91,7 @@ def findFlux():
             upperFlux = "errHigh:" + str(10**AllModels(1)(i).error[1])
             return [flux, lowerFlux, upperFlux]
 
-def calculateFlux(component, modelName):
+def calculateFlux(component, modelName, initialFlux = ""):
     if component == "unabsorbed":
         if "pcfabs" in modelName:
             # Assuming TBabs also exists, and pcfabs comes after TBabs. If not, please change this part.
@@ -103,12 +106,25 @@ def calculateFlux(component, modelName):
         newName = modelName[:compIndex] + "cflux*" + modelName[compIndex:]
 
     m = Model(newName)
-    enterParameters(parameters, {"Emin":Emin, "Emax":Emax, "lg10Flux" : -8})
+    if initialFlux != "":
+        enterParameters(parameters, {"Emin":Emin, "Emax":Emax, "lg10Flux": initialFlux})
+    else:
+        enterParameters(parameters, {"Emin":Emin, "Emax":Emax})
     freezeNorm()
     fitModel()
     fluxVals = findFlux()
     
     return fluxVals
+
+def writeParsAfterFlux():
+    for comp in AllModels(1).componentNames:
+        compObj = getattr(AllModels(1), comp)
+        for par in compObj.parameterNames:
+            parObj = getattr(compObj, par)
+            fullName = comp + "." + par
+            file.write(fullName + "     " + str(parObj.values[0]) + "\n")
+    
+    file.write("\n")
 #===================================================================================================================
 energyLimits = energyFilter.split(" ")
 Emin = energyLimits[0]
@@ -164,26 +180,36 @@ for obs in inputFile.readlines():
     modelName = AllModels(1).expression.replace(" ", "")
 
     # Absorbed flux
-    absFlux = calculateFlux("TBabs", modelName)
-    file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(absFlux) + "\n\n")
+    absFlux = calculateFlux("TBabs", modelName, -8.4)
+    file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(absFlux) + "\n")
+    if writeParValuesAfterCflux:
+        writeParsAfterFlux()
 
     if "pcfabs" in modelName:
         # TBabs excluded flux
-        halfAbsFlux = calculateFlux("pcfabs", modelName)
-        file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(halfAbsFlux) + "\n\n")
+        halfAbsFlux = calculateFlux("pcfabs", modelName, -8.1)
+        file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(halfAbsFlux) + "\n")
+        if writeParValuesAfterCflux:
+            writeParsAfterFlux()
         
     # Unabsorbed flux
-    unabsFlux = calculateFlux("unabsorbed", modelName)
-    file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(unabsFlux) + "\n\n")
+    unabsFlux = calculateFlux("unabsorbed", modelName, -7.85)
+    file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(unabsFlux) + "\n")
+    if writeParValuesAfterCflux:
+        writeParsAfterFlux()
 
     # Diskbb flux
-    fluxDisk = calculateFlux("diskbb", modelName)
-    file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(fluxDisk) + "\n\n")
+    fluxDisk = calculateFlux("diskbb", modelName, -7.85)
+    file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(fluxDisk) + "\n")
+    if writeParValuesAfterCflux:
+        writeParsAfterFlux()
 
     if "powerlaw" in modelName:
         # Powerlaw flux
-        fluxPow = calculateFlux("powerlaw", modelName)
-        file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(fluxPow) + "\n\n")
+        fluxPow = calculateFlux("powerlaw", modelName, -9)
+        file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(fluxPow) + "\n")
+        if writeParValuesAfterCflux:
+            writeParsAfterFlux()
     else:
         file.write("Powerlaw flux is 0. There is no powerlaw component in the model expression.\n")
 
