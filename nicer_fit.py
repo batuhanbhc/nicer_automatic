@@ -24,7 +24,7 @@ errorCalculations = True    # If set to True, the script will run "shakefit" fun
 
 fixNH = True                # If set to True, the script will fit "sampleSize" amount of observations, and take average values for nH parameters, then
                             # refit all observations by freezing nH parameters to the average values.
-sampleSize = 15
+sampleSize = 10
 
 energyLimits = energyFilter.split(" ")
 Emin = energyLimits[0]
@@ -422,9 +422,12 @@ def assignParameters(compName, parameterList, nthOccurence):
             if occurence == nthOccurence:
                 listIndex = 0
                 for par in compObj.parameterNames:
-                    parObj = getattr(compObj, par)
-                    parObj.values = parameterList[listIndex]
-                    listIndex += 1
+                    if listIndex < len(parameterList):
+                        parObj = getattr(compObj, par)
+                        parObj.values = parameterList[listIndex]
+                        listIndex += 1
+                    else:
+                        break
 
 def transferToNewList(sourceList):
     newList = [sourceList[0]]
@@ -661,7 +664,7 @@ for x in range(2):
         # Set some Xspec settings
         logFile = open(resultsFile, "w")
         Xset.openLog("xspec_output.log")
-        Xset.abund = "angr"
+        Xset.abund = "wilm"
         if chatterOn == False: 
             Xset.chatter = 0
         Fit.query = "yes"
@@ -708,8 +711,7 @@ for x in range(2):
         else:
             getParsFromList(bestModel)
             assignParameters("pcfabs", pcfabsPars, 1)
-
-        AllModels(1).TBabs.nH.values = AllModels(1).TBabs.nH.values[0] / 2
+            AllModels(1).TBabs.nH.values = AllModels(1).TBabs.nH.values[0] / 2
 
         if startFixingNH:
             fixAllNH(fixedValuesNH)
@@ -723,7 +725,7 @@ for x in range(2):
         nullhypModelList = transferToNewList(bestModel)
         #=================================================================================
         # Add powerlaw to the previous model and fit
-        powerlawPars = ["1.9,,0,0", "1.5,,1e-5,1e-5"]
+        powerlawPars = ["1.9,,0,0", "1.3,,1e-5,1e-5"]
         addComp("powerlaw", "diskbb", "after", "+", bestModel)
         assignParameters("powerlaw", powerlawPars, 1)
 
