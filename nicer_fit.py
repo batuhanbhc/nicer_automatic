@@ -4,31 +4,7 @@ import os
 from pathlib import Path
 from xspec import *
 import numpy as np
-from nicer_variables import outputDir, resultsFile, energyFilter
-
-#===================================================================================================================================
-# Set it to True if you have made changes in models, and do not want to use any previous model files in commonDirectory
-# restartOnce only deletes model files before the first observation, restartAlways deletes model files before all observations
-restartOnce = True
-restartAlways = False
-
-# Critical value for F-test
-ftestCrit = 0.05
-
-chatterOn = True
-
-makeXspecScript = True      # If set to True, the script will create an .xcm file that loads model and data files to xspec and creates a plot automatically
-
-errorCalculations = True    # If set to True, the script will run "shakefit" function to calculate the error boundaries and possibly converge the
-                            # fit to better parameter values.
-
-fixNH = True                # If set to True, the script will fit "sampleSize" amount of observations, and take average values for nH parameters, then
-                            # refit all observations by freezing nH parameters to the average values.
-sampleSize = 10
-
-energyLimits = energyFilter.split(" ")
-Emin = energyLimits[0]
-Emax = energyLimits[1]
+from nicer_variables import *
 #===================================================================================================================================
 # Functions
 def shakefit(resultsFile):
@@ -579,6 +555,10 @@ def checkResults():
         print(key,val)
     quit()
 #===================================================================================================================
+energyLimits = energyFilter.split(" ")
+Emin = energyLimits[0]
+Emax = energyLimits[1]
+
 # Find the script's own path
 scriptPath = os.path.abspath(__file__)
 scriptPathRev = scriptPath[::-1]
@@ -1008,5 +988,5 @@ os.chdir(scriptDir)
 os.system("python3 nicer_plot.py")
 
 # This file is created after importing variables from another python file
-if Path("__pycache__").exists():
-    os.system("rm -rf __pycache__")
+if Path(scriptDir + "/__pycache__").exists():
+    os.system("rm -rf "+scriptDir+"/__pycache__")

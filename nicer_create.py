@@ -4,23 +4,23 @@
 import subprocess
 import os
 from pathlib import Path
-from nicer_variables import outputDir, inputTxtFile, resultsFile
+from nicer_variables import *
 
 # Find the script's own path
 scriptPath = os.path.abspath(__file__)
 scriptPathRev = scriptPath[::-1]
 scriptPathRev = scriptPathRev[scriptPathRev.find("/") + 1:]
-scriptPath = scriptPathRev[::-1]
+scriptDir = scriptPathRev[::-1]
 
 # Check if outputDir has been assigned to be a spesific directory or not
 if outputDir == "":
-    outputDir = scriptPath
+    outputDir = scriptDir
 
 # Open the txt file located within the same directory as the script.
 try:
-    inputFile = open(scriptPath + "/" + inputTxtFile, "r")
+    inputFile = open(scriptDir + "/" + inputTxtFile, "r")
 except:
-    print("Could not find the input txt file under " + scriptPath + ". Terminating the script...")
+    print("Could not find the input txt file under " + scriptDir + ". Terminating the script...")
     quit()
 
 obsList = []
@@ -34,7 +34,7 @@ os.system("nigeodown chatter=3")
 
 for obs in obsList:
     parentDir = obs[::-1]
-    obsid = parentDir[:parentDir.find("/")]         
+    obsid = parentDir[:parentDir.find("/")]
     parentDir = parentDir[parentDir.find("/")+1:]   
     
     obsid = obsid[::-1]         # e.g. 6130010120
@@ -48,7 +48,7 @@ for obs in obsList:
         subprocess.run(["mkdir", commonDirectory])
 
     # Run nicer pipeline commands
-    nicerl2 = "nicerl2 indir=" + obs + " clobber=yes chatter=1 history=yes filtcolumns=NICERV4 cldir=" + outObsDir
+    nicerl2 = "nicerl2 indir=" + obs + " clobber=yes chatter=1 history=yes detlist=launch,-14,-34 filtcolumns=NICERV4 cldir=" + outObsDir
     os.system(nicerl2)
 
     nicerl3spect = "nicerl3-spect " + outObsDir + " grouptype=optmin groupscale=10 bkgmodeltype=3c50 suffix=3c50 clobber=YES mkfile=" + obs + "/auxil/*.mkf"
@@ -63,5 +63,5 @@ for obs in obsList:
         subprocess.run(["touch", outObsDir + "/" + resultsFile])
 
 # This file is created after importing variables from another python file
-if Path("__pycache__").exists():
-    os.system("rm -rf __pycache__")
+if Path(scriptDir + "/__pycache__").exists():
+    os.system("rm -rf "+scriptDir+"/__pycache__")

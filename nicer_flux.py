@@ -4,10 +4,7 @@ import os
 from pathlib import Path
 from xspec import *
 import matplotlib.pyplot as plt
-from nicer_variables import outputDir, resultsFile, energyFilter
-
-#===================================================================================================================================
-writeParValuesAfterCflux = True
+from nicer_variables import *
 #===================================================================================================================================
 # Functions
 def listToStr(array):
@@ -218,5 +215,5 @@ for obs in inputFile.readlines():
     AllData.clear()
 
 # This file is created after importing variables from another python file
-if Path("__pycache__").exists():
-    os.system("rm -rf __pycache__")
+if Path(scriptDir + "/__pycache__").exists():
+    os.system("rm -rf "+scriptDir+"/__pycache__")

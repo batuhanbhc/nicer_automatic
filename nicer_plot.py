@@ -6,11 +6,7 @@ from xspec import *
 import matplotlib.pyplot as plt
 import math
 from astropy.io import fits
-from nicer_variables import energyFilter, resultsFile, outputDir
-#===================================================================================================================================
-# If set to True, the plot will use the dates of observations in MJD format for x axis values as opposed to using observation IDs.
-plotMJD = False
-startDateMJD = 60000
+from nicer_variables import *
 #===================================================================================================================================
 # Functions
 def listToStr(array):
@@ -287,5 +283,5 @@ for eachDict in dictList:
     print("Plotting the graph was successful.\n")
 
 # This file is created after importing variables from another python file
-if Path("__pycache__").exists():
-    os.system("rm -rf __pycache__")
+if Path(scriptDir + "/__pycache__").exists():
+    os.system("rm -rf " +scriptDir+"/__pycache__")
