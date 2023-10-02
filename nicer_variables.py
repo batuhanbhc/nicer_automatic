@@ -18,12 +18,14 @@ energyFilter = "0.5 10."
 # Script switches
 createSwitch = False
 fitSwitch = True
+plotSwitch = True
 fluxSwitch = True
 
 # Script names
-create_script = "nicer_create.py"
-fit_script = "nicer_fit.py"
-flux_script = "nicer_flux.py"
+createScript = "nicer_create.py"
+fitScript = "nicer_fit.py"
+plotScript = "nicer_plot.py"
+fluxScript = "nicer_flux.py"
 
 #================================================= nicer.fit spesific variables ================================================
 # Set it to True if you have made changes in models, and do not want to use any previous model files in commonDirectory

@@ -12,11 +12,13 @@ scriptDir = scriptPathRev[::-1]
 os.chdir(scriptDir)
 
 if createSwitch:
-    os.system("python3 " + create_script)
+    os.system("python3 " + createScript)
 if fitSwitch:
-    os.system("python3 " + fit_script)
+    os.system("python3 " + fitScript)
+if plotSwitch:
+    os.system("python3 " + plotScript)
 if fluxSwitch:
-    os.system("python3 " + flux_script)
+    os.system("python3 " + fluxScript)
 
 if Path("__pycache__").exists():
     os.system("rm -rf __pycache__")
