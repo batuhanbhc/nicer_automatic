@@ -5,6 +5,7 @@ from pathlib import Path
 from xspec import *
 import numpy as np
 from nicer_variables import *
+from astropy.io import fits
 #===================================================================================================================================
 # Functions
 def shakefit(resultsFile):
@@ -594,8 +595,6 @@ if fixNH:
 for x in range(2):
     iteration = 0
     for obs in obsPaths:
-        iteration += 1
-    
         # Extract the obsid from the path name written in nicer_obs.txt
         obs = obs.strip("\n' ")
         parentDir = obs[::-1]
@@ -607,6 +606,14 @@ for x in range(2):
         outObsDir = outputDir + "/" + obsid
         os.chdir(outObsDir)
         allFiles = os.listdir(outObsDir)
+
+        # First, check whether the observation has long enough exposure for meaningful data
+        hdu = fits.open(outObsDir + "/ni" + obsid + "mpu7_sr3c50.pha")
+        exposure = hdu[0].header["EXPOSURE"]
+        if exposure < 100:
+            continue
+
+        iteration += 1
 
         # Find the spectrum, background, arf and response files
         counter = 0
