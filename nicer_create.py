@@ -31,7 +31,9 @@ for line in inputFile.readlines():
 inputFile.close()
 
 # Update Nicer geomagnetic data
+print("Running nigeodown command.\n")
 os.system("nigeodown chatter=3")
+print("Nigeodown is completed.\n")
 
 counter = 0
 for obs in obsList:
@@ -46,28 +48,45 @@ for obs in obsList:
     
     obsid = obsid[::-1]         # e.g. 6130010120
 
-    outObsDir = outputDir +"/"+ obsid      # e.g. ~/NICER/analysis/6130010120   
-    commonDirectory = outputDir + "/" + "commonFiles"   # ~/NICER/analysis/commonFiles
+    # Create observation directory for storing event files and etc.
+    outObsDir = outputDir +"/"+ obsid      # e.g. ~/NICER/analysis/6130010120
+    if Path(outObsDir).exists() == False:
+        os.system("mkdir " + outObsDir)
 
     # Create "commonFiles" directory for storing model files and flux graphs
-    commonPath = Path(commonDirectory)
-    if not commonPath.exists():
-        subprocess.run(["mkdir", commonDirectory])
+    commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
+    if Path(commonDirectory).exists() == False:
+        os.system("mkdir " + commonDirectory)
+
+    # Create a log file to record the outputs of pipeline commands
+    pipelineLog = outObsDir + "/pipeline_output.log"
+    if Path(pipelineLog).exists() == False:
+        os.system("touch " + pipelineLog)
 
     # Run nicer pipeline commands
-    nicerl2 = "nicerl2 indir=" + obs + " clobber=yes chatter=1 history=yes detlist=launch,-14,-34 filtcolumns=NICERV4 cldir=" + outObsDir
+    print("Starting to run pipeline commands for observation: " + obsid)
+    print("Running nicerl2 pipeline command.")
+    nicerl2 = "nicerl2 indir=" + obs + " clobber=yes chatter=1 history=yes detlist=launch,-14,-34 filtcolumns=NICERV4 cldir=" + outObsDir + " > " + pipelineLog
     os.system(nicerl2)
+    print("Nicerl2 is completed.\n")
 
-    nicerl3spect = "nicerl3-spect " + outObsDir + " grouptype=optmin groupscale=10 bkgmodeltype=3c50 suffix=3c50 clobber=YES mkfile=" + obs + "/auxil/*.mkf"
+    print("Running nicerl3-spect pipeline command.")
+    nicerl3spect = "nicerl3-spect " + outObsDir + " grouptype=optmin groupscale=10 bkgmodeltype=3c50 suffix=3c50 clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
     os.system(nicerl3spect)
-
-    nicerl3lc = "nicerl3-lc " + outObsDir + " pirange=50-1000 timebin=1 clobber=YES mkfile=" + obs + "/auxil/*.mkf"
+    print("Nicerl3-spect is completed.\n")
+    
+    print("Running nicerl3-lc pipeline command.")
+    nicerl3lc = "nicerl3-lc " + outObsDir + " pirange=50-1000 timebin=1 clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
     os.system(nicerl3lc)
+    print("Nicerl3-lc is completed.\n")
 
-    # Create log file
-    logPath = Path(outObsDir +"/" + resultsFile)
-    if not logPath.exists():
-        subprocess.run(["touch", outObsDir + "/" + resultsFile])
+    print("Please do not forget to check pipeline log file to detect potential issues that might occured while creating targeted event files.\n")
+    print("==================================================================================================================================")
+
+    # Create log file for saving fit results that will be used by nicer_fit.py
+    fitLog = outObsDir +"/" + resultsFile
+    if Path(fitLog).exists() == False:
+        os.system("touch " + fitLog)
 
 # This file is created after importing variables from another python file
 if Path(scriptDir + "/__pycache__").exists():
