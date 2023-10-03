@@ -33,7 +33,13 @@ inputFile.close()
 # Update Nicer geomagnetic data
 os.system("nigeodown chatter=3")
 
+counter = 0
 for obs in obsList:
+    counter += 1
+    if obs == "":
+        print("Empty line detected in " + inputTxtFile + ": Line " + str(counter) + ".\n")
+        continue
+
     parentDir = obs[::-1]
     obsid = parentDir[:parentDir.find("/")]
     parentDir = parentDir[parentDir.find("/")+1:]   
