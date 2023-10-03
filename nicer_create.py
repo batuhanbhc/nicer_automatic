@@ -13,6 +13,7 @@ scriptPathRev = scriptPathRev[scriptPathRev.find("/") + 1:]
 scriptDir = scriptPathRev[::-1]
 
 # Check if outputDir has been assigned to be a spesific directory or not
+# If not, assign outputDir to the directory where the script is located at
 if outputDir == "":
     outputDir = scriptDir
 
