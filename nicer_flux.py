@@ -68,7 +68,7 @@ def freezeNorm():
             indx = parObj.index
             if par == "norm":
                 parObj.frozen = True
-                    
+
             elif comp != "cflux":
                 # Noticed that for some observations, fitting the model after adding cflux componant may change parameter values drastically,
                 # (e.g. nH 8 -> 1.7, Tin 1.4 -> 0.07) which messes up the chi-sq value and a significant change in the model. Here, I force the
@@ -168,8 +168,15 @@ for obs in inputFile.readlines():
         if counter == 2:
             # All necessary files have been found
             break
-
+    
     file = open(resultsFile, "a")
+
+    if counter != 2:
+        print("WARNING: Necessary files for calculating fluxed are missing for observation: " + obsid + "\n")
+        file.write("WARNING: Necessary files for calculating fluxed are missing for observation: " + obsid + "\n")
+        file.close()
+        continue
+
     Xset.restore(dataFile)
     Xset.restore(modFile)
     Fit.query = "yes"

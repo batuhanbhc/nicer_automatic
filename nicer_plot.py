@@ -128,6 +128,10 @@ for obs in inputFile.readlines():
         if counter == 3:
             break
     
+    if counter != 3:
+        print("WARNING: Necessary files for retrieving parameters and plotting are missing for observation: " + obsid + "\n")
+        continue
+
     if plotMJD:
         # Extract MJD
         hdu = fits.open(spectrumFile)

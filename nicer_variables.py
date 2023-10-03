@@ -52,5 +52,5 @@ writeParValuesAfterCflux = True
 
 #================================================ nicer.plot spesific variables =================================================
 # If set to True, the plot will use the dates of observations in MJD format for x axis values as opposed to using observation IDs.
-plotMJD = False
+plotMJD = True
 startDateMJD = 60000
