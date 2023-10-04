@@ -70,7 +70,6 @@ def shakefit(resultsFile):
                     parametersToCalculateError.append(AllModels(1).powerlaw.PhoIndex.index)
                     parametersToCalculateError.append(AllModels(1).powerlaw.norm.index)
                     break
-        quit()
 
     Fit.query = "no"
     print("Performing shakefit error calculations for the model: " + AllModels(1).expression + ", obsid:" + str(obsid)+ "\n")
@@ -1057,9 +1056,6 @@ for x in range(2):
         break
 
 os.chdir(scriptDir)
-
-# Run the plot script
-os.system("python3 nicer_plot.py")
 
 # This file is created after importing variables from another python file
 if Path(scriptDir + "/__pycache__").exists():
