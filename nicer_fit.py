@@ -15,6 +15,7 @@ def shakefit(resultsFile):
         os.system("rm " + parameterFile)
     os.system("touch " + parameterFile)
 
+    # Initialize the strings that will be used as seperate lines for parameter file
     parLines = []
     parLines.append("Parameter name | Parameter Value | Parameter Uncertainity Lower Boundary | Parameter Uncertainity Upper Boundary | Extra Information\n")
     counter = 0
@@ -25,11 +26,55 @@ def shakefit(resultsFile):
             parObj = getattr(compObj, par)
             fullName = comp + "." + par
             parLines.append(fullName + " ")
+    
+    # Shakefit will only be run for these parameters
+    parametersToCalculateError = [AllModels(1).diskbb.Tin.index, AllModels(1).diskbb.norm.index]
+
+    # Before proceeding with shakefit, check if powerlaw is in model expression. If so, check whether xspec error for photon index is bigger than 1 or not.
+    # If bigger than 1, fix photon index to 1.8 (may change in future) and only then continue with shakefit
+    if "powerlaw" in AllModels(1).expression:
+        with open("xspec_output.log", "r") as testfile:
+            lines = testfile.readlines()[-35:]
+        
+        print("Checking powerlaw xspec error value...\n")
+        retrievePhotonIndex = False
+        for line in lines:
+            line = line.strip("\n")
+            if " par  comp" in line:
+                retrievePhotonIndex = True
+            
+            if retrievePhotonIndex:
+                if "powerlaw" not in line:
+                    pass
+                else:
+                    words = line.split(" ")
+
+                    # Remove all empty elements from the list
+                    while True:
+                        try:
+                            emptyIndex = words.index("")
+                            words.pop(emptyIndex)
+                        except:
+                            break
+
+                    errorValue = words[-1]  # Xspec error value
+                    errorValue = errorValue.strip("\n")
+                    errorValue = float(errorValue)
+                    if (1 >= errorValue > 0) == False:
+                        AllModels(1).powerlaw.PhoIndex.values = "1.8 -1"
+                        resultsFile.write("\nWARNING: Powerlaw photon index is frozen at " + str(AllModels(1).powerlaw.PhoIndex.values[0]) + " for having xspec error bigger than +/- 1.\n")
+                        print("Powerlaw xspec error value is: " + str(errorValue))
+                        print("\nWARNING: Powerlaw photon index is frozen at " + str(AllModels(1).powerlaw.PhoIndex.values[0]) + " for having xspec error bigger than +/- 1.\n")
+                    
+                    print("Powerlaw is now available for error calculations.\n")
+                    parametersToCalculateError.append(AllModels(1).powerlaw.PhoIndex.index)
+                    parametersToCalculateError.append(AllModels(1).powerlaw.norm.index)
+                    break
+        quit()
 
     Fit.query = "no"
     print("Performing shakefit error calculations for the model: " + AllModels(1).expression + ", obsid:" + str(obsid)+ "\n")
     resultsFile.write("========== Proceeding with shakefit error calculations ==========\n")
-
     paramNum = AllModels(1).nParameters
     rerunShakefit = False
     for k in range(2):
@@ -38,15 +83,15 @@ def shakefit(resultsFile):
 
         print("Performing shakefit error calculations for the model: " + AllModels(1).expression + ", obsid:" + str(obsid)+ ", shakefit count: " + str(k+1)+"\n")
         fitModel()
+        updateParameters(bestModel)
 
-        diskbbIndexes = [AllModels(1).diskbb.Tin.index, AllModels(1).diskbb.norm.index]
         for i in range(1, paramNum+1):
             parDelta = AllModels(1)(i).values[1]
 
             if parDelta < 0:  # Check for frozen parameters
                 continue
             
-            if i not in diskbbIndexes:
+            if i not in parametersToCalculateError:
                 continue
 
             continueError = True
@@ -57,7 +102,6 @@ def shakefit(resultsFile):
                 Fit.error("stopat 10 0.1 maximum 50 " + str(delChi) + " " + str(i))
                 errorResult = AllModels(1)(i).error
                 errorString = errorResult[2]
-
 
                 if errorString[3] == "T" or errorString[4] == "T":
                     # Hit lower/upper limits, stop the error process for the current model parameter
@@ -100,8 +144,8 @@ def shakefit(resultsFile):
         parValue = AllModels(1)(i).values[0]
 
         if AllModels(1)(i).values[1] < 0:
-             # Fixed parameter, handle seperately
-             parLines[i] = parLines[i] + (str(AllModels(1)(i).values[0]) + " ")*3 +" FIXED\n"
+             # Fixed parameter, do not plot
+             pass 
         else:
             lowerBound = str(errorResult[0])
             upperBound = str(errorResult[1])
@@ -693,7 +737,7 @@ for x in range(2):
 
         fitModel()
         updateParameters(bestModel)
-        
+
         saveModel(modelFile, obsid)
         saveModel(modelFile, obsid, commonDirectory)
 
@@ -893,10 +937,8 @@ for x in range(2):
                 valueList = list(sortedDict.values())
                 for i in range(3):
                     totalTBabsNH += valueList[countNh]
-                    print(keyList[countNh])
                     countNh += 1
                     
-                test = input("continue:")
             except:
                 break
 
