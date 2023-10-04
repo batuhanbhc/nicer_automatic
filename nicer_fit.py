@@ -18,14 +18,6 @@ def shakefit(resultsFile):
     # Initialize the strings that will be used as seperate lines for parameter file
     parLines = []
     parLines.append("Parameter name | Parameter Value | Parameter Uncertainity Lower Boundary | Parameter Uncertainity Upper Boundary | Extra Information\n")
-    counter = 0
-    for comp in AllModels(1).componentNames:
-        compObj = getattr(AllModels(1), comp)
-        for par in compObj.parameterNames:
-            counter += 1
-            parObj = getattr(compObj, par)
-            fullName = comp + "." + par
-            parLines.append(fullName + " ")
     
     # Shakefit will only be run for these parameters
     parametersToCalculateError = [AllModels(1).diskbb.Tin.index, AllModels(1).diskbb.norm.index]
@@ -135,34 +127,41 @@ def shakefit(resultsFile):
                 break
 
     resultsFile.write("=================================================================\n\n")
-    
-    # Save parameter information to a list
-    for i in range(1, AllModels(1).nParameters+1):
-        errorResult = AllModels(1)(i).error
-        errorString = errorResult[2]
-        parValue = AllModels(1)(i).values[0]
 
-        if AllModels(1)(i).values[1] < 0:
-             # Fixed parameter, do not plot
-             pass 
-        else:
-            lowerBound = str(errorResult[0])
-            upperBound = str(errorResult[1])
-            info = ""
-            if errorString[6] == "T" and errorString[7] == "T":
-                # Search failed in both directions
-                upperBound = str(parValue)
-                lowerBound = str(parValue)
-                info = "FAILED_BOTH_DIRECTIONS"
-            elif errorString[6] == "T":
-                # Search failed in negative direction
-                lowerBound = str(parValue)
-                info = "FAILED_NEGATIVE_DIRECTION"
-            elif errorString[7] == "T":
-                # Search failed in positive direction
-                upperBound = str(parValue)
-                info = "FAILED_POSITIVE_DIRECTION"
-            parLines[i] = parLines[i] + str(parValue) + " " + lowerBound + " " + upperBound + " " + info + "\n"
+    # Save parameter information to a list
+    for comp in AllModels(1).componentNames:
+        compObj = getattr(AllModels(1), comp)
+        for par in compObj.parameterNames:
+            parObj = getattr(compObj, par)
+            parName = parObj.name
+            parValue = parObj.values[0]
+            index = parObj.index
+            fullName = comp + "." + parName
+            
+            errorResult = AllModels(1)(index).error
+            errorString = errorResult[2]
+            
+            if parObj.values[1] < 0 and parName == "nH":
+                # Fixed nH parameter, do not plot
+                pass
+            else:
+                lowerBound = str(errorResult[0])
+                upperBound = str(errorResult[1])
+                info = ""
+                if errorString[6] == "T" and errorString[7] == "T":
+                    # Search failed in both directions
+                    upperBound = str(parValue)
+                    lowerBound = str(parValue)
+                    info = "FAILED_BOTH_DIRECTIONS"
+                elif errorString[6] == "T":
+                    # Search failed in negative direction
+                    lowerBound = str(parValue)
+                    info = "FAILED_NEGATIVE_DIRECTION"
+                elif errorString[7] == "T":
+                    # Search failed in positive direction
+                    upperBound = str(parValue)
+                    info = "FAILED_POSITIVE_DIRECTION"
+                parLines.append(fullName + " " + str(parValue) + " " + lowerBound + " " + upperBound + " " + info + "\n")
 
     updateParameters(bestModel)
 
