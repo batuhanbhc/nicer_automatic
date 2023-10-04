@@ -19,7 +19,7 @@ energyFilter = "0.5 10."
 createSwitch = False
 fitSwitch = True
 plotSwitch = True
-fluxSwitch = True
+fluxSwitch = False
 
 # Script names
 createScript = "nicer_create.py"
@@ -31,7 +31,7 @@ fluxScript = "nicer_flux.py"
 # Set it to True if you have made changes in models, and do not want to use any previous model files in commonDirectory
 # restartOnce only deletes model files before the first observation, restartAlways deletes model files before all observations
 restartOnce = True
-restartAlways = True
+restartAlways = False
 
 # Critical value for F-test
 ftestCrit = 0.05

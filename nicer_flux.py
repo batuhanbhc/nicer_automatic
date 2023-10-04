@@ -193,13 +193,6 @@ for obs in inputFile.readlines():
     file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(absFlux) + "\n")
     if writeParValuesAfterCflux:
         writeParsAfterFlux()
-
-    if "pcfabs" in modelName:
-        # TBabs excluded flux
-        halfAbsFlux = calculateFlux("pcfabs", modelName, -8.1)
-        file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(halfAbsFlux) + "\n")
-        if writeParValuesAfterCflux:
-            writeParsAfterFlux()
         
     # Unabsorbed flux
     unabsFlux = calculateFlux("unabsorbed", modelName, -7.85)
