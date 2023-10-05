@@ -191,13 +191,13 @@ for obs in inputFile.readlines():
             else:
                 otherParsDict[obsid].append(parTuple)
 
-counter = 0
+dictionaryCounter = 0
 dictList = [gaussParsDict, otherParsDict]
 print("=============================================================================================================")
 for eachDict in dictList:
-    counter += 1
+    dictionaryCounter += 1
 
-    if counter == 1:
+    if dictionaryCounter == 1:
         print("Plotting the graph: gauss parameters")
     else:
         print("Plotting the graph: non-gauss parameters")
@@ -216,7 +216,7 @@ for eachDict in dictList:
     plotNum = len(modelPars.keys())
     
     if plotNum == 0:
-        if counter == 1:
+        if dictionaryCounter == 1:
             problematicGraph = "gauss parameters"
         else:
             problematicGraph = "non-gauss parameters"
@@ -225,56 +225,53 @@ for eachDict in dictList:
 
         continue
     
-    rows = math.ceil(math.sqrt(plotNum))
-    cols = math.ceil(plotNum / rows)
+    rows = plotNum
+    cols = 1
 
-    fig, axs = plt.subplots(cols, rows, figsize=(18, 10))
+    fig, axs = plt.subplots(rows, cols, figsize=(6, 20))
 
     counter = 0
-    for i in range(cols):
-        for j in range(rows):
-            try:
-                xAxis = list(modelPars.values())[counter][3]
-                yAxis = list(modelPars.values())[counter][0]
-                errorLow = list(modelPars.values())[counter][1]
-                errorHigh = list(modelPars.values())[counter][2]
-                parName = list(modelPars.keys())[counter]
 
-                if plotMJD:
-                    xMin = int(min(xAxis)) - 1
-                    xMax = int(max(xAxis)) + 1
-                    
-                    if (xMax - xMin) < 20:
-                        tickInterval = 1
-                    elif 20 <= (xMax - xMin) < 100:
-                        tickInterval = 5
-                    elif 100 <= (xMax - xMin) < 200:
-                        tickInterval = 10
-                    else:
-                        tickInterval = 20
-                        
-                    ticks = []
-                    for k in range(xMin, xMax + tickInterval, tickInterval):
-                        ticks.append(k)
-                else:
-                    ticks = xAxis
+    for i in range(rows):
+        xAxis = list(modelPars.values())[counter][3]
+        yAxis = list(modelPars.values())[counter][0]
+        errorLow = list(modelPars.values())[counter][1]
+        errorHigh = list(modelPars.values())[counter][2]
+        parName = list(modelPars.keys())[counter]
 
-                #axs[i, j].plot(xAxis, yAxis, label= parName, color="black")
-                axs[i, j].errorbar(xAxis, yAxis, yerr=[errorLow, errorHigh], fmt='*', ecolor="black", color="black", capsize=0, label=parName)
-                if plotMJD:
-                    axs[i, j].set_xlabel("Date (MJD "+str(startDateMJD)+ ")")
-                else:
-                    axs[i, j].set_xlabel('Observation IDs')
-                axs[i, j].set_ylabel('Xspec model units')
+        if plotMJD:
+            xMin = int(min(xAxis)) - 1
+            xMax = int(max(xAxis)) + 1
+            
+            if (xMax - xMin) < 20:
+                tickInterval = 1
+            elif 20 <= (xMax - xMin) < 100:
+                tickInterval = 5
+            elif 100 <= (xMax - xMin) < 200:
+                tickInterval = 10
+            else:
+                tickInterval = 20
+                
+            ticks = []
+            for k in range(xMin, xMax + tickInterval, tickInterval):
+                ticks.append(k)
+        else:
+            ticks = xAxis
 
-                axs[i, j].set_xticks(ticks)
-                axs[i, j].set_xticklabels(ticks, rotation=60, ha='right')
+        #axs[i, j].plot(xAxis, yAxis, label= parName, color="black")
+        axs[i].errorbar(xAxis, yAxis, yerr=[errorLow, errorHigh], fmt='*', ecolor="black", color="black", capsize=0, label=parName)
+        if plotMJD:
+            axs[i].set_xlabel("Date (MJD "+str(startDateMJD)+ ")")
+        else:
+            axs[i].set_xlabel('Observation IDs')
+        axs[i].set_ylabel('Xspec model units')
 
-                axs[i, j].legend()
+        axs[i].set_xticks(ticks)
+        axs[i].set_xticklabels(ticks, rotation=60, ha='right')
 
-                counter += 1
-            except:
-                break
+        axs[i].legend()
+
+        counter += 1
             
 
     general_title = "Best-fitting Model Parameters " + "(Abundance: "+ abundance +")"
