@@ -145,23 +145,15 @@ def shakefit(resultsFile):
                 # Fixed nH parameter, do not plot
                 pass
             else:
-                lowerBound = str(errorResult[0])
-                upperBound = str(errorResult[1])
-                info = ""
-                if errorString[6] == "T" and errorString[7] == "T":
-                    # Search failed in both directions
-                    upperBound = str(parValue)
-                    lowerBound = str(parValue)
-                    info = "FAILED_BOTH_DIRECTIONS"
-                elif errorString[6] == "T":
-                    # Search failed in negative direction
-                    lowerBound = str(parValue)
-                    info = "FAILED_NEGATIVE_DIRECTION"
-                elif errorString[7] == "T":
-                    # Search failed in positive direction
-                    upperBound = str(parValue)
-                    info = "FAILED_POSITIVE_DIRECTION"
-                parLines.append(fullName + " " + str(parValue) + " " + lowerBound + " " + upperBound + " " + info + "\n")
+                lowerBound = errorResult[0]
+                upperBound = errorResult[1]
+                if lowerBound == 0:
+                    lowerBound = parValue
+                
+                if upperBound == 0:
+                    upperBound = parValue
+
+                parLines.append(fullName + " " + str(parValue) + " " + str(lowerBound) + " " + str(upperBound) + "\n")
 
     updateParameters(bestModel)
 
@@ -860,6 +852,36 @@ for x in range(2):
 
         nullhypModelList = transferToNewList(bestModel)
 
+        if "edge" not in AllModels(1).expression:
+            # Add an edge around 1.8 keV
+            addComp("edge", "TBabs", "after", "*", bestModel)
+
+            edgePars = ["1.8,,1.5,1.5,2,2", "0.1"]
+            assignParameters("edge", edgePars, 1)
+            
+            fitModel()
+            updateParameters(bestModel)
+
+            modelFile = extractModFileName()
+            saveModel(modelFile, obsid)
+            saveModel(modelFile, obsid, commonDirectory)
+
+            altModelList = bestModel
+
+            #===============================================================================================
+            # Apply f-test
+            pValue = performFtest(nullhypModelList, altModelList, logFile, "    (Second time of adding absorption edge around 1.8 keV)")
+
+            if abs(pValue) >= ftestCrit:
+                removeComp("edge", 1, bestModel)
+                fitModel()
+                updateParameters(bestModel)
+
+                logFile.write("\n====================================================================================\n")
+                logFile.write("Edge is taken out from the model due to not improving the fit significantly.")
+                logFile.write("\n====================================================================================\n\n")
+
+            nullhypModelList = transferToNewList(bestModel)
         #========================================================================================================================================
         # Start recording nH values if fixNH is set to True.
         if iteration < iterationMax and takeAverages:
@@ -1019,6 +1041,8 @@ for x in range(2):
             
             inputFile.close()
             outFile.close()
+
+            os.system("rm temp_parameters.txt")
         #===========================================================================
         # Remove any pre-existing best model files and save a new one
         for eachFile in allFiles:

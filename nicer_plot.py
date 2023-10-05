@@ -215,7 +215,7 @@ for eachDict in dictList:
         print("WARNING: The script is trying to create graphs without any parameters. Skipping the following graph: " + problematicGraph + "\n")
 
         continue
-
+    
     rows = math.ceil(math.sqrt(plotNum))
     cols = math.ceil(plotNum / rows)
 

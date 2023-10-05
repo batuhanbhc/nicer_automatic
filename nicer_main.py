@@ -15,10 +15,10 @@ if createSwitch:
     os.system("python3 " + createScript)
 if fitSwitch:
     os.system("python3 " + fitScript)
-if plotSwitch:
-    os.system("python3 " + plotScript)
 if fluxSwitch:
     os.system("python3 " + fluxScript)
+if plotSwitch:
+    os.system("python3 " + plotScript)
 
 if Path("__pycache__").exists():
     os.system("rm -rf __pycache__")
