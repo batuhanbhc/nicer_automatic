@@ -54,7 +54,7 @@ def shakefit(resultsFile):
                     errorValue = float(errorValue)
                     if (1 >= errorValue > 0) == False:
                         AllModels(1).powerlaw.PhoIndex.values = "1.8 -1"
-                        resultsFile.write("\nWARNING: Powerlaw photon index is frozen at " + str(AllModels(1).powerlaw.PhoIndex.values[0]) + " for having xspec error bigger than +/- 1.\n")
+                        resultsFile.write("\nWARNING: Powerlaw photon index is frozen at " + str(AllModels(1).powerlaw.PhoIndex.values[0]) + " for having large xspec error: " + str(errorValue)+ "\n")
                         print("Powerlaw xspec error value is: " + str(errorValue))
                         print("\nWARNING: Powerlaw photon index is frozen at " + str(AllModels(1).powerlaw.PhoIndex.values[0]) + " for having xspec error bigger than +/- 1.\n")
                     
@@ -693,7 +693,7 @@ for x in range(2):
         Xset.abund = "wilm"
         if chatterOn == False: 
             Xset.chatter = 0
-        Fit.query = "no"
+        Fit.query = "yes"
 
         logFile.write("OBSERVATION ID: " + obsid + "\n\n")
 
@@ -707,7 +707,7 @@ for x in range(2):
         # This list will carry the model name, model parameters and fit statistics for the best model throughout the script.
         # First element is the model name, second element is the dictionary for parameter name-value pairs, third element is the dictionary for fit statistics
         # such as chi-squared, degrees of freedom and null hypothesis probability.
-        bestModel = ["TBabs*pcfabs(gauss+diskbb)", {}, {}]
+        bestModel = ["TBabs*pcfabs(gauss+diskbb)", {"diskbb.Tin": ",,0.1,0.1,2.5,2.5", "diskbb.norm:":",,0.1,0.1"}, {}]
 
         #=================================================================================
         # Load the first model and fit
@@ -724,7 +724,7 @@ for x in range(2):
 
         if startFixingNH:
             fixAllNH(fixedValuesNH)
-
+            
         fitModel()
         updateParameters(bestModel)
 
@@ -736,7 +736,7 @@ for x in range(2):
         # Add an edge around 1.8 keV
         addComp("edge", "TBabs", "after", "*", bestModel)
 
-        edgePars = ["1.8,,1.5,1.5,2,2", "0.1"]
+        edgePars = ["1.8,,1.5,1.5,2,2", "0.3"]
         assignParameters("edge", edgePars, 1)
         
         fitModel()
@@ -852,36 +852,6 @@ for x in range(2):
 
         nullhypModelList = transferToNewList(bestModel)
 
-        if "edge" not in AllModels(1).expression:
-            # Add an edge around 1.8 keV
-            addComp("edge", "TBabs", "after", "*", bestModel)
-
-            edgePars = ["1.8,,1.5,1.5,2,2", "0.1"]
-            assignParameters("edge", edgePars, 1)
-            
-            fitModel()
-            updateParameters(bestModel)
-
-            modelFile = extractModFileName()
-            saveModel(modelFile, obsid)
-            saveModel(modelFile, obsid, commonDirectory)
-
-            altModelList = bestModel
-
-            #===============================================================================================
-            # Apply f-test
-            pValue = performFtest(nullhypModelList, altModelList, logFile, "    (Second time of adding absorption edge around 1.8 keV)")
-
-            if abs(pValue) >= ftestCrit:
-                removeComp("edge", 1, bestModel)
-                fitModel()
-                updateParameters(bestModel)
-
-                logFile.write("\n====================================================================================\n")
-                logFile.write("Edge is taken out from the model due to not improving the fit significantly.")
-                logFile.write("\n====================================================================================\n\n")
-
-            nullhypModelList = transferToNewList(bestModel)
         #========================================================================================================================================
         # Start recording nH values if fixNH is set to True.
         if iteration < iterationMax and takeAverages:
@@ -917,7 +887,7 @@ for x in range(2):
 
             continue
 
-        elif iteration == iterationMax and takeAverages:
+        elif iteration >= iterationMax and takeAverages:
             # The maximum sample size for calculating average nH values has been reached.
             # Terminate the first iteration of fitting observations, calculate average nH values and refit all observations again.
 
@@ -958,9 +928,8 @@ for x in range(2):
                 for i in range(3):
                     totalTBabsNH += valueList[countNh]
                     countNh += 1
-                    
             except:
-                break
+                print("WARNING: Average nH values will be calculated using data from less than 3 observations.\n")
 
             avgTBabs = totalTBabsNH / countNh
             fixedValuesNH["TBabs.nH"] = str(avgTBabs) + " -1"
@@ -984,12 +953,12 @@ for x in range(2):
                     totalPcfabsNH += valueList[countNh]
                     countNh += 1
             except:
-                break
+                print("WARNING: Average nH values will be calculated using data from less than 3 observations.\n")
 
             avgPcfabs = totalPcfabsNH / countNh
             fixedValuesNH["pcfabs.nH"] = str(avgPcfabs) + " -1"
 
-            # Close all log files
+            # Close all log files5
             writeBestFittingModel(logFile)
 
             modFileName = extractModFileName()
