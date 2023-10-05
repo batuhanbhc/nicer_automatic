@@ -145,23 +145,15 @@ def shakefit(resultsFile):
                 # Fixed nH parameter, do not plot
                 pass
             else:
-                lowerBound = str(errorResult[0])
-                upperBound = str(errorResult[1])
-                info = ""
-                if errorString[6] == "T" and errorString[7] == "T":
-                    # Search failed in both directions
-                    upperBound = str(parValue)
-                    lowerBound = str(parValue)
-                    info = "FAILED_BOTH_DIRECTIONS"
-                elif errorString[6] == "T":
-                    # Search failed in negative direction
-                    lowerBound = str(parValue)
-                    info = "FAILED_NEGATIVE_DIRECTION"
-                elif errorString[7] == "T":
-                    # Search failed in positive direction
-                    upperBound = str(parValue)
-                    info = "FAILED_POSITIVE_DIRECTION"
-                parLines.append(fullName + " " + str(parValue) + " " + lowerBound + " " + upperBound + " " + info + "\n")
+                lowerBound = errorResult[0]
+                upperBound = errorResult[1]
+                if lowerBound == 0:
+                    lowerBound = parValue
+                
+                if upperBound == 0:
+                    upperBound = parValue
+
+                parLines.append(fullName + " " + str(parValue) + " " + str(lowerBound) + " " + str(upperBound) + "\n")
 
     updateParameters(bestModel)
 

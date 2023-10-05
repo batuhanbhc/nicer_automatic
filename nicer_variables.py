@@ -18,8 +18,8 @@ energyFilter = "0.5 10."
 # Script switches
 createSwitch = False
 fitSwitch = True
+fluxSwitch = True
 plotSwitch = True
-fluxSwitch = False
 
 # Script names
 createScript = "nicer_create.py"
