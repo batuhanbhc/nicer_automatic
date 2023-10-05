@@ -132,29 +132,24 @@ for obs in inputFile.readlines():
         print("WARNING: Necessary files for retrieving parameters and plotting are missing for observation: " + obsid + "\n")
         continue
 
-    if plotMJD:
-        # Extract MJD
-        hdu = fits.open(spectrumFile)
-        date = float(format(hdu[1].header["MJD-OBS"], ".3f"))
+    # Extract MJD
+    hdu = fits.open(spectrumFile)
+    date = float(format(hdu[1].header["MJD-OBS"], ".3f"))
 
-        if date < startDateMJD:
-            print("MJD smaller than " + str(startDateMJD)+" has been detected. The graphs are plotted starting from MJD "+str(startDateMJD)+". Please change 'startDateMJD' variable to account for older MJD.")
-            quit()
-        else:
-            date = date - startDateMJD
-        hdu.close()
+    if date < startDateMJD:
+        print("MJD smaller than " + str(startDateMJD)+" has been detected. The graphs are plotted starting from MJD "+str(startDateMJD)+". Please change 'startDateMJD' variable to account for older MJD.")
+        quit()
+    else:
+        date = date - startDateMJD
+    hdu.close()
 
     Xset.chatter = 0
     Xset.restore(modFile)
     abundance = Xset.abund[:Xset.abund.find(":")]
     
     # Initialize the values of keys as lists
-    if plotMJD:
-        gaussParsDict[date] = []
-        otherParsDict[date] = []
-    else:
-        gaussParsDict[obsid] = []
-        otherParsDict[obsid] = []
+    gaussParsDict[date] = []
+    otherParsDict[date] = []
 
     file = open(parFile)
     iterator = 0
@@ -180,16 +175,29 @@ for obs in inputFile.readlines():
 
         parTuple = (line[0], line[1], line[2], line[3])
 
-        if plotMJD:
-            if "gauss" in parTuple[0]:
-                gaussParsDict[date].append(parTuple)
-            else:
-                otherParsDict[date].append(parTuple)
+        if "gauss" in parTuple[0]:
+            gaussParsDict[date].append(parTuple)
         else:
-            if "gauss" in parTuple[0]:
-                gaussParsDict[obsid].append(parTuple)
-            else:
-                otherParsDict[obsid].append(parTuple)
+            otherParsDict[date].append(parTuple)
+
+# Set static x-axis ticks for all graphs
+mjdList = list(gaussParsDict.keys()) + list(otherParsDict.keys())
+minMjd = min(mjdList)
+maxMjd = max(mjdList)
+if (maxMjd - minMjd) < 20:
+    tickInterval = 1
+elif 20 <= (maxMjd - minMjd) < 100:
+    tickInterval = 5
+elif 100 <= (maxMjd - minMjd) < 200:
+    tickInterval = 10
+else:
+    tickInterval = 20
+
+xAxisStart = round((minMjd - tickInterval*2) / tickInterval) * tickInterval
+xAxisEnd = round((maxMjd + tickInterval*2) / tickInterval) * tickInterval + 1
+xAxisTicks = []
+for i in range(xAxisStart, xAxisEnd, tickInterval):
+    xAxisTicks.append(i)
 
 dictionaryCounter = 0
 dictList = [gaussParsDict, otherParsDict]
@@ -209,7 +217,7 @@ for eachDict in dictList:
                 modelPars[tuple[0]][0].append(tuple[1])     # Value
                 modelPars[tuple[0]][1].append(tuple[2])     # Error lower
                 modelPars[tuple[0]][2].append(tuple[3])     # Error upper
-                modelPars[tuple[0]][3].append(key)          # Observation ID / MJD
+                modelPars[tuple[0]][3].append(key)          # MJD
             else:
                 modelPars[tuple[0]] = ([tuple[1]], [tuple[2]], [tuple[3]], [key])
 
@@ -239,35 +247,14 @@ for eachDict in dictList:
         errorHigh = list(modelPars.values())[counter][2]
         parName = list(modelPars.keys())[counter]
 
-        if plotMJD:
-            xMin = int(min(xAxis)) - 1
-            xMax = int(max(xAxis)) + 1
-            
-            if (xMax - xMin) < 20:
-                tickInterval = 1
-            elif 20 <= (xMax - xMin) < 100:
-                tickInterval = 5
-            elif 100 <= (xMax - xMin) < 200:
-                tickInterval = 10
-            else:
-                tickInterval = 20
-                
-            ticks = []
-            for k in range(xMin, xMax + tickInterval, tickInterval):
-                ticks.append(k)
-        else:
-            ticks = xAxis
-
         #axs[i, j].plot(xAxis, yAxis, label= parName, color="black")
         axs[i].errorbar(xAxis, yAxis, yerr=[errorLow, errorHigh], fmt='*', ecolor="black", color="black", capsize=0, label=parName)
-        if plotMJD:
-            axs[i].set_xlabel("Date (MJD "+str(startDateMJD)+ ")")
-        else:
-            axs[i].set_xlabel('Observation IDs')
+
+        axs[i].set_xlabel("Date (MJD "+str(startDateMJD)+ ")")
         axs[i].set_ylabel('Xspec model units')
 
-        axs[i].set_xticks(ticks)
-        axs[i].set_xticklabels(ticks, rotation=60, ha='right')
+        axs[i].set_xticks(xAxisTicks)
+        axs[i].set_xticklabels(xAxisTicks, rotation=60, ha='right')
 
         axs[i].legend()
 
