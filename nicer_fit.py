@@ -141,8 +141,8 @@ def shakefit(resultsFile):
             errorResult = AllModels(1)(index).error
             errorString = errorResult[2]
             
-            if parObj.values[1] < 0 and parName == "nH":
-                # Fixed nH parameter, do not plot
+            if (parObj.values[1] < 0) and (index not in parametersToCalculateError):
+                # Fixed parameter, do not plot
                 pass
             else:
                 lowerBound = errorResult[0]

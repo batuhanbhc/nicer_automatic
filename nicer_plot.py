@@ -169,6 +169,15 @@ for obs in inputFile.readlines():
         line[1] = float(line[1])
         line[2] = line[1] - float(line[2])
         line[3] = float(line[3]) - line[1]
+
+        # If the parameter is a float number with fractional part having more than 5 digits, round the fractional part to 5 digits.
+        tempList = [line[1], line[2], line[3]]
+        tempCounter = 0
+        for i in tempList:
+            tempCounter += 1
+            if i > 10**-5 and len(str(i)[str(i).find(".") +1:]) > 5:
+                line[tempCounter] = float(format(i, ".5f"))
+
         parTuple = (line[0], line[1], line[2], line[3])
 
         if plotMJD:
