@@ -860,6 +860,36 @@ for x in range(2):
 
         nullhypModelList = transferToNewList(bestModel)
 
+        if "edge" not in AllModels(1).expression:
+            # Add an edge around 1.8 keV
+            addComp("edge", "TBabs", "after", "*", bestModel)
+
+            edgePars = ["1.8,,1.5,1.5,2,2", "0.1"]
+            assignParameters("edge", edgePars, 1)
+            
+            fitModel()
+            updateParameters(bestModel)
+
+            modelFile = extractModFileName()
+            saveModel(modelFile, obsid)
+            saveModel(modelFile, obsid, commonDirectory)
+
+            altModelList = bestModel
+
+            #===============================================================================================
+            # Apply f-test
+            pValue = performFtest(nullhypModelList, altModelList, logFile, "    (Second time of adding absorption edge around 1.8 keV)")
+
+            if abs(pValue) >= ftestCrit:
+                removeComp("edge", 1, bestModel)
+                fitModel()
+                updateParameters(bestModel)
+
+                logFile.write("\n====================================================================================\n")
+                logFile.write("Edge is taken out from the model due to not improving the fit significantly.")
+                logFile.write("\n====================================================================================\n\n")
+
+            nullhypModelList = transferToNewList(bestModel)
         #========================================================================================================================================
         # Start recording nH values if fixNH is set to True.
         if iteration < iterationMax and takeAverages:
@@ -1019,6 +1049,8 @@ for x in range(2):
             
             inputFile.close()
             outFile.close()
+
+            os.system("rm temp_parameters.txt")
         #===========================================================================
         # Remove any pre-existing best model files and save a new one
         for eachFile in allFiles:

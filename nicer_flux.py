@@ -84,8 +84,8 @@ def findFlux():
             # Convert log10(x) flux to x
             flux = 10 ** AllModels(1)(i).values[0]
             Fit.error("maximum 50 "+ str(i))
-            lowerFlux = "errLow:" + str(10**AllModels(1)(i).error[0])
-            upperFlux = "errHigh:" + str(10**AllModels(1)(i).error[1])
+            lowerFlux = str(10**AllModels(1)(i).error[0])
+            upperFlux = str(10**AllModels(1)(i).error[1])
             return [flux, lowerFlux, upperFlux]
 
 def calculateFlux(component, modelName, initialFlux = ""):
@@ -199,6 +199,22 @@ for obs in inputFile.readlines():
     file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(unabsFlux) + "\n")
     if writeParValuesAfterCflux:
         writeParsAfterFlux()
+
+    parameterFile = open("parameters_bestmodel.txt", "r")
+    appendFlux = True
+    for line in parameterFile.readlines():
+        if "unabsorbedFlux" in line:
+            appendFlux = False
+            break
+    parameterFile.close()
+
+    if appendFlux:
+        parameterFile = open("parameters_bestmodel.txt", "a")
+        parameterFile.write("unabsorbedFlux " + listToStr(unabsFlux)+ "\n")
+        parameterFile.close()
+        print("Successfully added unabsorbed data flux to the parameter file.")
+    else:
+        print("There is already data about unabsorbed flux in parameter file.\n")
 
     # Diskbb flux
     fluxDisk = calculateFlux("diskbb", modelName, -7.85)
