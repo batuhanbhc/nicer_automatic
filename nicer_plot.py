@@ -185,19 +185,22 @@ mjdList = list(gaussParsDict.keys()) + list(otherParsDict.keys())
 minMjd = min(mjdList)
 maxMjd = max(mjdList)
 if (maxMjd - minMjd) < 20:
-    tickInterval = 1
-elif 20 <= (maxMjd - minMjd) < 100:
     tickInterval = 5
-elif 100 <= (maxMjd - minMjd) < 200:
-    tickInterval = 10
+elif 20 <= (maxMjd - minMjd) < 100:
+    tickInterval = 25
 else:
-    tickInterval = 20
+    tickInterval = 50
 
 xAxisStart = round((minMjd - tickInterval*2) / tickInterval) * tickInterval
 xAxisEnd = round((maxMjd + tickInterval*2) / tickInterval) * tickInterval + 1
-xAxisTicks = []
-for i in range(xAxisStart, xAxisEnd, tickInterval):
-    xAxisTicks.append(i)
+xAxisTicksMajor = []
+xAxisTicksMinor = []
+
+for i in range(xAxisStart, xAxisEnd):
+    if i % tickInterval == 0:
+        xAxisTicksMajor.append(i)
+    else:
+        xAxisTicksMinor.append(i)
 
 dictionaryCounter = 0
 dictList = [gaussParsDict, otherParsDict]
@@ -236,32 +239,30 @@ for eachDict in dictList:
     rows = plotNum
     cols = 1
 
-    fig, axs = plt.subplots(rows, cols, figsize=(6, 20))
-
+    fig, axs = plt.subplots(rows, cols, figsize=(6, plotNum*2))
+    plt.subplots_adjust(wspace=0, hspace=0)
     counter = 0
 
     for i in range(rows):
+        if i < rows - 1:
+            axs[i].xaxis.set_visible(False)
+
         xAxis = list(modelPars.values())[counter][3]
         yAxis = list(modelPars.values())[counter][0]
         errorLow = list(modelPars.values())[counter][1]
         errorHigh = list(modelPars.values())[counter][2]
         parName = list(modelPars.keys())[counter]
 
-        #axs[i, j].plot(xAxis, yAxis, label= parName, color="black")
         axs[i].errorbar(xAxis, yAxis, yerr=[errorLow, errorHigh], fmt='*', ecolor="black", color="black", capsize=0, label=parName)
-
-        axs[i].set_xlabel("Date (MJD "+str(startDateMJD)+ ")")
-        axs[i].set_ylabel('Xspec model units')
-
-        axs[i].set_xticks(xAxisTicks)
-        axs[i].set_xticklabels(xAxisTicks, rotation=60, ha='right')
-
         axs[i].legend()
 
-        counter += 1
+        axs[i].set_xlabel("Time (MJD-"+str(startDateMJD)+ " days)")
+        axs[i].set_ylabel('Xspec model units')
 
-    # Adjust layout and save the figure
-    plt.tight_layout()
+        axs[i].set_xticks(xAxisTicksMajor)
+        axs[i].set_xticks(xAxisTicksMinor, minor = True)
+
+        counter += 1
 
     if eachDict == otherParsDict:
         pngFile = commonDirectory + "/other_parameters.png"
