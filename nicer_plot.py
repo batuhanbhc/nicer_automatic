@@ -259,10 +259,6 @@ for eachDict in dictList:
         axs[i].legend()
 
         counter += 1
-            
-
-    general_title = "Best-fitting Model Parameters " + "(Abundance: "+ abundance +")"
-    fig.suptitle(general_title, fontsize=16)
 
     # Adjust layout and save the figure
     plt.tight_layout()

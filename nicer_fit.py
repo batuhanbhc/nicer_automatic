@@ -53,10 +53,10 @@ def shakefit(resultsFile):
                     errorValue = errorValue.strip("\n")
                     errorValue = float(errorValue)
                     if (1 >= errorValue > 0) == False:
-                        AllModels(1).powerlaw.PhoIndex.values = "1.8 -1"
+                        AllModels(1).powerlaw.PhoIndex.values = "1.7 -1"
                         resultsFile.write("\nWARNING: Powerlaw photon index is frozen at " + str(AllModels(1).powerlaw.PhoIndex.values[0]) + " for having large xspec error: " + str(errorValue)+ "\n")
                         print("Powerlaw xspec error value is: " + str(errorValue))
-                        print("\nWARNING: Powerlaw photon index is frozen at " + str(AllModels(1).powerlaw.PhoIndex.values[0]) + " for having xspec error bigger than +/- 1.\n")
+                        print("\nWARNING: Powerlaw photon index is frozen at " + str(AllModels(1).powerlaw.PhoIndex.values[0]) + " for having xspec error bigger than 1: "+str(errorValue)+"\n")
                     
                     print("Powerlaw is now available for error calculations.\n")
                     parametersToCalculateError.append(AllModels(1).powerlaw.PhoIndex.index)
@@ -731,7 +731,6 @@ for x in range(2):
         saveModel(modelFile, obsid)
         saveModel(modelFile, obsid, commonDirectory)
 
-        nullhypModelList = transferToNewList(bestModel)
         #===============================================================================================
         # Add an edge around 1.8 keV
         addComp("edge", "TBabs", "after", "*", bestModel)
@@ -745,21 +744,6 @@ for x in range(2):
         modelFile = extractModFileName()
         saveModel(modelFile, obsid)
         saveModel(modelFile, obsid, commonDirectory)
-
-        altModelList = bestModel
-
-        #===============================================================================================
-         # Apply f-test
-        pValue = performFtest(nullhypModelList, altModelList, logFile, "    (adding absorption edge around 1.8 keV)")
-
-        if abs(pValue) >= ftestCrit:
-            removeComp("edge", 1, bestModel)
-            fitModel()
-            updateParameters(bestModel)
-
-            logFile.write("\n====================================================================================\n")
-            logFile.write("Edge is taken out from the model due to not improving the fit significantly.")
-            logFile.write("\n====================================================================================\n\n")
 
         nullhypModelList = transferToNewList(bestModel)
         #===============================================================================================
@@ -851,7 +835,7 @@ for x in range(2):
             logFile.write("\n====================================================================================\n\n")
 
         nullhypModelList = transferToNewList(bestModel)
-
+        
         #========================================================================================================================================
         # Start recording nH values if fixNH is set to True.
         if iteration < iterationMax and takeAverages:
