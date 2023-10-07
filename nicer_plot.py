@@ -200,7 +200,7 @@ minMjd = min(mjdList)
 maxMjd = max(mjdList)
 
 totalDifference = maxMjd - minMjd
-majorTickInterval = round((totalDifference / 5) / 5) * 5
+majorTickInterval = round(totalDifference / 5) * 5
 
 xAxisStart = round((minMjd - majorTickInterval) / majorTickInterval) * majorTickInterval
 xAxisEnd = round((maxMjd + majorTickInterval) / majorTickInterval) * majorTickInterval + 1
