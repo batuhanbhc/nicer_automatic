@@ -938,7 +938,7 @@ for x in range(2):
 
             # Initialize the strings that will be used as seperate lines for parameter file
             parLines = []
-            parLines.append("Parameter name | Parameter Value | Parameter Uncertainity Lower Boundary | Parameter Uncertainity Upper Boundary | Parameter Unit\n")
+            parLines.append("Parameter name | Parameter Value | Parameter Uncertainity Lower Boundary | Parameter Uncertainity Upper Boundary\n")
             
             # Save parameter information to parLines
             for comp in AllModels(1).componentNames:
@@ -963,7 +963,7 @@ for x in range(2):
                             upperBound = parValue
 
                         if parametersForShakefit[fullName] == "X":
-                            parUnit = ""
+                            parUnit = fullName
                         else:
                             unit = ""
                             for char in parametersForShakefit[fullName]:
@@ -972,8 +972,8 @@ for x in range(2):
                                 else:
                                     unit += char
 
-                            parUnit = " " + unit 
-                        parLines.append(fullName + " " + str(parValue) + " " + str(lowerBound) + " " + str(upperBound) + parUnit +"\n")
+                            parUnit = unit
+                        parLines.append(parUnit + " " + str(parValue) + " " + str(lowerBound) + " " + str(upperBound) +"\n")
             
             # Create a temporary parameter file that will carry parameter values along with error boundaries
             parameterFile = outObsDir + "/" + "temp_parameters.txt"

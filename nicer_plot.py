@@ -170,7 +170,7 @@ for obs in inputFile.readlines():
         line[2] = line[1] - float(line[2])
         line[3] = float(line[3]) - line[1]
 
-        # Try to see whether the parameter has a 
+        # Try to see whether the parameter has a unit associated with in in parameter file.
         try:
             test = line[4]
         except:
@@ -261,13 +261,22 @@ for eachDict in dictList:
     plt.subplots_adjust(wspace=0, hspace=0)
     counter = 0
 
+    createCommonLabel = False
+    commonLabel = ""
+    for key, val in modelPars.items():
+        if val[4] != "":
+            createCommonLabel = True
+            commonLabel = val[4]
+    
+    if createCommonLabel:
+        fig.text(0.93, 0.5, commonLabel, va='center', rotation='vertical')
+
     for i in range(rows):
         xAxis = list(modelPars.values())[counter][3]
         yAxis = list(modelPars.values())[counter][0]
         errorLow = list(modelPars.values())[counter][1]
         errorHigh = list(modelPars.values())[counter][2]
         parName = list(modelPars.keys())[counter]
-        unit = list(modelPars.values())[counter][4]
 
         axs[i].errorbar(xAxis, yAxis, yerr=[errorLow, errorHigh], fmt='o', markersize=4, ecolor="black", color="black", capsize=0)
         axs[i].minorticks_on()
@@ -331,14 +340,9 @@ for eachDict in dictList:
 
         newMinorList = tempList
 
-        axs[i].set_ylabel(unit)
+        axs[i].set_ylabel(parName)
         axs[i].set_yticks(newMinorList, minor = True)
         axs[i].set_yticks(newMajorList)
-
-        # Set a secondary label for y-axis on the other side of the graph
-        axSide = axs[i].twinx()
-        axSide.set_ylabel(parName, labelpad=10)
-        axSide.set_yticks([])
 
         counter += 1
 

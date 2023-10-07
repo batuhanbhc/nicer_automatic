@@ -216,7 +216,7 @@ for obs in inputFile.readlines():
 
     if appendFlux:
         parameterFile = open("parameters_bestmodel.txt", "a")
-        parameterFile.write("Unabsorbed_Flux " + listToStr(unabsFlux)+ " 10^-9_ergs_cm^-2_s^-1\n")
+        parameterFile.write("Unabsorbed_Flux " + listToStr(unabsFlux)+ " (10^-9_ergs_cm^-2_s^-1)\n")
         parameterFile.close()
         print("Successfully added unabsorbed flux data to the parameter file.")
     else:
@@ -239,7 +239,7 @@ for obs in inputFile.readlines():
 
     if appendFlux:
         parameterFile = open("parameters_bestmodel.txt", "a")
-        parameterFile.write("Diskbb_Flux " + listToStr(fluxDisk)+ " 10^-9_ergs_cm^-2_s^-1\n")
+        parameterFile.write("Diskbb_Flux " + listToStr(fluxDisk)+ " (10^-9_ergs_cm^-2_s^-1)\n")
         parameterFile.close()
         print("Successfully added diskbb flux data to the parameter file.")
     else:
@@ -263,7 +263,7 @@ for obs in inputFile.readlines():
 
         if appendFlux:
             parameterFile = open("parameters_bestmodel.txt", "a")
-            parameterFile.write("Powerlaw_Flux " + listToStr(fluxPow)+ " 10^-9_ergs_cm^-2_s^-1\n")
+            parameterFile.write("Powerlaw_Flux " + listToStr(fluxPow)+ " (10^-9_ergs_cm^-2_s^-1)\n")
             parameterFile.close()
             print("Successfully added powerlaw flux data to the parameter file.")
         else:

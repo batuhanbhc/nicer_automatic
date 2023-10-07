@@ -51,10 +51,10 @@ sampleSize = 10
 # If the parameter does not have a spesific unit (like normalizations, photon index etc), put "X" as value
 # Also important: You need to write models and parameters exactly like how they are written in Xspec. For instance, you need to write "TBabs" instead of "tbabs".
 parametersForShakefit = {
-    "diskbb.norm": "X",
-    "diskbb.Tin": "keV",
-    "powerlaw.PhoIndex": "X",
-    "powerlaw.norm": "X"
+    "diskbb.norm": "Normalization_(diskbb)",
+    "diskbb.Tin": "Tin_(keV)",
+    "powerlaw.PhoIndex": "index_(Γ)",
+    "powerlaw.norm": "Normalization_(powerlaw)"
 }
 #================================================ nicer.flux spesific variables ================================================
 writeParValuesAfterCflux = True
