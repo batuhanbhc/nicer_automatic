@@ -84,8 +84,12 @@ def findFlux():
             # Convert log10(x) flux to x
             flux = 10 ** AllModels(1)(i).values[0]
             Fit.error("maximum 50 "+ str(i))
-            lowerFlux = str(10**AllModels(1)(i).error[0])
-            upperFlux = str(10**AllModels(1)(i).error[1])
+            lowerFlux = 10**AllModels(1)(i).error[0]
+            upperFlux = 10**AllModels(1)(i).error[1]
+
+            flux /= (10**-9)
+            lowerFlux /= (10**-9)
+            upperFlux /= (10**-9)
             return [flux, lowerFlux, upperFlux]
 
 def calculateFlux(component, modelName, initialFlux = ""):
@@ -193,41 +197,77 @@ for obs in inputFile.readlines():
     file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(absFlux) + "\n")
     if writeParValuesAfterCflux:
         writeParsAfterFlux()
-        
+    
+    #============================================================================================================
     # Unabsorbed flux
     unabsFlux = calculateFlux("unabsorbed", modelName, -7.85)
     file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(unabsFlux) + "\n")
     if writeParValuesAfterCflux:
         writeParsAfterFlux()
 
+    # Write unabsorbed flux values to parameter file
     parameterFile = open("parameters_bestmodel.txt", "r")
     appendFlux = True
     for line in parameterFile.readlines():
-        if "unabsorbedFlux" in line:
+        if "Unabsorbed_Flux" in line:
             appendFlux = False
             break
     parameterFile.close()
 
     if appendFlux:
         parameterFile = open("parameters_bestmodel.txt", "a")
-        parameterFile.write("unabsorbedFlux " + listToStr(unabsFlux)+ "\n")
+        parameterFile.write("Unabsorbed_Flux " + listToStr(unabsFlux)+ " 10^-9_ergs_cm^-2_s^-1\n")
         parameterFile.close()
-        print("Successfully added unabsorbed data flux to the parameter file.")
+        print("Successfully added unabsorbed flux data to the parameter file.")
     else:
         print("There is already data about unabsorbed flux in parameter file.\n")
-
+    #============================================================================================================
     # Diskbb flux
     fluxDisk = calculateFlux("diskbb", modelName, -7.85)
     file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(fluxDisk) + "\n")
     if writeParValuesAfterCflux:
         writeParsAfterFlux()
+    
+    # Write diskbb flux values to parameter file
+    parameterFile = open("parameters_bestmodel.txt", "r")
+    appendFlux = True
+    for line in parameterFile.readlines():
+        if "Diskbb_Flux" in line:
+            appendFlux = False
+            break
+    parameterFile.close()
 
+    if appendFlux:
+        parameterFile = open("parameters_bestmodel.txt", "a")
+        parameterFile.write("Diskbb_Flux " + listToStr(fluxDisk)+ " 10^-9_ergs_cm^-2_s^-1\n")
+        parameterFile.close()
+        print("Successfully added diskbb flux data to the parameter file.")
+    else:
+        print("There is already data about diskbb flux in parameter file.\n")
+    #============================================================================================================
     if "powerlaw" in modelName:
         # Powerlaw flux
         fluxPow = calculateFlux("powerlaw", modelName, -9)
         file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(fluxPow) + "\n")
         if writeParValuesAfterCflux:
             writeParsAfterFlux()
+        
+        # Write powerlaw flux values to parameter file
+        parameterFile = open("parameters_bestmodel.txt", "r")
+        appendFlux = True
+        for line in parameterFile.readlines():
+            if "Powerlaw_Flux" in line:
+                appendFlux = False
+                break
+        parameterFile.close()
+
+        if appendFlux:
+            parameterFile = open("parameters_bestmodel.txt", "a")
+            parameterFile.write("Powerlaw_Flux " + listToStr(fluxPow)+ " 10^-9_ergs_cm^-2_s^-1\n")
+            parameterFile.close()
+            print("Successfully added powerlaw flux data to the parameter file.")
+        else:
+            print("There is already data about powerlaw flux in parameter file.\n")
     else:
         file.write("Powerlaw flux is 0. There is no powerlaw component in the model expression.\n")
 

@@ -47,6 +47,15 @@ fixNH = True                # If set to True, the script will fit "sampleSize" a
                             # refit all observations by freezing nH parameters to the average values.
 sampleSize = 10
 
+# Shakefit will only try to calculate errors for below parameters. The keys are xspec modelnames.parameternames, and values are the units.
+# If the parameter does not have a spesific unit (like normalizations, photon index etc), put "X" as value
+# Also important: You need to write models and parameters exactly like how they are written in Xspec. For instance, you need to write "TBabs" instead of "tbabs".
+parametersForShakefit = {
+    "diskbb.norm": "X",
+    "diskbb.Tin": "keV",
+    "powerlaw.PhoIndex": "X",
+    "powerlaw.norm": "X"
+}
 #================================================ nicer.flux spesific variables ================================================
 writeParValuesAfterCflux = True
 

@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import math
 from astropy.io import fits
 from nicer_variables import *
+import numpy as np
 #===================================================================================================================================
 # Functions
 def listToStr(array):
@@ -96,6 +97,7 @@ if outputDir == "":
 
 gaussParsDict = {}
 otherParsDict = {}
+fluxValuesDict = {}
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
 
 inputFile = open("nicer_obs.txt")
@@ -149,6 +151,7 @@ for obs in inputFile.readlines():
     
     # Initialize the values of keys as lists
     gaussParsDict[date] = []
+    fluxValuesDict[date] = []
     otherParsDict[date] = []
 
     file = open(parFile)
@@ -161,9 +164,18 @@ for obs in inputFile.readlines():
         # Extract the parameter values with uncertainities
         line = line.strip("\n")
         line = line.split(" ")
+        for i in range(len(line)):
+            line[i] = line[i].replace("_", " ")
         line[1] = float(line[1])
         line[2] = line[1] - float(line[2])
         line[3] = float(line[3]) - line[1]
+
+        # Try to see whether the parameter has a 
+        try:
+            test = line[4]
+        except:
+            line.append("")
+
 
         # If the parameter is a float number with fractional part having more than 5 digits, round the fractional part to 5 digits.
         tempList = [line[1], line[2], line[3]]
@@ -173,10 +185,12 @@ for obs in inputFile.readlines():
             if i > 10**-5 and len(str(i)[str(i).find(".") +1:]) > 5:
                 line[tempCounter] = float(format(i, ".5f"))
 
-        parTuple = (line[0], line[1], line[2], line[3])
+        parTuple = (line[0], line[1], line[2], line[3], line[4])
 
         if "gauss" in parTuple[0]:
             gaussParsDict[date].append(parTuple)
+        elif "Flux" in parTuple[0]:
+            fluxValuesDict[date].append(parTuple)
         else:
             otherParsDict[date].append(parTuple)
 
@@ -203,15 +217,17 @@ for i in range(xAxisStart, xAxisEnd):
         xAxisTicksMinor.append(i)
 
 dictionaryCounter = 0
-dictList = [gaussParsDict, otherParsDict]
+dictList = [fluxValuesDict, otherParsDict, gaussParsDict]
 print("=============================================================================================================")
 for eachDict in dictList:
     dictionaryCounter += 1
 
     if dictionaryCounter == 1:
-        print("Plotting the graph: gauss parameters")
-    else:
+        print("Plotting the graph: Flux values")
+    elif dictionaryCounter == 2:
         print("Plotting the graph: non-gauss parameters")
+    else:
+        print("Plotting the graph: gauss parameters")
 
     modelPars = {}
     for key, val in eachDict.items():
@@ -222,15 +238,17 @@ for eachDict in dictList:
                 modelPars[tuple[0]][2].append(tuple[3])     # Error upper
                 modelPars[tuple[0]][3].append(key)          # MJD
             else:
-                modelPars[tuple[0]] = ([tuple[1]], [tuple[2]], [tuple[3]], [key])
+                modelPars[tuple[0]] = ([tuple[1]], [tuple[2]], [tuple[3]], [key], tuple[4])
 
     plotNum = len(modelPars.keys())
     
     if plotNum == 0:
         if dictionaryCounter == 1:
-            problematicGraph = "gauss parameters"
-        else:
+            problematicGraph = "flux values"
+        elif dictionaryCounter == 2:
             problematicGraph = "non-gauss parameters"
+        else:
+            problematicGraph = "gauss parameters"
 
         print("WARNING: The script is trying to create graphs without any parameters. Skipping the following graph: " + problematicGraph + "\n")
 
@@ -239,33 +257,100 @@ for eachDict in dictList:
     rows = plotNum
     cols = 1
 
-    fig, axs = plt.subplots(rows, cols, figsize=(6, plotNum*2))
+    fig, axs = plt.subplots(rows, cols, figsize=(6, plotNum*2.5))
     plt.subplots_adjust(wspace=0, hspace=0)
     counter = 0
 
     for i in range(rows):
-        if i < rows - 1:
-            axs[i].xaxis.set_visible(False)
-
         xAxis = list(modelPars.values())[counter][3]
         yAxis = list(modelPars.values())[counter][0]
         errorLow = list(modelPars.values())[counter][1]
         errorHigh = list(modelPars.values())[counter][2]
         parName = list(modelPars.keys())[counter]
+        unit = list(modelPars.values())[counter][4]
 
-        axs[i].errorbar(xAxis, yAxis, yerr=[errorLow, errorHigh], fmt='*', ecolor="black", color="black", capsize=0, label=parName)
-        axs[i].legend()
-
-        axs[i].set_xlabel("Time (MJD-"+str(startDateMJD)+ " days)")
-        axs[i].set_ylabel('Xspec model units')
+        axs[i].errorbar(xAxis, yAxis, yerr=[errorLow, errorHigh], fmt='o', markersize=4, ecolor="black", color="black", capsize=0)
+        axs[i].minorticks_on()
 
         axs[i].set_xticks(xAxisTicksMajor)
         axs[i].set_xticks(xAxisTicksMinor, minor = True)
+        axs[i].tick_params(which = "both", direction="in")
+
+        # If the plot is not the bottom one, hide the x-axis tick labels
+        if i < rows-1:
+            axs[i].xaxis.set_ticklabels([])
+        else:
+            axs[i].set_xlabel("Time (MJD-"+str(startDateMJD)+ " days)")
+
+        # Rearrange major-minor y-axis ticks to prevent tick collision between subsequent graphs
+        yTicksMajor = axs[i].get_yticks()
+        yTicksMinor = axs[i].get_yticks(minor = True)
+        minMajorTickY = min(yTicksMajor)
+        maxMajorTickY = max(yTicksMajor)
+
+        # Divide major tick gaps into 5 equal intervals
+        minorInterval = (yTicksMajor[1] - yTicksMajor[0]) / 5
+
+        newMajorList = []
+        for elem in yTicksMajor:
+            newMajorList.append(elem)
+        
+        # Check whether the lowest major y-axis tick in current tick list is truly the minimum, or is there another tick that is also lower than all y-axis values
+        testList = newMajorList
+        testList.remove(minMajorTickY)
+        secondMinimum = min(testList)
+        trueMinimum = False
+        for val in yAxis:
+            if val < secondMinimum:
+                trueMinimum = True
+        if trueMinimum == False:
+            newMajorList = testList
+
+        # Check whether the highest major y-axis tick in current tick list is truly the maximum, or is there another tick that is also higher than all y-axis values
+        testList = newMajorList
+        testList.remove(maxMajorTickY)
+        secondMaximum = max(testList)
+        trueMaximum = False
+        for val in yAxis:
+            if val > secondMaximum:
+                trueMaximum = True
+        if trueMaximum == False:
+            newMajorList = testList
+        
+        # Get new minimum/maximum major y-axis ticks
+        minMajorTickY = min(newMajorList)
+        maxMajorTickY = max(newMajorList)
+
+        tempList = []
+        for j in range(4, 0, -1):
+            tempList.append(minMajorTickY - j*minorInterval)
+
+        for j in newMajorList:
+            for k in range(1, round((newMajorList[1] - newMajorList[0]) / minorInterval) + 1):
+                tempList.append(j + minorInterval * k)
+
+        newMinorList = tempList
+
+        axs[i].set_ylabel(unit)
+        axs[i].set_yticks(newMinorList, minor = True)
+        axs[i].set_yticks(newMajorList)
+
+        # Set a secondary label for y-axis on the other side of the graph
+        axSide = axs[i].twinx()
+        axSide.set_ylabel(parName, labelpad=10)
+        axSide.set_yticks([])
 
         counter += 1
 
     if eachDict == otherParsDict:
         pngFile = commonDirectory + "/other_parameters.png"
+        pngPath = Path(pngFile)
+        if pngPath.exists():
+            subprocess.run(["rm", pngFile])
+
+        plt.savefig(pngFile)
+    elif eachDict == fluxValuesDict:
+        pngFile = commonDirectory + "/flux_values.png"
         pngPath = Path(pngFile)
         if pngPath.exists():
             subprocess.run(["rm", pngFile])

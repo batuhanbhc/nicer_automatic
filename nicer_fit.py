@@ -9,18 +9,21 @@ from astropy.io import fits
 #===================================================================================================================================
 # Functions
 def shakefit(resultsFile):
-    # Create a temporary parameter file that will carry parameter values along with error boundaries
-    parameterFile = outObsDir + "/" + "temp_parameters.txt"
-    if Path(parameterFile).exists():
-        os.system("rm " + parameterFile)
-    os.system("touch " + parameterFile)
 
-    # Initialize the strings that will be used as seperate lines for parameter file
-    parLines = []
-    parLines.append("Parameter name | Parameter Value | Parameter Uncertainity Lower Boundary | Parameter Uncertainity Upper Boundary | Extra Information\n")
-    
     # Shakefit will only be run for these parameters
-    parametersToCalculateError = [AllModels(1).diskbb.Tin.index, AllModels(1).diskbb.norm.index]
+    parametersToCalculateError = []
+
+    for key in parametersForShakefit.keys():
+        model = key[:key.find(".")]
+        parameter = key[key.find(".") + 1:]
+        if model in AllModels(1).expression:
+            compObj = getattr(AllModels(1), model)
+            parObj = getattr(compObj, parameter)
+            index = parObj.index
+
+            parametersToCalculateError.append(index)
+        else:
+            pass
 
     # Before proceeding with shakefit, check if powerlaw is in model expression. If so, check whether xspec error for photon index is bigger than 1 or not.
     # If bigger than 1, fix photon index to 1.8 (may change in future) and only then continue with shakefit
@@ -59,8 +62,6 @@ def shakefit(resultsFile):
                         print("\nWARNING: Powerlaw photon index is frozen at " + str(AllModels(1).powerlaw.PhoIndex.values[0]) + " for having xspec error bigger than 1: "+str(errorValue)+"\n")
                     
                     print("Powerlaw is now available for error calculations.\n")
-                    parametersToCalculateError.append(AllModels(1).powerlaw.PhoIndex.index)
-                    parametersToCalculateError.append(AllModels(1).powerlaw.norm.index)
                     break
 
     Fit.query = "no"
@@ -127,41 +128,7 @@ def shakefit(resultsFile):
                 break
 
     resultsFile.write("=================================================================\n\n")
-
-    # Save parameter information to a list
-    for comp in AllModels(1).componentNames:
-        compObj = getattr(AllModels(1), comp)
-        for par in compObj.parameterNames:
-            parObj = getattr(compObj, par)
-            parName = parObj.name
-            parValue = parObj.values[0]
-            index = parObj.index
-            fullName = comp + "." + parName
-            
-            errorResult = AllModels(1)(index).error
-            errorString = errorResult[2]
-            
-            if (parObj.values[1] < 0) and (index not in parametersToCalculateError):
-                # Fixed parameter, do not plot
-                pass
-            else:
-                lowerBound = errorResult[0]
-                upperBound = errorResult[1]
-                if lowerBound == 0:
-                    lowerBound = parValue
-                
-                if upperBound == 0:
-                    upperBound = parValue
-
-                parLines.append(fullName + " " + str(parValue) + " " + str(lowerBound) + " " + str(upperBound) + "\n")
-
     updateParameters(bestModel)
-
-    # Write the parameter information from list to the temporary parameter file
-    parFile = open(parameterFile, "w")
-    for line in parLines:
-        parFile.write(line)
-    parFile.close()
 
 def listToStr(array):
     result = ""
@@ -735,7 +702,7 @@ for x in range(2):
         # Add an edge around 1.8 keV
         addComp("edge", "TBabs", "after", "*", bestModel)
 
-        edgePars = ["1.8,,1.5,1.5,2,2", "0.3"]
+        edgePars = ["1.8,,1.5,1.5,2,2", "0.2"]
         assignParameters("edge", edgePars, 1)
         
         fitModel()
@@ -967,9 +934,61 @@ for x in range(2):
         saveModel(modFileName, obsid, commonDirectory)
         #==========================================================================
         if errorCalculations:
+            # Create parameter files that will be used by nicer_plot for creating parameter graphs
+
+            # Initialize the strings that will be used as seperate lines for parameter file
+            parLines = []
+            parLines.append("Parameter name | Parameter Value | Parameter Uncertainity Lower Boundary | Parameter Uncertainity Upper Boundary | Parameter Unit\n")
+            
+            # Save parameter information to parLines
+            for comp in AllModels(1).componentNames:
+                compObj = getattr(AllModels(1), comp)
+                for par in compObj.parameterNames:
+                    parObj = getattr(compObj, par)
+                    parName = parObj.name
+                    parValue = parObj.values[0]
+                    index = parObj.index
+                    fullName = comp + "." + parName
+
+                    if fullName in parametersForShakefit:
+                        errorResult = AllModels(1)(index).error
+                        errorString = errorResult[2]
+                        
+                        lowerBound = errorResult[0]
+                        upperBound = errorResult[1]
+                        if lowerBound == 0:
+                            lowerBound = parValue
+                        
+                        if upperBound == 0:
+                            upperBound = parValue
+
+                        if parametersForShakefit[fullName] == "X":
+                            parUnit = ""
+                        else:
+                            unit = ""
+                            for char in parametersForShakefit[fullName]:
+                                if char == " ":
+                                    unit += "_"
+                                else:
+                                    unit += char
+
+                            parUnit = " " + unit 
+                        parLines.append(fullName + " " + str(parValue) + " " + str(lowerBound) + " " + str(upperBound) + parUnit +"\n")
+            
+            # Create a temporary parameter file that will carry parameter values along with error boundaries
+            parameterFile = outObsDir + "/" + "temp_parameters.txt"
+            if Path(parameterFile).exists():
+                os.system("rm " + parameterFile)
+            os.system("touch " + parameterFile)
+
+            # Write the parameter information from list to the temporary parameter file
+            parFile = open(parameterFile, "w")
+            for line in parLines:
+                parFile.write(line)
+            parFile.close()
+
             # Rename gauss names in the temp_parameters.txt file for grouping purposes.
             # For instance, this part changes gauss names from "gaussian_5" to "6.7keV_gauss" and so on.
-
             renameDict = matchGaussWithEnergy(gaussEnergyList)
             inputFile = open("temp_parameters.txt", "r")
             outputFile = "parameters_bestmodel.txt"
