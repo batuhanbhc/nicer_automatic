@@ -198,23 +198,23 @@ for obs in inputFile.readlines():
 mjdList = list(gaussParsDict.keys()) + list(otherParsDict.keys())
 minMjd = min(mjdList)
 maxMjd = max(mjdList)
-if (maxMjd - minMjd) < 20:
-    tickInterval = 5
-elif 20 <= (maxMjd - minMjd) < 100:
-    tickInterval = 25
-else:
-    tickInterval = 50
 
-xAxisStart = round((minMjd - tickInterval*2) / tickInterval) * tickInterval
-xAxisEnd = round((maxMjd + tickInterval*2) / tickInterval) * tickInterval + 1
+totalDifference = maxMjd - minMjd
+majorTickInterval = round((totalDifference / 5) / 5) * 5
+
+xAxisStart = round((minMjd - majorTickInterval) / majorTickInterval) * majorTickInterval
+xAxisEnd = round((maxMjd + majorTickInterval) / majorTickInterval) * majorTickInterval + 1
 xAxisTicksMajor = []
 xAxisTicksMinor = []
 
 for i in range(xAxisStart, xAxisEnd):
-    if i % tickInterval == 0:
+    if i % majorTickInterval == 0:
         xAxisTicksMajor.append(i)
-    else:
-        xAxisTicksMinor.append(i)
+
+for i in xAxisTicksMajor:
+    minorTickInterval = majorTickInterval / 5
+    for k in range(1, 5):
+        xAxisTicksMinor.append(i + k * minorTickInterval)
 
 dictionaryCounter = 0
 dictList = [fluxValuesDict, otherParsDict, gaussParsDict]
