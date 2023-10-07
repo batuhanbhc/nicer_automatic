@@ -63,11 +63,17 @@ for obs in obsList:
     if Path(pipelineLog).exists() == False:
         os.system("touch " + pipelineLog)
 
-    try:
-        print("Trying to gunzip the mkf file prior to nicerl2.\n")
+    gunzipMkf = True
+    fileList = os.listdir(obs+"/auxil")
+    for each in fileList:
+        each = each.strip("\n")
+        if each == "ni" + obsid + ".mkf":
+            gunzipMkf = False
+            break
+
+    if gunzipMkf:
+        print("Gunzipping the mkf file prior to nicerl2.\n")
         os.system("gunzip "+obs+"/auxil/ni" + obsid + ".mkf.gz")
-    except:
-        print("Mkf file has already been gunzipped.\n")
 
     # Run nicer pipeline commands
     print("Starting to run pipeline commands for observation: " + obsid)
