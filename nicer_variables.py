@@ -16,7 +16,7 @@ energyFilter = "0.5 10."
 
 #=============================================== nicer.main spesific variables =================================================
 # Script switches
-createSwitch = False
+createSwitch = True
 fitSwitch = True
 fluxSwitch = True
 plotSwitch = True
@@ -27,6 +27,11 @@ fitScript = "nicer_fit.py"
 plotScript = "nicer_plot.py"
 fluxScript = "nicer_flux.py"
 
+#================================================= nicer.create spesific variables =============================================
+# Please do not forget to give each interval in string form, and seperate them by comma
+lightCurvePiRanges = ["50-200", "200-600", "600-1000"]
+
+lightCurveTimeResolution = 2**-8
 #================================================= nicer.fit spesific variables ================================================
 # Set it to True if you have made changes in models, and do not want to use any previous model files in commonDirectory
 # restartOnce only deletes model files before the first observation, restartAlways deletes model files before all observations
@@ -45,7 +50,7 @@ errorCalculations = True    # If set to True, the script will run "shakefit" fun
 
 fixNH = True                # If set to True, the script will fit "sampleSize" amount of observations, and take average values for nH parameters, then
                             # refit all observations by freezing nH parameters to the average values.
-sampleSize = 10
+sampleSize = 15
 
 # Shakefit will only try to calculate errors for below parameters. The keys are xspec modelnames.parameternames, and values are the units.
 # If the parameter does not have a spesific unit (like normalizations, photon index etc), put "X" as value
