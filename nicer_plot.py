@@ -79,6 +79,9 @@ def transferToNewList(sourceList):
     return newList
 
 #===================================================================================================================
+print("====================================================================")
+print("Running the ", plotScript," file:\n")
+
 energyLimits = energyFilter.split(" ")
 Emin = energyLimits[0]
 Emax = energyLimits[1]
@@ -367,8 +370,6 @@ for eachDict in dictList:
             subprocess.run(["rm", pngFile])
 
         plt.savefig(pngFile)
-
-    print("Plotting the graph was successful.\n")
 
 # This file is created after importing variables from another python file
 if Path(scriptDir + "/__pycache__").exists():

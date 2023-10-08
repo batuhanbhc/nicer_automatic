@@ -41,7 +41,7 @@ restartAlways = False
 # Critical value for F-test
 ftestCrit = 0.05
 
-chatterOn = True
+chatterOn = False
 
 makeXspecScript = True      # If set to True, the script will create an .xcm file that loads model and data files to xspec and creates a plot automatically
 

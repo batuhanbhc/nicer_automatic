@@ -65,7 +65,6 @@ def shakefit(resultsFile):
                     break
 
     Fit.query = "no"
-    print("Performing shakefit error calculations for the model: " + AllModels(1).expression + ", obsid:" + str(obsid)+ "\n")
     resultsFile.write("========== Proceeding with shakefit error calculations ==========\n")
     paramNum = AllModels(1).nParameters
     rerunShakefit = False
@@ -73,7 +72,7 @@ def shakefit(resultsFile):
         if k == 1 and rerunShakefit == False:
             break
 
-        print("Performing shakefit error calculations for the model: " + AllModels(1).expression + ", obsid:" + str(obsid)+ ", shakefit count: " + str(k+1)+"\n")
+        print("Performing shakefit error calculations for the model: " + AllModels(1).expression + ", obsid:" + str(obsid)+ ", shakefit number: " + str(k+1)+"\n")
         fitModel()
         updateParameters(bestModel)
 
@@ -336,7 +335,6 @@ def addComp(compName, targetComp ,before_after, calcChar, modelList):
 
     if calcChar == "+":
         targetIdx = modelName.find(targetComp)
-        print(modelName)
         if modelName[targetIdx - 1] != "(" and modelName[targetIdx + len(targetComp)] != ")":
             modelName = modelName.replace(targetComp, "(" + targetComp + ")", 1)
 
@@ -598,6 +596,14 @@ startFixingNH = False
 if fixNH:
     takeAverages = True
 
+# If both restartOnce and restartAlways are set to True, set restartAlways to False.
+if restartOnce:
+    restartAlways = False
+
+if chatterOn == False:
+    print("Chatter has been disabled.\n") 
+    Xset.chatter = 0
+
 for x in range(2):
     iteration = 0
     for obs in obsPaths:
@@ -611,6 +617,13 @@ for x in range(2):
         
         obsid = obsid[::-1]         # e.g. 6130010120
 
+        print("=============================================================================================")
+        print("Starting the fitting procedure for observation:", obsid)
+        if startFixingNH:
+            print("Fixing nH parameters: TRUE\n")
+        else:
+            print("Fixing nH parameters: FALSE\n")
+
         outObsDir = outputDir + "/" + obsid
         os.chdir(outObsDir)
         allFiles = os.listdir(outObsDir)
@@ -619,6 +632,7 @@ for x in range(2):
         hdu = fits.open(outObsDir + "/ni" + obsid + "mpu7_sr3c50.pha")
         exposure = hdu[0].header["EXPOSURE"]
         if exposure < 100:
+            print("Current observation has exposure less than 100, skipping the fitting procedure for current observation. Obsid: " + obsid +", exposure: " + format(exposure, ".2f") + "\n")
             continue
 
         # Find the spectrum, background, arf and response files
@@ -640,10 +654,17 @@ for x in range(2):
             if counter == 4:
                 # All necessary files have been found
                 break
+        
+        print("Spectrum file:", spectrumFile)
+        print("Background file:", backgroundFile)
+        print("Arf file:", arfFile)
+        print("Rmf file:", rmfFile, "\n")
 
         if restartOnce and iteration == 1:
+            print("Removing all model files in '" + commonDirectory + "' for only once.\n")
             os.system("rm " + commonDirectory + "/mod*")
         elif restartAlways:
+            print("Removing all model files in '" + commonDirectory + "'\n")
             os.system("rm " + commonDirectory + "/mod*")
 
         #-------------------------------------------------------------------------------------    
@@ -658,8 +679,6 @@ for x in range(2):
         logFile = open(resultsFile, "w")
         Xset.openLog("xspec_output.log")
         Xset.abund = "wilm"
-        if chatterOn == False: 
-            Xset.chatter = 0
         Fit.query = "yes"
 
         logFile.write("OBSERVATION ID: " + obsid + "\n\n")
@@ -674,10 +693,11 @@ for x in range(2):
         # This list will carry the model name, model parameters and fit statistics for the best model throughout the script.
         # First element is the model name, second element is the dictionary for parameter name-value pairs, third element is the dictionary for fit statistics
         # such as chi-squared, degrees of freedom and null hypothesis probability.
-        bestModel = ["TBabs*pcfabs(gauss+diskbb)", {"diskbb.Tin": ",,0.1,0.1,2.5,2.5", "diskbb.norm:":",,0.1,0.1"}, {}]
+        bestModel = ["TBabs*pcfabs(gaussian+diskbb)", {"diskbb.Tin": ",,0.1,0.1,2.5,2.5", "diskbb.norm:":",,0.1,0.1"}, {}]
 
         #=================================================================================
         # Load the first model and fit
+        print("Loading the first model:", bestModel[0], "\n")
         m = Model(bestModel[0])  
 
         modelFile = extractModFileName()
@@ -690,6 +710,7 @@ for x in range(2):
         assignParameters("gaussian", gaussPars_1, 1)
 
         if startFixingNH:
+            print("nH parameters has now been fixed.\n")
             fixAllNH(fixedValuesNH)
             
         fitModel()
@@ -701,6 +722,7 @@ for x in range(2):
         #===============================================================================================
         # Add an edge around 1.8 keV
         addComp("edge", "TBabs", "after", "*", bestModel)
+        print("Adding edge to current model expression.\n")
 
         edgePars = ["1.8,,1.5,1.5,2,2", "0.2"]
         assignParameters("edge", edgePars, 1)
@@ -716,6 +738,7 @@ for x in range(2):
         #===============================================================================================
         # Add 6.98 keV absorption gauss and fit
         addComp("gaussian", "diskbb", "before", "+", bestModel)
+        print("Adding 6.98 keV absorption gauss to the current model expression.")
 
         gaussPars_2 = ["6.98,,6.8,6.8,7.5,7.5", "7e-2,,,,0.2,0.2", "-1e-3,,-1e12,-1e12,-1e-12,-1e-12"]
         gaussCount = wordCounter(AllModels(1).expression, "gaussian")
@@ -732,8 +755,11 @@ for x in range(2):
         #===============================================================================================
         # Apply f-test and check whether last gaussian improves the fit significantly or not
         pValue = performFtest(nullhypModelList, altModelList, logFile, "    (Adding 6.98 keV absorption gauss)")
+        print("Applying f-test to check the significance of 6.98 keV absorption gauss:")
 
         if abs(pValue) >= ftestCrit:
+            print("6.98 keV gaussian has been taken out of the model expression by the f-test:")
+            print("F-test critical value: " + str(ftestCrit) + ", p-value: " + str(pValue) + "\n")
             removeComp("gaussian", gaussCount, bestModel)
             fitModel()
             updateParameters(bestModel)
@@ -741,11 +767,15 @@ for x in range(2):
             logFile.write("\n====================================================================================\n")
             logFile.write("6.98 keV gauss is taken out from the model due to not improving the fit significantly.")
             logFile.write("\n====================================================================================\n")
+        else:
+            print("6.98 keV gaussian has been found to be significant by f-test:")
+            print("F-test critical value: " + str(ftestCrit) + ", p-value: " + str(pValue) + "\n")
 
         nullhypModelList = transferToNewList(bestModel)
         #===============================================================================================
         # Add 6.7 keV absorption gauss and fit
         addComp("gaussian", "diskbb", "before", "+", bestModel)
+        print("Adding 6.7 keV absorption gauss to the current model expression.")
 
         gaussPars_3 = ["6.7,,6.4,6.4,6.8,6.8", "0.07,,,,0.2,0.2", "-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"]
         gaussCount = wordCounter(AllModels(1).expression, "gaussian")
@@ -764,6 +794,8 @@ for x in range(2):
         pValue = performFtest(nullhypModelList, altModelList, logFile, "    (adding 6.7 keV absorption gauss)")
         
         if abs(pValue) >= ftestCrit:
+            print("6.7 keV gaussian has been taken out of the model expression by the f-test:")
+            print("F-test critical value: " + str(ftestCrit) + ", p-value: " + str(pValue) + "\n")
             removeComp("gaussian", gaussCount, bestModel)
             fitModel()
             updateParameters(bestModel)
@@ -771,11 +803,15 @@ for x in range(2):
             logFile.write("\n====================================================================================\n")
             logFile.write("6.7 keV gauss is taken out from the model due to not improving the fit significantly.")
             logFile.write("\n====================================================================================\n")
+        else:
+            print("6.7 keV gaussian has been found to be significant by f-test:")
+            print("F-test critical value: " + str(ftestCrit) + ", p-value: " + str(pValue) + "\n")
 
         nullhypModelList = transferToNewList(bestModel)
         #===============================================================================================
         # Add powerlaw
         addComp("powerlaw", "diskbb", "after", "+", bestModel)
+        print("Adding powerlaw to the current model expression.")
 
         powerlawPars = ["1.8,,1.2,1.2,3,3", "0.1"]
         assignParameters("powerlaw", powerlawPars, 1)
@@ -793,6 +829,8 @@ for x in range(2):
         pValue = performFtest(nullhypModelList, altModelList, logFile, "    (adding powerlaw)")
 
         if abs(pValue) >= ftestCrit:
+            print("Powerlaw has been taken out of the model expression by the f-test:")
+            print("F-test critical value: " + str(ftestCrit) + ", p-value: " + str(pValue) + "\n")
             removeComp("powerlaw", 1, bestModel)
             fitModel()
             updateParameters(bestModel)
@@ -800,6 +838,9 @@ for x in range(2):
             logFile.write("\n====================================================================================\n")
             logFile.write("Powerlaw is taken out from the model due to not improving the fit significantly.")
             logFile.write("\n====================================================================================\n\n")
+        else:
+            print("Powerlaw has been found to be significant by f-test:")
+            print("F-test critical value: " + str(ftestCrit) + ", p-value: " + str(pValue) + "\n")
 
         nullhypModelList = transferToNewList(bestModel)
         
@@ -832,10 +873,11 @@ for x in range(2):
             for eachFile in allFiles:
                 if "best_" in eachFile:
                     os.system("rm " + eachFile)
-            saveModel("best_" + modFileName, obsid)
 
+            saveModel("best_" + modFileName, obsid)
             closeAllFiles()
 
+            print("nH values from observation '" + obsid + "' have been saved.")
             continue
 
         elif iteration >= iterationMax and takeAverages:
@@ -858,10 +900,14 @@ for x in range(2):
                 fixedValuesNH["pcfabs.nH"] = [finalInput]
             else:
                 fixedValuesNH["pcfabs.nH"].append(finalInput)
-           
+            
+            print("nH values from observation '" + obsid + "' have been saved.")
+            print("=============================================================================================")
+            print("Collecting the sample for determining the values to fix nH parameters is now finished.")
+            print("Values from three observations with longest exposures will be used for fixing nH parameters.\n")
+
             startFixingNH = True
             takeAverages = False
-
             # Calculate average value for TBabs.nH from top 3 longest exposure observations
             expoNhPairs = {}
             for i in fixedValuesNH["TBabs.nH"]:
@@ -874,17 +920,20 @@ for x in range(2):
             countNh = 0
             totalTBabsNH = 0
             try:
+                print("Taking the average of nH values for TBabs model:")
                 keyList = list(sortedDict.keys())
                 valueList = list(sortedDict.values())
                 for i in range(3):
+                    print("nH value:", valueList[countNh], "from an observation with exposure:", keyList[countNh])
                     totalTBabsNH += valueList[countNh]
                     countNh += 1
             except:
-                print("WARNING: Average nH values will be calculated using data from less than 3 observations.\n")
+                print("\nWARNING: Average nH values will be calculated using data from less than 3 observations.\n")
 
             avgTBabs = totalTBabsNH / countNh
             fixedValuesNH["TBabs.nH"] = str(avgTBabs) + " -1"
-            
+            print("TBabs.nH has been fixed to the value:", avgTBabs, "\n")
+
             # Calculate average value for pcfabs.nH from top 3 longest exposure observations
             expoNhPairs = {}
             for i in fixedValuesNH["pcfabs.nH"]:
@@ -898,16 +947,19 @@ for x in range(2):
             totalPcfabsNH = 0
 
             try:
+                print("Taking the average of nH values for pcfabs model:")
                 keyList = list(sortedDict.keys())
                 valueList = list(sortedDict.values())
                 for i in range(3):
+                    print("nH value:", valueList[countNh], "from an observation with exposure:", keyList[countNh])
                     totalPcfabsNH += valueList[countNh]
                     countNh += 1
             except:
-                print("WARNING: Average nH values will be calculated using data from less than 3 observations.\n")
+                print("\nWARNING: Average nH values will be calculated using data from less than 3 observations.\n")
 
             avgPcfabs = totalPcfabsNH / countNh
             fixedValuesNH["pcfabs.nH"] = str(avgPcfabs) + " -1"
+            print("pcfabs.nH has been fixed to the value:", avgPcfabs)
 
             # Close all log files5
             writeBestFittingModel(logFile)
@@ -917,10 +969,11 @@ for x in range(2):
             for eachFile in allFiles:
                 if "best_" in eachFile:
                     os.system("rm " + eachFile)
-            saveModel("best_" + modFileName, obsid)
 
+            saveModel("best_" + modFileName, obsid)
             closeAllFiles()
-            
+
+            print("=============================================================================================\n")
             break
         #========================================================================================================================================
         # Calculate uncertainity boundaries
@@ -928,13 +981,18 @@ for x in range(2):
                 shakefit(logFile)
 
         # Save the last model
+        print("Writing the best model parameters to ", resultsFile)
         modFileName = extractModFileName()
         writeBestFittingModel(logFile)
+
+        print("Saving the best model xspec file.\n")
         saveModel(modFileName, obsid)
         saveModel(modFileName, obsid, commonDirectory)
         #==========================================================================
         if errorCalculations:
             # Create parameter files that will be used by nicer_plot for creating parameter graphs
+            outputFile = "parameters_bestmodel.txt"
+            print("Creating", outputFile, "file that will carry the necessary data for creating parameter graphs.\n")
 
             # Initialize the strings that will be used as seperate lines for parameter file
             parLines = []
@@ -991,7 +1049,6 @@ for x in range(2):
             # For instance, this part changes gauss names from "gaussian_5" to "6.7keV_gauss" and so on.
             renameDict = matchGaussWithEnergy(gaussEnergyList)
             inputFile = open("temp_parameters.txt", "r")
-            outputFile = "parameters_bestmodel.txt"
 
             if Path(outputFile).exists():
                 os.system("rm " + outputFile)
@@ -1023,6 +1080,7 @@ for x in range(2):
         saveModel("best_" + modFileName, obsid)
 
         # Calculate and write equivalent widths of gausses to log file
+        print("Calculating equivalence widths for gaussians in model expression.\n")
         calculateGaussEqw(logFile)
         
         # Close all log files
@@ -1049,6 +1107,8 @@ for x in range(2):
     if fixNH == False:
         # The whole fitting process is looped twice for refitting purposes. If fixing nH option is False, do not try to refit
         break
+    else:
+        print("Restarting the fitting procedure for all observations by fixing the nH parameters.\n")
 
 os.chdir(scriptDir)
 

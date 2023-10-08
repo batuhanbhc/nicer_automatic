@@ -127,6 +127,8 @@ def writeParsAfterFlux():
     
     file.write("\n")
 #===================================================================================================================
+print("====================================================================")
+print("Running the", fluxScript, "file:\n")
 energyLimits = energyFilter.split(" ")
 Emin = energyLimits[0]
 Emax = energyLimits[1]
@@ -145,6 +147,9 @@ if outputDir == "":
 
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
 
+if chatterOn == False:
+    Xset.chatter = 0
+
 inputFile = open("nicer_obs.txt")
 for obs in inputFile.readlines():
     # Extract the obsid from the path name written in nicer_obs.txt
@@ -154,6 +159,8 @@ for obs in inputFile.readlines():
     parentDir = parentDir[parentDir.find("/")+1:]   
     
     obsid = obsid[::-1]         # e.g. 6130010120
+    print("====================================================================")
+    print("Calculating fluxes for observation:", obsid, "\n")
 
     outObsDir = outputDir + "/" + obsid
     os.chdir(outObsDir)
@@ -173,6 +180,8 @@ for obs in inputFile.readlines():
             # All necessary files have been found
             break
     
+    print("Model file: ", modFile)
+    print("Data file: ", dataFile, "\n")
     file = open(resultsFile, "a")
 
     if counter != 2:
@@ -193,6 +202,7 @@ for obs in inputFile.readlines():
     modelName = AllModels(1).expression.replace(" ", "")
 
     # Absorbed flux
+    print("Calculating the absorbed flux.\n")
     absFlux = calculateFlux("TBabs", modelName, -8.4)
     file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(absFlux) + "\n")
     if writeParValuesAfterCflux:
@@ -200,6 +210,7 @@ for obs in inputFile.readlines():
     
     #============================================================================================================
     # Unabsorbed flux
+    print("Calculating the unabsorbed flux.\n")
     unabsFlux = calculateFlux("unabsorbed", modelName, -7.85)
     file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(unabsFlux) + "\n")
     if writeParValuesAfterCflux:
@@ -223,6 +234,7 @@ for obs in inputFile.readlines():
         print("There is already data about unabsorbed flux in parameter file.\n")
     #============================================================================================================
     # Diskbb flux
+    print("Calculating diskbb flux.\n")
     fluxDisk = calculateFlux("diskbb", modelName, -7.85)
     file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(fluxDisk) + "\n")
     if writeParValuesAfterCflux:
@@ -247,6 +259,7 @@ for obs in inputFile.readlines():
     #============================================================================================================
     if "powerlaw" in modelName:
         # Powerlaw flux
+        print("Calculating powerlaw flux.\n")
         fluxPow = calculateFlux("powerlaw", modelName, -9)
         file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(fluxPow) + "\n")
         if writeParValuesAfterCflux:
