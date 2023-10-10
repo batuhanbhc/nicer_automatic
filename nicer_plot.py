@@ -1,13 +1,7 @@
 # This is an automatic NICER script for calculating the flux of the best fitting model for each observation
-import subprocess
-import os
-from pathlib import Path
-from xspec import *
-import matplotlib.pyplot as plt
-import math
-from astropy.io import fits
+
 from nicer_variables import *
-import numpy as np
+
 #===================================================================================================================================
 # Functions
 def listToStr(array):

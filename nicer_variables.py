@@ -1,5 +1,12 @@
+import subprocess
 import os
-
+from pathlib import Path
+from xspec import *
+import numpy as np
+from astropy.io import fits
+import matplotlib.pyplot as plt
+import numpy as np
+import math
 #============================================ Common variables for all scripts =================================================
 
 # The directory where the output files will be created at (Leave it blank [outputDir = ""] if you want output files to be created under the same directory as all scripts)
@@ -16,7 +23,7 @@ energyFilter = "0.5 10."
 
 #=============================================== nicer.main spesific variables =================================================
 # Script switches
-createSwitch = True
+createSwitch = False
 fitSwitch = True
 fluxSwitch = True
 plotSwitch = True
@@ -38,8 +45,8 @@ lightCurveTimeResolution = 2**-8
 restartOnce = True
 restartAlways = False
 
-# Critical value for F-test
-ftestCrit = 0.05
+# F-test significance (alpha) value
+ftestSignificance = 0.05
 
 chatterOn = False
 
@@ -61,8 +68,121 @@ parametersForShakefit = {
     "powerlaw.PhoIndex": "index_(Γ)",
     "powerlaw.norm": "Normalization_(powerlaw)"
 }
-#================================================ nicer.flux spesific variables ================================================
+#================================================ nicer.flux spesific variables =================================================
 writeParValuesAfterCflux = True
 
 #================================================ nicer.plot spesific variables =================================================
 startDateMJD = 60000
+
+#================================================================================================================================
+#Input checks
+
+if str(startDateMJD).isnumeric() == False:
+    while True:
+        print("\nstartDateMJD variable is not type integer.")
+        startDateMJD = input("Please enter an integer value for startDateMJD: ")
+
+        if startDateMJD.isnumeric():
+            startDateMJD = int(startDateMJD)
+            break
+        
+if isinstance(writeParValuesAfterCflux, bool) == False:
+    while True:
+        print("\nwriteParValuesAfterCflux variable is not type boolean.")
+        writeParValuesAfterCflux = input("Please enter a boolean value for writeParValuesAfterCflux (True/False): ")
+
+        if writeParValuesAfterCflux == "True" or writeParValuesAfterCflux == "False":
+            writeParValuesAfterCflux = bool(writeParValuesAfterCflux)
+            break
+
+if str(sampleSize).isnumeric() == False or int(sampleSize) <= 0:
+    while True:
+        print("\nEither sampleSize variable is not type integer, or it is smaller than 0.")
+        sampleSize = input("Please enter a positive integer value for sampleSize: ")
+
+        if sampleSize.isnumeric() and int(sampleSize) > 0:
+            sampleSize = int(sampleSize)
+            break
+
+if isinstance(fixNH, bool) == False:
+    while True:
+        print("\nfixNH variable is not type boolean.")
+        fixNH = input("Please enter a boolean value for fixNH (True/False): ")
+
+        if fixNH == "True" or fixNH == "False":
+            fixNH = bool(fixNH)
+            break
+
+if isinstance(errorCalculations, bool) == False:
+    while True:
+        print("\nerrorCalculations variable is not type boolean.")
+        errorCalculations = input("Please enter a boolean value for errorCalculations (True/False): ")
+
+        if errorCalculations == "True" or errorCalculations == "False":
+            errorCalculations = bool(errorCalculations)
+            break
+
+if isinstance(makeXspecScript, bool) == False:
+    while True:
+        print("\nmakeXspecScript variable is not type boolean.")
+        makeXspecScript = input("Please enter a boolean value for makeXspecScript (True/False): ")
+
+        if makeXspecScript == "True" or makeXspecScript == "False":
+            makeXspecScript = bool(makeXspecScript)
+            break
+
+if isinstance(chatterOn, bool) == False:
+    while True:
+        print("\nchatterOn variable is not type boolean.")
+        chatterOn = input("Please enter a boolean value for chatterOn (True/False): ")
+
+        if chatterOn == "True" or chatterOn == "False":
+            chatterOn = bool(chatterOn)
+            break
+
+if isinstance(ftestSignificance, float) == False or not (0 < ftestSignificance < 1):
+    while True:
+        try:
+            ftestSignificance = float(ftestSignificance)
+            if ftestSignificance <= 0 or ftestSignificance >= 1:
+                # Make an error on purpose and trigger except block, since fTestSignificance is not on the correct interval
+                errorVariable = int("99.99")
+            else:
+                break
+        except:
+            print("\nfTestSignificance variable must be a float number between 0 and 1.")
+            ftestSignificance = input("Please enter a float number between 0 and 1 for ftestSignificance (0 < x < 1): ")
+
+if isinstance(restartAlways, bool) == False:
+    while True:
+        print("\nrestartAlways variable is not type boolean.")
+        restartAlways = input("Please enter a boolean value for restartAlways (True/False): ")
+
+        if restartAlways == "True" or restartAlways == "False":
+            restartAlways = bool(restartAlways)
+            break
+
+if isinstance(restartOnce, bool) == False:
+    while True:
+        print("\nrestartOnce variable is not type boolean.")
+        restartOnce = input("Please enter a boolean value for restarOnce (True/False): ")
+
+        if restartOnce == "True" or restartOnce == "False":
+            restartOnce = bool(restartOnce)
+            break
+
+if isinstance(lightCurveTimeResolution, float) == False or isinstance(lightCurveTimeResolution, int) == False or lightCurveTimeResolution < (300 * 10 ** -9):
+    while True:
+        try:
+            lightCurveTimeResolution = float(lightCurveTimeResolution)
+            if lightCurveTimeResolution < (300* 10**-9):
+                # Make an error on purpose and trigger except block, since fTestSignificance is not on the correct interval
+                errorVariable = int("99.99")
+            else:
+                if lightCurveTimeResolution == int(lightCurveTimeResolution):
+                    lightCurveTimeResolution = int(lightCurveTimeResolution)
+                
+                break
+        except:
+            print("\nlightCurveTimeResolution must be a number bigger or equal than 300 ns.")
+            lightCurveTimeResolution = input("Please enter a number bigger or equal than 300 ns for lightCurveTimeResolution (>= 3e-7 s): ")

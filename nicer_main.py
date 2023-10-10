@@ -1,7 +1,5 @@
 # Change the script switches below to select which files you would like to run
 
-import os
-from pathlib import Path
 from nicer_variables import *
 
 # Find the script's own path

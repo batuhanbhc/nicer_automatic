@@ -1,9 +1,5 @@
 # This is an automatic NICER script for creating event files
-# Make sure the script is located at the same directory as the input text file containing the locations of observation folders
 
-import subprocess
-import os
-from pathlib import Path
 from nicer_variables import *
 
 # Find the script's own path

@@ -1,10 +1,7 @@
 # This is an automatic NICER script for calculating the flux of the best fitting model for each observation
-import subprocess
-import os
-from pathlib import Path
-from xspec import *
-import matplotlib.pyplot as plt
+
 from nicer_variables import *
+
 #===================================================================================================================================
 # Functions
 def listToStr(array):
@@ -210,7 +207,7 @@ for obs in inputFile.readlines():
     
     #============================================================================================================
     # Unabsorbed flux
-    print("Calculating the unabsorbed flux.\n")
+    print("Calculating the unabsorbed flux.")
     unabsFlux = calculateFlux("unabsorbed", modelName, -7.85)
     file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(unabsFlux) + "\n")
     if writeParValuesAfterCflux:
@@ -229,12 +226,12 @@ for obs in inputFile.readlines():
         parameterFile = open("parameters_bestmodel.txt", "a")
         parameterFile.write("Unabsorbed_Flux " + listToStr(unabsFlux)+ " (10^-9_ergs_cm^-2_s^-1)\n")
         parameterFile.close()
-        print("Successfully added unabsorbed flux data to the parameter file.")
+        print("Successfully added unabsorbed flux data to the parameter file.\n")
     else:
         print("There is already data about unabsorbed flux in parameter file.\n")
     #============================================================================================================
     # Diskbb flux
-    print("Calculating diskbb flux.\n")
+    print("Calculating diskbb flux.")
     fluxDisk = calculateFlux("diskbb", modelName, -7.85)
     file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(fluxDisk) + "\n")
     if writeParValuesAfterCflux:
@@ -253,13 +250,13 @@ for obs in inputFile.readlines():
         parameterFile = open("parameters_bestmodel.txt", "a")
         parameterFile.write("Diskbb_Flux " + listToStr(fluxDisk)+ " (10^-9_ergs_cm^-2_s^-1)\n")
         parameterFile.close()
-        print("Successfully added diskbb flux data to the parameter file.")
+        print("Successfully added diskbb flux data to the parameter file.\n")
     else:
         print("There is already data about diskbb flux in parameter file.\n")
     #============================================================================================================
     if "powerlaw" in modelName:
         # Powerlaw flux
-        print("Calculating powerlaw flux.\n")
+        print("Calculating powerlaw flux.")
         fluxPow = calculateFlux("powerlaw", modelName, -9)
         file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(fluxPow) + "\n")
         if writeParValuesAfterCflux:
@@ -278,7 +275,7 @@ for obs in inputFile.readlines():
             parameterFile = open("parameters_bestmodel.txt", "a")
             parameterFile.write("Powerlaw_Flux " + listToStr(fluxPow)+ " (10^-9_ergs_cm^-2_s^-1)\n")
             parameterFile.close()
-            print("Successfully added powerlaw flux data to the parameter file.")
+            print("Successfully added powerlaw flux data to the parameter file.\n")
         else:
             print("There is already data about powerlaw flux in parameter file.\n")
     else:

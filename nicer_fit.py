@@ -1,11 +1,7 @@
 # This is an automatic NICER script for fitting and comparing models
-import subprocess
-import os
-from pathlib import Path
-from xspec import *
-import numpy as np
+
 from nicer_variables import *
-from astropy.io import fits
+
 #===================================================================================================================================
 # Functions
 def shakefit(resultsFile):
@@ -61,7 +57,6 @@ def shakefit(resultsFile):
                         print("Powerlaw xspec error value is: " + str(errorValue))
                         print("\nWARNING: Powerlaw photon index is frozen at " + str(AllModels(1).powerlaw.PhoIndex.values[0]) + " for having xspec error bigger than 1: "+str(errorValue)+"\n")
                     
-                    print("Powerlaw is now available for error calculations.\n")
                     break
 
     Fit.query = "no"
@@ -121,8 +116,10 @@ def shakefit(resultsFile):
             errorString = AllModels(1)(m).error
             if errorString[0] != 0 and parValue < errorString[0]:
                 rerunShakefit = True
+                print("Some parameters are out of their previously calculated error boundaries. Rerunning shakefit...\n")
                 break
             elif errorString[1] != 0 and parValue > errorString[1]:
+                print("Some parameters are out of their previously calculated error boundaries. Rerunning shakefit...\n")
                 rerunShakefit = True
                 break
 
@@ -757,9 +754,9 @@ for x in range(2):
         pValue = performFtest(nullhypModelList, altModelList, logFile, "    (Adding 6.98 keV absorption gauss)")
         print("Applying f-test to check the significance of 6.98 keV absorption gauss:")
 
-        if abs(pValue) >= ftestCrit:
+        if abs(pValue) >= ftestSignificance:
             print("6.98 keV gaussian has been taken out of the model expression by the f-test:")
-            print("F-test critical value: " + str(ftestCrit) + ", p-value: " + str(pValue) + "\n")
+            print("F-test critical value: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
             removeComp("gaussian", gaussCount, bestModel)
             fitModel()
             updateParameters(bestModel)
@@ -769,7 +766,7 @@ for x in range(2):
             logFile.write("\n====================================================================================\n")
         else:
             print("6.98 keV gaussian has been found to be significant by f-test:")
-            print("F-test critical value: " + str(ftestCrit) + ", p-value: " + str(pValue) + "\n")
+            print("F-test critical value: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
 
         nullhypModelList = transferToNewList(bestModel)
         #===============================================================================================
@@ -793,9 +790,9 @@ for x in range(2):
         # Apply f-test and check whether last gaussian improves the fit significantly or not
         pValue = performFtest(nullhypModelList, altModelList, logFile, "    (adding 6.7 keV absorption gauss)")
         
-        if abs(pValue) >= ftestCrit:
+        if abs(pValue) >= ftestSignificance:
             print("6.7 keV gaussian has been taken out of the model expression by the f-test:")
-            print("F-test critical value: " + str(ftestCrit) + ", p-value: " + str(pValue) + "\n")
+            print("F-test critical value: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
             removeComp("gaussian", gaussCount, bestModel)
             fitModel()
             updateParameters(bestModel)
@@ -805,7 +802,7 @@ for x in range(2):
             logFile.write("\n====================================================================================\n")
         else:
             print("6.7 keV gaussian has been found to be significant by f-test:")
-            print("F-test critical value: " + str(ftestCrit) + ", p-value: " + str(pValue) + "\n")
+            print("F-test critical value: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
 
         nullhypModelList = transferToNewList(bestModel)
         #===============================================================================================
@@ -828,9 +825,9 @@ for x in range(2):
          # Apply f-test
         pValue = performFtest(nullhypModelList, altModelList, logFile, "    (adding powerlaw)")
 
-        if abs(pValue) >= ftestCrit:
+        if abs(pValue) >= ftestSignificance:
             print("Powerlaw has been taken out of the model expression by the f-test:")
-            print("F-test critical value: " + str(ftestCrit) + ", p-value: " + str(pValue) + "\n")
+            print("F-test critical value: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
             removeComp("powerlaw", 1, bestModel)
             fitModel()
             updateParameters(bestModel)
@@ -840,7 +837,7 @@ for x in range(2):
             logFile.write("\n====================================================================================\n\n")
         else:
             print("Powerlaw has been found to be significant by f-test:")
-            print("F-test critical value: " + str(ftestCrit) + ", p-value: " + str(pValue) + "\n")
+            print("F-test critical value: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
 
         nullhypModelList = transferToNewList(bestModel)
         
