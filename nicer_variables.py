@@ -74,7 +74,7 @@ writeParValuesAfterCflux = True
 #================================================ nicer.plot spesific variables =================================================
 startDateMJD = 60000
 
-#================================================================================================================================
+"""#================================================================================================================================
 #Input checks
 
 if str(startDateMJD).isnumeric() == False:
@@ -185,4 +185,4 @@ if isinstance(lightCurveTimeResolution, float) == False or isinstance(lightCurve
                 break
         except:
             print("\nlightCurveTimeResolution must be a number bigger or equal than 300 ns.")
-            lightCurveTimeResolution = input("Please enter a number bigger or equal than 300 ns for lightCurveTimeResolution (>= 3e-7 s): ")
+            lightCurveTimeResolution = input("Please enter a number bigger or equal than 300 ns for lightCurveTimeResolution (>= 3e-7 s): ")"""
