@@ -676,7 +676,7 @@ for x in range(2):
         logFile = open(resultsFile, "w")
         Xset.openLog("xspec_output.log")
         Xset.abund = "wilm"
-        Fit.query = "yes"
+        Fit.query = "no"
 
         logFile.write("OBSERVATION ID: " + obsid + "\n\n")
 
@@ -690,7 +690,7 @@ for x in range(2):
         # This list will carry the model name, model parameters and fit statistics for the best model throughout the script.
         # First element is the model name, second element is the dictionary for parameter name-value pairs, third element is the dictionary for fit statistics
         # such as chi-squared, degrees of freedom and null hypothesis probability.
-        bestModel = ["TBabs*pcfabs(gaussian+diskbb)", {"diskbb.Tin": ",,0.1,0.1,2.5,2.5", "diskbb.norm:":",,0.1,0.1"}, {}]
+        bestModel = ["TBabs*pcfabs(gaussian+diskbb)", {"diskbb.Tin": ",,0.1,0.1,2.5,2.5", "diskbb.norm:":",,0.1,0.1", "pcfabs.CvrFract":0.95}, {}]
 
         #=================================================================================
         # Load the first model and fit
@@ -840,6 +840,12 @@ for x in range(2):
             print("F-test critical value: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
 
         nullhypModelList = transferToNewList(bestModel)
+
+        if AllModels(1).edge.MaxTau.values[0] < 1e-4:
+            logFile.write("Reset edge.MaxTau parameter to 0.1 for refitting due to having an extremely low value.\n")
+            AllModels(1).edge.MaxTau.values = 0.1
+            fitModel()
+            updateParameters(bestModel)
         
         #========================================================================================================================================
         # Start recording nH values if fixNH is set to True.

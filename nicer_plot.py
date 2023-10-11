@@ -197,7 +197,15 @@ minMjd = min(mjdList)
 maxMjd = max(mjdList)
 
 totalDifference = maxMjd - minMjd
+
+if totalDifference == 0:
+    print("There is only one observation for creating parameter graphs.")
+    print("Parameter graphs will not be created.")
+    quit()
+    
 majorTickInterval = round((totalDifference / 5) / 5) * 5
+if majorTickInterval < 5:
+    majorTickInterval = 5
 
 xAxisStart = round((minMjd - majorTickInterval) / majorTickInterval) * majorTickInterval
 xAxisEnd = round((maxMjd + majorTickInterval) / majorTickInterval) * majorTickInterval + 1

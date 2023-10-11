@@ -23,7 +23,7 @@ energyFilter = "0.5 10."
 
 #=============================================== nicer.main spesific variables =================================================
 # Script switches
-createSwitch = False
+createSwitch = True
 fitSwitch = True
 fluxSwitch = True
 plotSwitch = True
