@@ -228,7 +228,7 @@ def writeBestFittingModel(resultsFile):
         for par in compObj.parameterNames:
             parVal = getattr(compObj, par).values
             fullName = comp + "." + par
-            parameterString += fullName + ": " + str(parVal) + "\n"
+            parameterString += fullName + ":\t" + str(parVal) + "\n"
 
     resultsFile.write("Parameters: \n" + parameterString)
     resultsFile.write("=================================================================\n")
@@ -440,7 +440,8 @@ def performFtest(mainModelList, altModelList, logFile, infoTxt = ""):
     if infoTxt != "":
         logFile.write(infoTxt)
 
-    logFile.write("\nNull hypothesis model: " + mainModelList[0] + "\nAlternative model: " + altModelList[0] +"\np-value: " + str(pValue)+"\n\n")
+    logFile.write("\nNull hypothesis model: " + mainModelList[0] + "\nAlternative model: " + altModelList[0] +"\n")
+    logFile.write("F-test significance: "+ str(ftestSignificance)+", p-value: " + str(pValue)+"\n\n")
     return pValue
 
 def calculateGaussEqw(logFile):
@@ -756,7 +757,7 @@ for x in range(2):
 
         if abs(pValue) >= ftestSignificance:
             print("6.98 keV gaussian has been taken out of the model expression by the f-test:")
-            print("F-test critical value: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
+            print("F-test significance: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
             removeComp("gaussian", gaussCount, bestModel)
             fitModel()
             updateParameters(bestModel)
@@ -766,7 +767,7 @@ for x in range(2):
             logFile.write("\n====================================================================================\n")
         else:
             print("6.98 keV gaussian has been found to be significant by f-test:")
-            print("F-test critical value: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
+            print("F-test significance: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
 
         nullhypModelList = transferToNewList(bestModel)
         #===============================================================================================
@@ -792,7 +793,7 @@ for x in range(2):
         
         if abs(pValue) >= ftestSignificance:
             print("6.7 keV gaussian has been taken out of the model expression by the f-test:")
-            print("F-test critical value: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
+            print("F-test significance: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
             removeComp("gaussian", gaussCount, bestModel)
             fitModel()
             updateParameters(bestModel)
@@ -802,7 +803,7 @@ for x in range(2):
             logFile.write("\n====================================================================================\n")
         else:
             print("6.7 keV gaussian has been found to be significant by f-test:")
-            print("F-test critical value: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
+            print("F-test significance: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
 
         nullhypModelList = transferToNewList(bestModel)
         #===============================================================================================
@@ -827,7 +828,7 @@ for x in range(2):
 
         if abs(pValue) >= ftestSignificance:
             print("Powerlaw has been taken out of the model expression by the f-test:")
-            print("F-test critical value: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
+            print("F-test significance: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
             removeComp("powerlaw", 1, bestModel)
             fitModel()
             updateParameters(bestModel)
@@ -837,12 +838,12 @@ for x in range(2):
             logFile.write("\n====================================================================================\n\n")
         else:
             print("Powerlaw has been found to be significant by f-test:")
-            print("F-test critical value: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
+            print("F-test significance: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
 
         nullhypModelList = transferToNewList(bestModel)
 
         if AllModels(1).edge.MaxTau.values[0] < 1e-4:
-            logFile.write("Reset edge.MaxTau parameter to 0.1 for refitting due to having an extremely low value.\n")
+            logFile.write("Reset edge.MaxTau parameter to 0.1 for refitting due to having an extremely low value.\n\n")
             AllModels(1).edge.MaxTau.values = 0.1
             fitModel()
             updateParameters(bestModel)

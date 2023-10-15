@@ -376,3 +376,49 @@ for eachDict in dictList:
 # This file is created after importing variables from another python file
 if Path(scriptDir + "/__pycache__").exists():
     os.system("rm -rf " +scriptDir+"/__pycache__")
+
+try:
+    print("Creating the table: Flux values\n")
+    unit = list(fluxValuesDict.values())[0][0][4]
+    rowNum = len(list(fluxValuesDict.keys()))
+
+    fluxTable = [["Time (MJD)", "Unabsorbed Flux\n" + unit, "Diskbb Flux\n" + unit, "Powerlaw Flux\n" + unit]]
+
+    for key, val in fluxValuesDict.items():
+        tableRow = []
+        tableRow.append(float(format(key, ".1f")) + startDateMJD)
+        tableRow.append(format(val[0][1], ".4f") + "\n(-" + format(val[0][2], ".4f") + "/+" + format(val[0][3], ".4f") + ")")
+        tableRow.append(format(val[1][1], ".4f") + "\n(-" + format(val[1][2], ".4f") + "/+" + format(val[1][3], ".4f") + ")")
+        try:
+            tableRow.append(format(val[2][1], ".4f") + "\n(-" + format(val[2][2], ".4f") + "/+" + format(val[2][3], ".4f") + ")")
+        except:
+            tableRow.append("-")
+        
+        fluxTable.append(tableRow)
+
+    fluxTable.append([" ", " ", " ", " "])
+    fig, ax = plt.subplots(figsize=(12,rowNum))
+
+    table = ax.table(cellText=fluxTable, cellLoc='center', loc='center', edges='T')
+    table.auto_set_font_size(False)
+    table.set_fontsize(12)
+    table.scale(1.2, 2.7)  # Adjust the size of the table
+
+    cellSize = 4 * len(fluxTable)
+    cellCounter = 0
+    for key, cell in table._cells.items():
+        if cellCounter > 7 and cellCounter < cellSize - 4:
+            cell.set_linewidth(0)
+        
+        cellCounter += 1
+
+    ax.axis('off')  # Turn off the axes
+
+    tablePng = commonDirectory + "/flux_table.png"
+    tablePath = Path(tablePng)
+    if tablePath.exists():
+        subprocess.run(["rm", tablePng])
+
+    plt.savefig(tablePng)
+except:
+    print("Flux data could not be found: Flux table cannot be created.\n")
