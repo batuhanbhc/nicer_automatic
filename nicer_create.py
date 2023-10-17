@@ -88,10 +88,11 @@ for obs in obsList:
         for each in highResLightCurvePiRanges:
             each = each.replace(" ", "")
             nicerl3lc = "nicerl3-lc " + outObsDir + " pirange=" + str(each) + " timebin=" + str(highResLightCurveTimeResolution) +" suffix=_"+ str(each).replace("-", "_") + "_" + str(highResLightCurveTimeResolution).replace(".", "") + " clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
+            os.system(nicerl3lc)
     else:
         nicerl3lc = "nicerl3-lc " + outObsDir + " pirange=50-1000 timebin=1 suffix=_50_1000_1 clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
-        
-    os.system(nicerl3lc)
+        os.system(nicerl3lc)
+    
     print("Nicerl3-lc is completed.\n")
 
     print("Please do not forget to check pipeline log file to detect potential issues that might occured while creating targeted event files.\n")
