@@ -92,7 +92,6 @@ os.chdir(scriptDir)
 if outputDir == "":
     outputDir = scriptDir
 
-gaussParsDict = {}
 otherParsDict = {}
 fluxValuesDict = {}
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
@@ -147,7 +146,6 @@ for obs in inputFile.readlines():
     abundance = Xset.abund[:Xset.abund.find(":")]
     
     # Initialize the values of keys as lists
-    gaussParsDict[date] = []
     fluxValuesDict[date] = []
     otherParsDict[date] = []
 
@@ -184,15 +182,13 @@ for obs in inputFile.readlines():
 
         parTuple = (line[0], line[1], line[2], line[3], line[4])
 
-        if "gauss" in parTuple[0]:
-            gaussParsDict[date].append(parTuple)
-        elif "Flux" in parTuple[0]:
+        if "Flux" in parTuple[0]:
             fluxValuesDict[date].append(parTuple)
         else:
             otherParsDict[date].append(parTuple)
 
 # Set static x-axis ticks for all graphs
-mjdList = list(gaussParsDict.keys()) + list(otherParsDict.keys())
+mjdList = list(otherParsDict.keys())
 minMjd = min(mjdList)
 maxMjd = max(mjdList)
 
@@ -222,17 +218,15 @@ for i in xAxisTicksMajor:
         xAxisTicksMinor.append(i + k * minorTickInterval)
 
 dictionaryCounter = 0
-dictList = [fluxValuesDict, otherParsDict, gaussParsDict]
+dictList = [fluxValuesDict, otherParsDict]
 print("=============================================================================================================")
 for eachDict in dictList:
     dictionaryCounter += 1
 
     if dictionaryCounter == 1:
         print("Plotting the graph: Flux values")
-    elif dictionaryCounter == 2:
-        print("Plotting the graph: non-gauss parameters")
     else:
-        print("Plotting the graph: gauss parameters")
+        print("Plotting the graph: Model parameters")
 
     modelPars = {}
     for key, val in eachDict.items():
@@ -249,11 +243,9 @@ for eachDict in dictList:
     
     if plotNum == 0:
         if dictionaryCounter == 1:
-            problematicGraph = "flux values"
-        elif dictionaryCounter == 2:
-            problematicGraph = "non-gauss parameters"
+            problematicGraph = "Flux values"
         else:
-            problematicGraph = "gauss parameters"
+            problematicGraph = "Model parameters"
 
         print("WARNING: The script is trying to create graphs without any parameters. Skipping the following graph: " + problematicGraph + "\n")
 
@@ -352,21 +344,14 @@ for eachDict in dictList:
         counter += 1
 
     if eachDict == otherParsDict:
-        pngFile = commonDirectory + "/other_parameters.png"
-        pngPath = Path(pngFile)
-        if pngPath.exists():
-            subprocess.run(["rm", pngFile])
-
-        plt.savefig(pngFile)
-    elif eachDict == fluxValuesDict:
-        pngFile = commonDirectory + "/flux_values.png"
+        pngFile = commonDirectory + "/model_parameters.png"
         pngPath = Path(pngFile)
         if pngPath.exists():
             subprocess.run(["rm", pngFile])
 
         plt.savefig(pngFile)
     else:
-        pngFile = commonDirectory + "/gauss_parameters.png"
+        pngFile = commonDirectory + "/flux_values.png"
         pngPath = Path(pngFile)
         if pngPath.exists():
             subprocess.run(["rm", pngFile])

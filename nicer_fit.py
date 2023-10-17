@@ -465,62 +465,6 @@ def calculateGaussEqw(logFile):
         for each in eqwList:
             logFile.write(each)
 
-def findTheClosestValue(targetNum, valueList):
-    minDiff = 9999
-    closestValue = 0
-    for val in valueList:
-        tempDiff = abs(targetNum - val)
-        if tempDiff < minDiff:
-            minDiff = tempDiff
-            closestValue = val
-    
-    return closestValue
-
-def matchGaussWithEnergy(gaussGroups):
-    # Match gaussian component with their corresponding emission/absorption line in keV
-    # e.g. matchDict = {gaussian: 1.8keV_gauss, gaussian_5: 6.7keV_gauss, ...}
-    matchDict = {}
-
-    for comp in AllModels(1).componentNames:
-        if "gauss" in comp:
-            compObj = getattr(AllModels(1), comp)
-            for par in compObj.parameterNames:
-                if par == "LineE":
-                    parObj = getattr(compObj, par)
-                    value = parObj.values[0]
-                    energyGroup = findTheClosestValue(value, gaussGroups)
-                    matchDict[comp] = str(energyGroup) + "keV_gauss"
-    
-    return matchDict
-
-def findTheClosestValue(targetNum, valueList):
-    minDiff = 9999
-    closestValue = 0
-    for val in valueList:
-        tempDiff = abs(targetNum - val)
-        if tempDiff < minDiff:
-            minDiff = tempDiff
-            closestValue = val
-    
-    return closestValue
-
-def matchGaussWithEnergy(gaussGroups):
-    # Match gaussian component with their corresponding emission/absorption line in keV
-    # e.g. matchDict = {gaussian: 1.8keV_gauss, gaussian_5: 6.7keV_gauss, ...}
-    matchDict = {}
-
-    for comp in AllModels(1).componentNames:
-        if "gauss" in comp:
-            compObj = getattr(AllModels(1), comp)
-            for par in compObj.parameterNames:
-                if par == "LineE":
-                    parObj = getattr(compObj, par)
-                    value = parObj.values[0]
-                    energyGroup = findTheClosestValue(value, gaussGroups)
-                    matchDict[comp] = str(energyGroup) + "keV_gauss"
-    
-    return matchDict
-
 def fixAllNH(nhDict):
     if "TBabs" in AllModels(1).expression:
         AllModels(1).TBabs.nH.values = nhDict["TBabs.nH"]
@@ -994,10 +938,6 @@ for x in range(2):
         saveModel(modFileName, obsid, commonDirectory)
         #==========================================================================
         if errorCalculations:
-            # Create parameter files that will be used by nicer_plot for creating parameter graphs
-            outputFile = "parameters_bestmodel.txt"
-            print("Creating", outputFile, "file that will carry the necessary data for creating parameter graphs.\n")
-
             # Initialize the strings that will be used as seperate lines for parameter file
             parLines = []
             parLines.append("Parameter name | Parameter Value | Parameter Uncertainity Lower Boundary | Parameter Uncertainity Upper Boundary\n")
@@ -1037,45 +977,20 @@ for x in range(2):
                             parUnit = unit
                         parLines.append(parUnit + " " + str(parValue) + " " + str(lowerBound) + " " + str(upperBound) +"\n")
             
-            # Create a temporary parameter file that will carry parameter values along with error boundaries
-            parameterFile = outObsDir + "/" + "temp_parameters.txt"
-            if Path(parameterFile).exists():
-                os.system("rm " + parameterFile)
-            os.system("touch " + parameterFile)
+            # Create parameter files that will be used by nicer_plot for creating parameter graphs
+            outputParameterFile = outObsDir + "/parameters_bestmodel.txt"
+            print("Creating", outputParameterFile, "file that will carry the necessary data for creating parameter graphs.\n")
 
-            # Write the parameter information from list to the temporary parameter file
-            parFile = open(parameterFile, "w")
+            # Create a temporary parameter file that will carry parameter values along with error boundaries
+            if Path(outputParameterFile).exists():
+                os.system("rm " + outputParameterFile)
+            os.system("touch " + outputParameterFile)
+
+            # Write the parameter information from list to the parameter file
+            parFile = open(outputParameterFile, "w")
             for line in parLines:
                 parFile.write(line)
             parFile.close()
-
-            # Rename gauss names in the temp_parameters.txt file for grouping purposes.
-            # For instance, this part changes gauss names from "gaussian_5" to "6.7keV_gauss" and so on.
-            renameDict = matchGaussWithEnergy(gaussEnergyList)
-            inputFile = open("temp_parameters.txt", "r")
-
-            if Path(outputFile).exists():
-                os.system("rm " + outputFile)
-            os.system("touch " + outputFile)
-
-            outFile = open(outputFile, "w")
-
-            for line in inputFile.readlines():
-                line = line.split(" ")
-                compName = line[0]
-                compName = compName[: compName.find(".")]
-                rest = line[0][line[0].find("."):]
-                for key, val in renameDict.items():
-                    if compName == key:
-                        line[0] = val + rest
-                        break
-
-                outFile.write(listToStr(line))
-            
-            inputFile.close()
-            outFile.close()
-
-            os.system("rm temp_parameters.txt")
         #===========================================================================
         # Remove any pre-existing best model files and save a new one
         for eachFile in allFiles:

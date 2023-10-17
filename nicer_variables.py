@@ -16,14 +16,14 @@ outputDir = "/home/batuhanbahceci/NICER/analysis"
 inputTxtFile = "nicer_obs.txt"
 
 # The log file where the fit results will be saved
-resultsFile = "script_results.log"
+resultsFile = "fit_results.log"
 
 # Write it in XSpec format
 energyFilter = "0.5 10."
 
 #=============================================== nicer.main spesific variables =================================================
 # Script switches
-createSwitch = False
+createSwitch = True
 fitSwitch = True
 fluxSwitch = True
 plotSwitch = True
@@ -35,10 +35,12 @@ plotScript = "nicer_plot.py"
 fluxScript = "nicer_flux.py"
 
 #================================================= nicer.create spesific variables =============================================
-# Please do not forget to give each interval in string form, and seperate them by comma
-lightCurvePiRanges = ["50-200", "200-600", "600-1000"]
+# Set this variable to True if you want high resolution light curves. If set to False, light curves will have 1 second time resolution.
+createHighResLightCurves = False
 
-lightCurveTimeResolution = 2**-8
+# Below variables will only be used if createHighResLightCurves is set to True, otherwise pirange=50-1000 and time resolution=1s will be set for all observations
+highResLightCurvePiRanges = ["50-200", "200-600", "600-1000"]   # Please do not forget to give each interval in string form, and seperate them by comma
+highResLightCurveTimeResolution = 2**-8
 #================================================= nicer.fit spesific variables ================================================
 # Set it to True if you have made changes in models, and do not want to use any previous model files in commonDirectory
 # restartOnce only deletes model files before the first observation, restartAlways deletes model files before all observations

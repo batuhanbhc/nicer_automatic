@@ -195,7 +195,7 @@ for obs in inputFile.readlines():
     updateParameters(parameters)
 
     file.write("\n===========================================================\n")
-    file.write("Fluxes of model components (in ergs/cm^2/s) (90% confidence intervals)\n\n")
+    file.write("Fluxes of model components (in 10^-9 ergs/cm^2/s) (90% confidence intervals)\n\n")
     modelName = AllModels(1).expression.replace(" ", "")
 
     # Absorbed flux
