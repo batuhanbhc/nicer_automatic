@@ -28,7 +28,7 @@ inputFile.close()
 
 # Update Nicer geomagnetic data
 print("Running nigeodown command.\n")
-os.system("nigeodown chatter=3")
+os.system("nigeodown chatter=10")
 print("Nigeodown is completed.\n")
 
 counter = 0
@@ -84,14 +84,14 @@ for obs in obsList:
     print("Nicerl3-spect is completed.\n")
     
     print("Running nicerl3-lc pipeline command.")
+    nicerl3lc = "nicerl3-lc " + outObsDir + " pirange=50-1000 timebin=1 suffix=_50_1000_1 clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
+    os.system(nicerl3lc)
+
     if createHighResLightCurves:
         for each in highResLightCurvePiRanges:
             each = each.replace(" ", "")
             nicerl3lc = "nicerl3-lc " + outObsDir + " pirange=" + str(each) + " timebin=" + str(highResLightCurveTimeResolution) +" suffix=_"+ str(each).replace("-", "_") + "_" + str(highResLightCurveTimeResolution).replace(".", "") + " clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
             os.system(nicerl3lc)
-    else:
-        nicerl3lc = "nicerl3-lc " + outObsDir + " pirange=50-1000 timebin=1 suffix=_50_1000_1 clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
-        os.system(nicerl3lc)
     
     print("Nicerl3-lc is completed.\n")
 
