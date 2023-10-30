@@ -113,8 +113,6 @@ for obs in obsList:
     fitLog = outObsDir +"/" + resultsFile
     if Path(fitLog).exists() == False:
         os.system("touch " + fitLog)
-    
-    quit()
 
 # This file is created after importing variables from another python file
 if Path(scriptDir + "/__pycache__").exists():
