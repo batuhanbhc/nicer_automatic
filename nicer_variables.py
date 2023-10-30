@@ -36,11 +36,11 @@ fluxScript = "nicer_flux.py"
 
 #================================================= nicer.create spesific variables =============================================
 # Set this variable to True if you want high resolution light curves. If set to False, light curves will have 1 second time resolution.
-createHighResLightCurves = False
+createHighResLightCurves = True
 
 # Below variables will only be used if createHighResLightCurves is set to True, otherwise pirange=50-1000 and time resolution=1s will be set for all observations
-highResLightCurvePiRanges = ["50-200", "200-600", "600-1000"]   # Please do not forget to give each interval in string form, and seperate them by comma
-highResLightCurveTimeResolution = 2**-8
+highResLcPiRanges = ["50-200", "200-600", "600-1000"]   # Please do not forget to give each interval in string form, and seperate them by comma
+highResLcTimeResInPwrTwo = -8    # Enter a value as a power of two smaller or equal than 0. Lc files will be names as such: 2^0 -> dt0.lc, 2^-8 -> dt8.lc etc.
 #================================================= nicer.fit spesific variables ================================================
 # Set it to True if you have made changes in models, and do not want to use any previous model files in commonDirectory
 # restartOnce only deletes model files before the first observation, restartAlways deletes model files before all observations

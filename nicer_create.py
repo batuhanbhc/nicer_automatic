@@ -72,7 +72,8 @@ for obs in obsList:
         os.system("gunzip "+obs+"/auxil/ni" + obsid + ".mkf.gz")
 
     # Run nicer pipeline commands
-    print("Starting to run pipeline commands for observation: " + obsid)
+    print("==============================================================================")
+    print("Starting to run pipeline commands for observation: " + obsid + "\n")
     print("Running nicerl2 pipeline command.")
     nicerl2 = "nicerl2 indir=" + obs + " clobber=yes history=yes detlist=launch,-14,-34 filtcolumns=NICERV5 niprefilter2_coltypes=base,3c50 cldir=" + outObsDir + " > " + pipelineLog
     os.system(nicerl2)
@@ -84,24 +85,36 @@ for obs in obsList:
     print("Nicerl3-spect is completed.\n")
     
     print("Running nicerl3-lc pipeline command.")
-    nicerl3lc = "nicerl3-lc " + outObsDir + " pirange=50-1000 timebin=1 suffix=_50_1000_1 clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
+    nicerl3lc = "nicerl3-lc " + outObsDir + " pirange=50-1000 timebin=1 suffix=_50_1000_dt0 clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
     os.system(nicerl3lc)
 
+    while (str(highResLcTimeResInPwrTwo).lstrip("-").isnumeric() == False) or (int(highResLcTimeResInPwrTwo) > 0):
+        print("Please enter an integer value x <= 0 for the time resolution of high resolution light curves, or enter 'exit' to terminate the script.")
+        highResLcTimeResInPwrTwo = input("Enter your input x (x<=0 / exit): ")
+        if highResLcTimeResInPwrTwo == "exit":
+            print("Terminating the " + createScript + ": Next scripts to be executed may crash.")
+            quit()
+        if highResLcTimeResInPwrTwo.lstrip("-").isnumeric() == True and int(highResLcTimeResInPwrTwo) <= 0:
+            highResLcTimeResInPwrTwo = int(highResLcTimeResInPwrTwo)
+            break
+
     if createHighResLightCurves:
-        for each in highResLightCurvePiRanges:
+        for each in highResLcPiRanges:
             each = each.replace(" ", "")
-            nicerl3lc = "nicerl3-lc " + outObsDir + " pirange=" + str(each) + " timebin=" + str(highResLightCurveTimeResolution) +" suffix=_"+ str(each).replace("-", "_") + "_" + str(highResLightCurveTimeResolution).replace(".", "") + " clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
+            nicerl3lc = "nicerl3-lc " + outObsDir + " pirange=" + str(each) + " timebin=" + str(2**highResLcTimeResInPwrTwo) +" suffix=_"+ str(each).replace("-", "_") + "_dt" + str(abs(highResLcTimeResInPwrTwo)).replace(".", "") + " clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
             os.system(nicerl3lc)
-    
+
     print("Nicerl3-lc is completed.\n")
 
-    print("Please do not forget to check pipeline log file to detect potential issues that might occured while creating targeted event files.\n")
-    print("==================================================================================================================================")
+    print("Please do not forget to check pipeline log file to detect potential issues that might have occured while creating output files.")
+    print("==============================================================================")
 
     # Create log file for saving fit results that will be used by nicer_fit.py
     fitLog = outObsDir +"/" + resultsFile
     if Path(fitLog).exists() == False:
         os.system("touch " + fitLog)
+    
+    quit()
 
 # This file is created after importing variables from another python file
 if Path(scriptDir + "/__pycache__").exists():
