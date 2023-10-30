@@ -1,6 +1,40 @@
-# This is an automatic NICER script for calculating the flux of the best fitting model for each observation
+# This is an automatic NICER script for plotting comparison graphsof previously found parameter and flux values from multiple observations
+# Authors: Batuhan Bahçeci
+# Contact: batuhan.bahceci@sabanciuniv.edu
 
 from nicer_variables import *
+
+print("==============================================================================")
+print("\t\t\tRunning the file: " + plotScript + "\n")
+
+# Find the script's own path
+scriptPath = os.path.abspath(__file__)
+scriptPathRev = scriptPath[::-1]
+scriptPathRev = scriptPathRev[scriptPathRev.find("/") + 1:]
+scriptDir = scriptPathRev[::-1]
+os.chdir(scriptDir)
+
+# Check if outputDir has been assigned to be a spesific directory or not
+# If not, assign outputDir to the directory where the script is located at
+if outputDir == "":
+    outputDir = scriptDir
+
+#===================================================================================================================================
+# Input check for outputDir
+while(Path(outputDir).exists() == False):
+    print("Directory defined by outputDir could not be found. Terminating the script...")
+    quit()
+
+# Input check for startDateMJD
+if str(startDateMJD).isnumeric() == False:
+    while True:
+        print("\nThe 'startDateMJD' variable is not of type non-negative integer.")
+        startDateMJD = input("Please enter a non-negative integer value for startDateMJD: ")
+
+        if startDateMJD.isnumeric():
+            startDateMJD = int(startDateMJD)
+            break
+#===================================================================================================================================
 
 #===================================================================================================================================
 # Functions
@@ -79,18 +113,6 @@ print("Running the ", plotScript," file:\n")
 energyLimits = energyFilter.split(" ")
 Emin = energyLimits[0]
 Emax = energyLimits[1]
-
-# Find the script's own path
-scriptPath = os.path.abspath(__file__)
-scriptPathRev = scriptPath[::-1]
-scriptPathRev = scriptPathRev[scriptPathRev.find("/") + 1:]
-scriptDir = scriptPathRev[::-1]
-os.chdir(scriptDir)
-
-# Check if outputDir has been assigned to be a spesific directory or not
-# If not, assign outputDir to the directory where the script is located at
-if outputDir == "":
-    outputDir = scriptDir
 
 otherParsDict = {}
 fluxValuesDict = {}

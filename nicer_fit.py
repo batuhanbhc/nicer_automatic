@@ -1,6 +1,114 @@
-# This is an automatic NICER script for fitting and comparing models
+# This is an automatic NICER script for performing spectral analysis by fitting and comparing different Xspec models
+# Authors: Batuhan Bahçeci
+# Contact: batuhan.bahceci@sabanciuniv.edu
 
 from nicer_variables import *
+
+print("==============================================================================")
+print("\t\t\tRunning the file: " + fitScript + "\n")
+
+# Find the script's own path
+scriptPath = os.path.abspath(__file__)
+scriptPathRev = scriptPath[::-1]
+scriptPathRev = scriptPathRev[scriptPathRev.find("/") + 1:]
+scriptDir = scriptPathRev[::-1]
+os.chdir(scriptDir)
+
+# Check if outputDir has been assigned to be a spesific directory or not
+# If not, assign outputDir to the directory where the script is located at
+if outputDir == "":
+    outputDir = scriptDir
+
+#========================================================== Input Checks ===========================================================
+# Input check for outputDir
+while(Path(outputDir).exists() == False):
+    print("Directory defined by outputDir could not be found. Terminating the script...")
+    quit()
+
+# Input check for restartAlways
+if isinstance(restartAlways, bool) == False:
+    while True:
+        print("\nThe 'restartAlways' variable is not of type boolean.")
+        restartAlways = input("Please enter a boolean value for 'restartAlways' (True/False): ")
+
+        if restartAlways == "True" or restartAlways == "False":
+            restartAlways = bool(restartAlways)
+            break
+
+# Input check for restartOnce
+if isinstance(restartOnce, bool) == False:
+    while True:
+        print("\nThe 'restartOnce' variable is not of type boolean.")
+        restartOnce = input("Please enter a boolean value for 'restartOnce' (True/False): ")
+
+        if restartOnce == "True" or restartOnce == "False":
+            restartOnce = bool(restartOnce)
+            break
+
+# Input check for ftestSignificance
+if isinstance(ftestSignificance, float) == False or not (0 < ftestSignificance < 1):
+    while True:
+        try:
+            ftestSignificance = float(ftestSignificance)
+            if ftestSignificance <= 0 or ftestSignificance >= 1:
+                # Make an error on purpose and trigger except block, since fTestSignificance is not on the correct interval
+                errorVariable = int("99.99")
+            else:
+                break
+        except:
+            print("\nThe 'fTestSignificance' variable must be a float number between 0 and 1.")
+            ftestSignificance = input("Please enter a float number between 0 and 1 for 'ftestSignificance' (0 < x < 1): ")
+
+# Input check for sampleSize
+if str(sampleSize).isnumeric() == False or int(sampleSize) <= 0:
+    while True:
+        print("\nEither the 'sampleSize' variable is not of type integer, or it is smaller or equal to 0.")
+        sampleSize = input("Please enter a positive integer value for 'sampleSize' (x > 0): ")
+
+        if sampleSize.isnumeric() and int(sampleSize) > 0:
+            sampleSize = int(sampleSize)
+            break
+
+# Input check for fixNH
+if isinstance(fixNH, bool) == False:
+    while True:
+        print("\nThe 'fixNH' variable is not of type boolean.")
+        fixNH = input("Please enter a boolean value for 'fixNH' (True/False): ")
+
+        if fixNH == "True" or fixNH == "False":
+            fixNH = bool(fixNH)
+            break
+
+# Input check for errorCalculations
+if isinstance(errorCalculations, bool) == False:
+    while True:
+        print("\nThe 'errorCalculations' variable is not of type boolean.")
+        errorCalculations = input("Please enter a boolean value for 'errorCalculations' (True/False): ")
+
+        if errorCalculations == "True" or errorCalculations == "False":
+            errorCalculations = bool(errorCalculations)
+            break
+
+# Input check for makeXspecScript
+if isinstance(makeXspecScript, bool) == False:
+    while True:
+        print("\nThe 'makeXspecScript' variable is not of type boolean.")
+        makeXspecScript = input("Please enter a boolean value for 'makeXspecScript' (True/False): ")
+
+        if makeXspecScript == "True" or makeXspecScript == "False":
+            makeXspecScript = bool(makeXspecScript)
+            break
+
+# Input check for calculateGaussEqw
+if isinstance(calculateGaussEquivalentWidth, bool) == False:
+    while True:
+        print("\nThe 'calculateGaussEquivalentWidth' variable is not of type boolean.")
+        calculateGaussEquivalentWidth = input("Please enter a boolean value for 'calculateGaussEquivalentWidth' (True/False): ")
+
+        if calculateGaussEquivalentWidth == "True" or calculateGaussEquivalentWidth == "False":
+            calculateGaussEquivalentWidth = bool(calculateGaussEquivalentWidth)
+            break
+#===================================================================================================================================
 
 #===================================================================================================================================
 # Functions
@@ -505,18 +613,6 @@ energyLimits = energyFilter.split(" ")
 Emin = energyLimits[0]
 Emax = energyLimits[1]
 
-# Find the script's own path
-scriptPath = os.path.abspath(__file__)
-scriptPathRev = scriptPath[::-1]
-scriptPathRev = scriptPathRev[scriptPathRev.find("/") + 1:]
-scriptDir = scriptPathRev[::-1]
-os.chdir(scriptDir)
-
-# Check if outputDir has been assigned to be a spesific directory or not
-# If not, assign outputDir to the directory where the script is located at
-if outputDir == "":
-    outputDir = scriptDir
-
 allDir = os.listdir(outputDir)
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
 
@@ -998,9 +1094,10 @@ for x in range(2):
                 os.system("rm " + eachFile)
         saveModel("best_" + modFileName, obsid)
 
-        # Calculate and write equivalent widths of gausses to log file
-        print("Calculating equivalence widths for gaussians in model expression.\n")
-        calculateGaussEqw(logFile)
+        if calculateGaussEquivalentWidth:
+            # Calculate and write equivalent widths of gausses to log file
+            print("Calculating equivalence widths for gaussians in model expression.\n")
+            calculateGaussEqw(logFile)
         
         # Close all log files
         closeAllFiles()

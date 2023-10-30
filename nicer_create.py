@@ -1,6 +1,11 @@
-# This is an automatic NICER script for creating event files
+# This is an automatic NICER script for creating output files (Event files, spectrum, background, responses, light curves...)
+# Authors: Batuhan Bahçeci
+# Contact: batuhan.bahceci@sabanciuniv.edu
 
 from nicer_variables import *
+
+print("==============================================================================")
+print("\t\t\tRunning the file: " + createScript + "\n")
 
 # Find the script's own path
 scriptPath = os.path.abspath(__file__)
@@ -20,16 +25,56 @@ except:
     print("Could not find the input txt file under " + scriptDir + ". Terminating the script...")
     quit()
 
+#=============================================== Input Checks ===========================================================
+# Input check for outputDir
+while(Path(outputDir).exists() == False):
+    print("Directory defined by outputDir could not be found. Terminating the script...")
+    quit()
+
+# Input check for createHighResLightCurves
+if isinstance(createHighResLightCurves, bool) == False:
+    while True:
+        print("\nThe 'createHighResLightCurves' variable is not of type boolean.")
+        createHighResLightCurves = input("Please enter a boolean value for 'createHighResLightCurves' (True/False): ")
+
+        if createHighResLightCurves == "True" or createHighResLightCurves == "False":
+            createHighResLightCurves = bool(createHighResLightCurves)
+            break
+
+# Input check for runNigeodown
+if isinstance(runNigeodown, bool) == False:
+    while True:
+        print("\nThe 'runNigeodown' variable is not of type boolean.")
+        runNigeodown = input("Please enter a boolean value for 'runNigeodown' (True/False): ")
+
+        if runNigeodown == "True" or runNigeodown == "False":
+            runNigeodown = bool(runNigeodown)
+            break
+
+# Input check for highResLcTimeResInPwrTwo
+if createHighResLightCurves:
+    while (str(highResLcTimeResInPwrTwo).lstrip("-").isnumeric() == False) or (int(highResLcTimeResInPwrTwo) > 0):
+        print("Please enter an integer value x <= 0 for the time resolution of high resolution light curves, or enter 'exit' to terminate the script.")
+        highResLcTimeResInPwrTwo = input("Enter your input x (x<=0 / exit): ")
+        if highResLcTimeResInPwrTwo == "exit":
+            print("Terminating the " + createScript + ": Next scripts to be executed may crash.")
+            quit()
+        if highResLcTimeResInPwrTwo.lstrip("-").isnumeric() == True and int(highResLcTimeResInPwrTwo) <= 0:
+            highResLcTimeResInPwrTwo = int(highResLcTimeResInPwrTwo)
+            break
+#========================================================================================================================
+
 obsList = []
 for line in inputFile.readlines():
     line = line.strip("\n' ")
     obsList.append(line)
 inputFile.close()
 
-# Update Nicer geomagnetic data
-print("Running nigeodown command.\n")
-os.system("nigeodown chatter=10")
-print("Nigeodown is completed.\n")
+if runNigeodown:
+    # Update Nicer geomagnetic data
+    print("Running nigeodown command.\n")
+    os.system("nigeodown chatter=10")
+    print("Nigeodown is completed.\n")
 
 counter = 0
 for obs in obsList:
@@ -74,30 +119,32 @@ for obs in obsList:
     # Run nicer pipeline commands
     print("==============================================================================")
     print("Starting to run pipeline commands for observation: " + obsid + "\n")
+
+    # Run nicerl2
     print("Running nicerl2 pipeline command.")
     nicerl2 = "nicerl2 indir=" + obs + " clobber=yes history=yes detlist=launch,-14,-34 filtcolumns=NICERV5 niprefilter2_coltypes=base,3c50 cldir=" + outObsDir + " > " + pipelineLog
     os.system(nicerl2)
     print("Nicerl2 is completed.\n")
 
+    # Run nicerl3-spect
     print("Running nicerl3-spect pipeline command.")
     nicerl3spect = "nicerl3-spect " + outObsDir + " grouptype=optmin groupscale=10 bkgmodeltype=3c50 suffix=3c50 clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
     os.system(nicerl3spect)
     print("Nicerl3-spect is completed.\n")
     
+    # Run nicerl3-lc and create default resolution (1s) light curve
     print("Running nicerl3-lc pipeline command.")
     nicerl3lc = "nicerl3-lc " + outObsDir + " pirange=50-1000 timebin=1 suffix=_50_1000_dt0 clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
     os.system(nicerl3lc)
 
-    while (str(highResLcTimeResInPwrTwo).lstrip("-").isnumeric() == False) or (int(highResLcTimeResInPwrTwo) > 0):
-        print("Please enter an integer value x <= 0 for the time resolution of high resolution light curves, or enter 'exit' to terminate the script.")
-        highResLcTimeResInPwrTwo = input("Enter your input x (x<=0 / exit): ")
-        if highResLcTimeResInPwrTwo == "exit":
-            print("Terminating the " + createScript + ": Next scripts to be executed may crash.")
-            quit()
-        if highResLcTimeResInPwrTwo.lstrip("-").isnumeric() == True and int(highResLcTimeResInPwrTwo) <= 0:
-            highResLcTimeResInPwrTwo = int(highResLcTimeResInPwrTwo)
+    # Input check for createHighResLightCurves
+    while (str(createHighResLightCurves) != "True" and str(createHighResLightCurves) != "False"):
+        createHighResLightCurves = input("Enter True or False to create light curves with high resolution (True/False): ")
+        if createHighResLightCurves == "True" or createHighResLightCurves == "False":
+            createHighResLightCurves = bool(createHighResLightCurves)
             break
 
+    # Check whether the user wants to create high resolution light curves
     if createHighResLightCurves:
         for each in highResLcPiRanges:
             each = each.replace(" ", "")

@@ -1,6 +1,41 @@
-# This is an automatic NICER script for calculating the flux of the best fitting model for each observation
+# This is an automatic NICER script for calculating the fluxes of the Xspec models previously fitted by nicer_fit.py
+# Authors: Batuhan Bahçeci
+# Contact: batuhan.bahceci@sabanciuniv.edu
 
 from nicer_variables import *
+
+print("==============================================================================")
+print("\t\t\tRunning the file: " + fluxScript + "\n")
+
+# Find the script's own path
+scriptPath = os.path.abspath(__file__)
+scriptPathRev = scriptPath[::-1]
+scriptPathRev = scriptPathRev[scriptPathRev.find("/") + 1:]
+scriptDir = scriptPathRev[::-1]
+os.chdir(scriptDir)
+
+# Check if outputDir has been assigned to be a spesific directory or not
+# If not, assign outputDir to the directory where the script is located at
+if outputDir == "":
+    outputDir = scriptDir
+
+#========================================================= Input Checks ============================================================
+# Input check for outputDir
+while(Path(outputDir).exists() == False):
+    print("Directory defined by outputDir could not be found. Terminating the script...")
+    quit()
+
+# Input check for writeParValuesAfterCflux
+if isinstance(writeParValuesAfterCflux, bool) == False:
+    while True:
+        print("\nThe 'writeParValuesAfterCflux' variable is not of type boolean.")
+        writeParValuesAfterCflux = input("Please enter a boolean value for 'writeParValuesAfterCflux' (True/False): ")
+
+        if writeParValuesAfterCflux == "True" or writeParValuesAfterCflux == "False":
+            writeParValuesAfterCflux = bool(writeParValuesAfterCflux)
+            break
+
+#===================================================================================================================================
 
 #===================================================================================================================================
 # Functions
@@ -124,23 +159,9 @@ def writeParsAfterFlux():
     
     file.write("\n")
 #===================================================================================================================
-print("====================================================================")
-print("Running the", fluxScript, "file:\n")
 energyLimits = energyFilter.split(" ")
 Emin = energyLimits[0]
 Emax = energyLimits[1]
-
-# Find the script's own path
-scriptPath = os.path.abspath(__file__)
-scriptPathRev = scriptPath[::-1]
-scriptPathRev = scriptPathRev[scriptPathRev.find("/") + 1:]
-scriptDir = scriptPathRev[::-1]
-os.chdir(scriptDir)
-
-# Check if outputDir has been assigned to be a spesific directory or not
-# If not, assign outputDir to the directory where the script is located at
-if outputDir == "":
-    outputDir = scriptDir
 
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
 
