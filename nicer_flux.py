@@ -21,7 +21,7 @@ if outputDir == "":
 
 #========================================================= Input Checks ============================================================
 # Input check for outputDir
-while(Path(outputDir).exists() == False):
+if Path(outputDir).exists() == False:
     print("Directory defined by outputDir could not be found. Terminating the script...")
     quit()
 
@@ -185,28 +185,40 @@ for obs in inputFile.readlines():
     allFiles = os.listdir(outObsDir)
 
     # Find the data file and the best fitting model file for the current observation
-    counter = 0
+    missingFiles = True
+    foundModfile = False
+    foundDatafile = False
     for file in allFiles:
         if "best_" in file:
             modFile = file
-            counter += 1
+            foundModfile = True
         elif "data_" in file:
             dataFile = file
-            counter += 1
+            foundDatafile = True
 
-        if counter == 2:
+        if foundDatafile and foundModfile:
             # All necessary files have been found
+            missingFiles = False
             break
-    
-    print("Model file: ", modFile)
-    print("Data file: ", dataFile, "\n")
+
     file = open(resultsFile, "a")
 
-    if counter != 2:
-        print("WARNING: Necessary files for calculating fluxed are missing for observation: " + obsid + "\n")
-        file.write("WARNING: Necessary files for calculating fluxed are missing for observation: " + obsid + "\n")
+    # Check if there are any missing files
+    if missingFiles:
+        print("ERROR: Necessary files for calculating fluxes are missing for the observation: " + obsid)
+        file.write("\nERROR: Necessary files for calculating fluxes are missing for the observation: " + obsid + "\n")
+        if foundModfile == False:
+            print("->Missing model file")
+            file.write("->Missing model file\n")
+        if foundDatafile == False:
+            print("->Missing data file")
+            file.write("->Missing data file\n")
         file.close()
         continue
+    
+    print("All the necessary files for flux calculations are found. Please check if the correct files are in use.")
+    print("Model file: ", modFile)
+    print("Data file: ", dataFile, "\n")
 
     Xset.restore(dataFile)
     Xset.restore(modFile)

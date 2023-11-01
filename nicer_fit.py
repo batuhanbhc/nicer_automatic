@@ -21,7 +21,7 @@ if outputDir == "":
 
 #========================================================== Input Checks ===========================================================
 # Input check for outputDir
-while(Path(outputDir).exists() == False):
+if Path(outputDir).exists() == False:
     print("Directory defined by outputDir could not be found. Terminating the script...")
     quit()
 
@@ -666,33 +666,59 @@ for x in range(2):
         os.chdir(outObsDir)
         allFiles = os.listdir(outObsDir)
 
+        # Find the spectrum, background, arf and response files
+        foundSpectrum = False
+        foundBackground = False
+        foundArf = False
+        foundRmf = False
+        missingFiles = True
+        for file in allFiles:
+            if file == ("ni" + obsid + "mpu7_sr3c50.pha"):
+                spectrumFile = file
+                foundSpectrum = True
+            elif file == ("ni" + obsid + "mpu7_bg3c50.pha"):
+                backgroundFile = file
+                foundBackground = True
+            elif file == ("ni" + obsid + "mpu73c50.arf"):
+                arfFile = file
+                foundArf = True
+            elif file == ("ni" + obsid + "mpu73c50.rmf"):
+                rmfFile = file
+                foundRmf = True
+
+            if foundSpectrum and foundBackground and foundArf and foundRmf:
+                # All necessary files have been found
+                missingFiles = False
+                break
+        
+        # Check if there are any missing files
+        if missingFiles:
+            f = open(resultsFile, "w")
+            print("ERROR: Necessary files for spectral fitting are missing for the observation: " + obsid)
+            f.write("ERROR: Necessary files for spectral fitting are missing for the observation: " + obsid + "\n")
+            if foundSpectrum == False:
+                print("Missing spectrum file")
+                f.write("Missing spectrum file\n")
+            if foundBackground == False:
+                print("Missing background file")
+                f.write("Missing background file\n")
+            if foundArf == False:
+                print("Missing arf file")
+                f.write("Missing arf file\n")
+            if foundRmf == False:
+                print("Missing rmf file")
+                f.write("Missing spectrum file\n")
+            f.close()
+            continue
+
         # First, check whether the observation has long enough exposure for meaningful data
-        hdu = fits.open(outObsDir + "/ni" + obsid + "mpu7_sr3c50.pha")
+        hdu = fits.open(outObsDir + "/" + spectrumFile)
         exposure = hdu[0].header["EXPOSURE"]
         if exposure < 100:
             print("Current observation has exposure less than 100, skipping the fitting procedure for current observation. Obsid: " + obsid +", exposure: " + format(exposure, ".2f") + "\n")
             continue
-
-        # Find the spectrum, background, arf and response files
-        counter = 0
-        for file in allFiles:
-            if file == ("ni" + obsid + "mpu7_sr3c50.pha"):
-                spectrumFile = file
-                counter += 1
-            elif file == ("ni" + obsid + "mpu7_bg3c50.pha"):
-                backgroundFile = file
-                counter += 1
-            elif file == ("ni" + obsid + "mpu73c50.arf"):
-                arfFile = file
-                counter += 1
-            elif file == ("ni" + obsid + "mpu73c50.rmf"):
-                rmfFile = file
-                counter += 1
-
-            if counter == 4:
-                # All necessary files have been found
-                break
         
+        print("All the necessary spectral files are found. Please check if the correct files are in use.")
         print("Spectrum file:", spectrumFile)
         print("Background file:", backgroundFile)
         print("Arf file:", arfFile)

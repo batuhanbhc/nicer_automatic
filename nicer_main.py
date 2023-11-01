@@ -21,10 +21,34 @@ os.chdir(scriptDir)
 if outputDir == "":
     outputDir = scriptDir
 
+# ========================================= Input checks =============================================================
 # Input check for outputDir
-while(Path(outputDir).exists() == False):
+if Path(outputDir).exists() == False:
     print("Directory defined by outputDir could not be found. Terminating the script...")
     quit()
+
+stopExecution = False
+# Input checks for sub-scripts
+if Path(scriptDir + "/" + createScript).exists() == False:
+    print(createScript + " file necessary for the proper execution of the script could not be found under " + scriptDir)
+    stopExecution = True
+
+if Path(scriptDir + "/" + fitScript).exists() == False:
+    print(fitScript + " file necessary for the proper execution of the script could not be found under " + scriptDir)
+    stopExecution = True
+
+if Path(scriptDir + "/" + fluxScript).exists() == False:
+    print(fluxScript + " file necessary for the proper execution of the script could not be found under " + scriptDir)
+    stopExecution = True
+
+if Path(scriptDir + "/" + plotScript).exists() == False:
+    print(plotScript + " file necessary for the proper execution of the script could not be found under " + scriptDir)
+    stopExecution = True
+
+if stopExecution:
+    print("Terminating the script...")
+    quit()
+# ====================================================================================================================
 
 if createSwitch:
     os.system("python3 " + createScript)

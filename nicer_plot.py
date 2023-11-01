@@ -21,7 +21,7 @@ if outputDir == "":
 
 #===================================================================================================================================
 # Input check for outputDir
-while(Path(outputDir).exists() == False):
+if Path(outputDir).exists() == False:
     print("Directory defined by outputDir could not be found. Terminating the script...")
     quit()
 
@@ -133,23 +133,34 @@ for obs in inputFile.readlines():
 
     allFiles = os.listdir(outObsDir)
     # Find the data file and the best fitting model file for the current observation
-    counter = 0
+    missingFiles = True
+    foundParameterfile = False
+    foundModfile = False
+    foundSpectrum = False
     for file in allFiles:
         if "parameters_" in file:
             parFile = file
-            counter += 1
+            foundParameterfile = True
         elif "best_" in file:
             modFile = file
-            counter += 1
+            foundModfile = True
         elif file == "ni" + obsid + "mpu7_sr3c50.pha":
             spectrumFile = file
-            counter += 1
+            foundSpectrum = True
         
-        if counter == 3:
+        if foundSpectrum and foundModfile and foundParameterfile:
+            missingFiles = False
             break
     
-    if counter != 3:
-        print("WARNING: Necessary files for retrieving parameters and plotting are missing for observation: " + obsid + "\n")
+    # Check if there are any missing files
+    if missingFiles:
+        print("WARNING: Necessary files for retrieving parameters and plotting are missing for observation: " + obsid)
+        if foundSpectrum == False:
+            print("Missing spectrum file")
+        if foundModfile == False:
+            print("Missing model file")
+        if foundParameterfile == False:
+            print("Missing parameter file")
         continue
 
     # Extract MJD
@@ -209,223 +220,226 @@ for obs in inputFile.readlines():
         else:
             otherParsDict[date].append(parTuple)
 
-# Set static x-axis ticks for all graphs
-mjdList = list(otherParsDict.keys())
-minMjd = min(mjdList)
-maxMjd = max(mjdList)
+if len(otherParsDict.keys()) != 0 and len(fluxValuesDict.keys()) == 0:
+    # Set static x-axis ticks for all graphs
+    mjdList = list(otherParsDict.keys())
+    minMjd = min(mjdList)
+    maxMjd = max(mjdList)
 
-totalDifference = maxMjd - minMjd
+    totalDifference = maxMjd - minMjd
 
-if totalDifference == 0:
-    print("There is only one observation for creating parameter graphs.")
-    print("Parameter graphs will not be created.")
-    quit()
-    
-majorTickInterval = round((totalDifference / 5) / 5) * 5
-if majorTickInterval < 5:
-    majorTickInterval = 5
+    if totalDifference == 0:
+        print("There is only one observation for creating parameter graphs.")
+        print("Parameter graphs will not be created.")
+        quit()
+        
+    majorTickInterval = round((totalDifference / 5) / 5) * 5
+    if majorTickInterval < 5:
+        majorTickInterval = 5
 
-xAxisStart = round((minMjd - majorTickInterval) / majorTickInterval) * majorTickInterval
-xAxisEnd = round((maxMjd + majorTickInterval) / majorTickInterval) * majorTickInterval + 1
-xAxisTicksMajor = []
-xAxisTicksMinor = []
+    xAxisStart = round((minMjd - majorTickInterval) / majorTickInterval) * majorTickInterval
+    xAxisEnd = round((maxMjd + majorTickInterval) / majorTickInterval) * majorTickInterval + 1
+    xAxisTicksMajor = []
+    xAxisTicksMinor = []
 
-for i in range(xAxisStart, xAxisEnd):
-    if i % majorTickInterval == 0:
-        xAxisTicksMajor.append(i)
+    for i in range(xAxisStart, xAxisEnd):
+        if i % majorTickInterval == 0:
+            xAxisTicksMajor.append(i)
 
-for i in xAxisTicksMajor:
-    minorTickInterval = majorTickInterval / 5
-    for k in range(1, 5):
-        xAxisTicksMinor.append(i + k * minorTickInterval)
+    for i in xAxisTicksMajor:
+        minorTickInterval = majorTickInterval / 5
+        for k in range(1, 5):
+            xAxisTicksMinor.append(i + k * minorTickInterval)
 
-dictionaryCounter = 0
-dictList = [fluxValuesDict, otherParsDict]
-print("=============================================================================================================")
-for eachDict in dictList:
-    dictionaryCounter += 1
+    dictionaryCounter = 0
+    dictList = [fluxValuesDict, otherParsDict]
+    print("=============================================================================================================")
+    for eachDict in dictList:
+        dictionaryCounter += 1
 
-    if dictionaryCounter == 1:
-        print("Plotting the graph: Flux values")
-    else:
-        print("Plotting the graph: Model parameters")
-
-    modelPars = {}
-    for key, val in eachDict.items():
-        for tuple in val:
-            if tuple[0] in modelPars:
-                modelPars[tuple[0]][0].append(tuple[1])     # Value
-                modelPars[tuple[0]][1].append(tuple[2])     # Error lower
-                modelPars[tuple[0]][2].append(tuple[3])     # Error upper
-                modelPars[tuple[0]][3].append(key)          # MJD
-            else:
-                modelPars[tuple[0]] = ([tuple[1]], [tuple[2]], [tuple[3]], [key], tuple[4])
-
-    plotNum = len(modelPars.keys())
-    
-    if plotNum == 0:
         if dictionaryCounter == 1:
-            problematicGraph = "Flux values"
+            print("Plotting the graph: Flux values")
         else:
-            problematicGraph = "Model parameters"
+            print("Plotting the graph: Model parameters")
 
-        print("WARNING: The script is trying to create graphs without any parameters. Skipping the following graph: " + problematicGraph + "\n")
+        modelPars = {}
+        for key, val in eachDict.items():
+            for tuple in val:
+                if tuple[0] in modelPars:
+                    modelPars[tuple[0]][0].append(tuple[1])     # Value
+                    modelPars[tuple[0]][1].append(tuple[2])     # Error lower
+                    modelPars[tuple[0]][2].append(tuple[3])     # Error upper
+                    modelPars[tuple[0]][3].append(key)          # MJD
+                else:
+                    modelPars[tuple[0]] = ([tuple[1]], [tuple[2]], [tuple[3]], [key], tuple[4])
 
-        continue
-    
-    rows = plotNum
-    cols = 1
+        plotNum = len(modelPars.keys())
+        
+        if plotNum == 0:
+            if dictionaryCounter == 1:
+                problematicGraph = "Flux values"
+            else:
+                problematicGraph = "Model parameters"
 
-    fig, axs = plt.subplots(rows, cols, figsize=(6, plotNum*2.5))
-    plt.subplots_adjust(wspace=0, hspace=0)
-    counter = 0
+            print("WARNING: The script is trying to create graphs without any parameters. Skipping the following graph: " + problematicGraph + "\n")
 
-    createCommonLabel = False
-    commonLabel = ""
-    for key, val in modelPars.items():
-        if val[4] != "":
-            createCommonLabel = True
-            commonLabel = val[4]
-    
-    if createCommonLabel:
-        fig.text(0.93, 0.5, commonLabel, va='center', rotation='vertical')
+            continue
+        
+        rows = plotNum
+        cols = 1
 
-    for i in range(rows):
-        xAxis = list(modelPars.values())[counter][3]
-        yAxis = list(modelPars.values())[counter][0]
-        errorLow = list(modelPars.values())[counter][1]
-        errorHigh = list(modelPars.values())[counter][2]
-        parName = list(modelPars.keys())[counter]
+        fig, axs = plt.subplots(rows, cols, figsize=(6, plotNum*2.5))
+        plt.subplots_adjust(wspace=0, hspace=0)
+        counter = 0
 
-        axs[i].errorbar(xAxis, yAxis, yerr=[errorLow, errorHigh], fmt='o', markersize=4, ecolor="black", color="black", capsize=0)
-        axs[i].minorticks_on()
+        createCommonLabel = False
+        commonLabel = ""
+        for key, val in modelPars.items():
+            if val[4] != "":
+                createCommonLabel = True
+                commonLabel = val[4]
+        
+        if createCommonLabel:
+            fig.text(0.93, 0.5, commonLabel, va='center', rotation='vertical')
 
-        axs[i].set_xticks(xAxisTicksMajor)
-        axs[i].set_xticks(xAxisTicksMinor, minor = True)
-        axs[i].tick_params(which = "both", direction="in")
+        for i in range(rows):
+            xAxis = list(modelPars.values())[counter][3]
+            yAxis = list(modelPars.values())[counter][0]
+            errorLow = list(modelPars.values())[counter][1]
+            errorHigh = list(modelPars.values())[counter][2]
+            parName = list(modelPars.keys())[counter]
 
-        # If the plot is not the bottom one, hide the x-axis tick labels
-        if i < rows-1:
-            axs[i].xaxis.set_ticklabels([])
+            axs[i].errorbar(xAxis, yAxis, yerr=[errorLow, errorHigh], fmt='o', markersize=4, ecolor="black", color="black", capsize=0)
+            axs[i].minorticks_on()
+
+            axs[i].set_xticks(xAxisTicksMajor)
+            axs[i].set_xticks(xAxisTicksMinor, minor = True)
+            axs[i].tick_params(which = "both", direction="in")
+
+            # If the plot is not the bottom one, hide the x-axis tick labels
+            if i < rows-1:
+                axs[i].xaxis.set_ticklabels([])
+            else:
+                axs[i].set_xlabel("Time (MJD-"+str(startDateMJD)+ " days)")
+
+            # Rearrange major-minor y-axis ticks to prevent tick collision between subsequent graphs
+            yTicksMajor = axs[i].get_yticks()
+            yTicksMinor = axs[i].get_yticks(minor = True)
+            minMajorTickY = min(yTicksMajor)
+            maxMajorTickY = max(yTicksMajor)
+
+            # Divide major tick gaps into 5 equal intervals
+            minorInterval = (yTicksMajor[1] - yTicksMajor[0]) / 5
+
+            newMajorList = []
+            for elem in yTicksMajor:
+                newMajorList.append(elem)
+            
+            # Check whether the lowest major y-axis tick in current tick list is truly the minimum, or is there another tick that is also lower than all y-axis values
+            testList = newMajorList
+            testList.remove(minMajorTickY)
+            secondMinimum = min(testList)
+            trueMinimum = False
+            for val in yAxis:
+                if val < secondMinimum:
+                    trueMinimum = True
+            if trueMinimum == False:
+                newMajorList = testList
+
+            # Check whether the highest major y-axis tick in current tick list is truly the maximum, or is there another tick that is also higher than all y-axis values
+            testList = newMajorList
+            testList.remove(maxMajorTickY)
+            secondMaximum = max(testList)
+            trueMaximum = False
+            for val in yAxis:
+                if val > secondMaximum:
+                    trueMaximum = True
+            if trueMaximum == False:
+                newMajorList = testList
+            
+            # Get new minimum/maximum major y-axis ticks
+            minMajorTickY = min(newMajorList)
+            maxMajorTickY = max(newMajorList)
+
+            tempList = []
+            for j in range(4, 0, -1):
+                tempList.append(minMajorTickY - j*minorInterval)
+
+            for j in newMajorList:
+                for k in range(1, round((newMajorList[1] - newMajorList[0]) / minorInterval) + 1):
+                    tempList.append(j + minorInterval * k)
+
+            newMinorList = tempList
+
+            axs[i].set_ylabel(parName)
+            axs[i].set_yticks(newMinorList, minor = True)
+            axs[i].set_yticks(newMajorList)
+
+            counter += 1
+
+        if eachDict == otherParsDict:
+            pngFile = commonDirectory + "/model_parameters.png"
+            pngPath = Path(pngFile)
+            if pngPath.exists():
+                subprocess.run(["rm", pngFile])
+
+            plt.savefig(pngFile)
         else:
-            axs[i].set_xlabel("Time (MJD-"+str(startDateMJD)+ " days)")
+            pngFile = commonDirectory + "/flux_values.png"
+            pngPath = Path(pngFile)
+            if pngPath.exists():
+                subprocess.run(["rm", pngFile])
 
-        # Rearrange major-minor y-axis ticks to prevent tick collision between subsequent graphs
-        yTicksMajor = axs[i].get_yticks()
-        yTicksMinor = axs[i].get_yticks(minor = True)
-        minMajorTickY = min(yTicksMajor)
-        maxMajorTickY = max(yTicksMajor)
+            plt.savefig(pngFile)
 
-        # Divide major tick gaps into 5 equal intervals
-        minorInterval = (yTicksMajor[1] - yTicksMajor[0]) / 5
+    # This file is created after importing variables from another python file
+    if Path(scriptDir + "/__pycache__").exists():
+        os.system("rm -rf " +scriptDir+"/__pycache__")
 
-        newMajorList = []
-        for elem in yTicksMajor:
-            newMajorList.append(elem)
-        
-        # Check whether the lowest major y-axis tick in current tick list is truly the minimum, or is there another tick that is also lower than all y-axis values
-        testList = newMajorList
-        testList.remove(minMajorTickY)
-        secondMinimum = min(testList)
-        trueMinimum = False
-        for val in yAxis:
-            if val < secondMinimum:
-                trueMinimum = True
-        if trueMinimum == False:
-            newMajorList = testList
+    try:
+        print("Creating the table: Flux values\n")
+        unit = list(fluxValuesDict.values())[0][0][4]
+        rowNum = len(list(fluxValuesDict.keys()))
 
-        # Check whether the highest major y-axis tick in current tick list is truly the maximum, or is there another tick that is also higher than all y-axis values
-        testList = newMajorList
-        testList.remove(maxMajorTickY)
-        secondMaximum = max(testList)
-        trueMaximum = False
-        for val in yAxis:
-            if val > secondMaximum:
-                trueMaximum = True
-        if trueMaximum == False:
-            newMajorList = testList
-        
-        # Get new minimum/maximum major y-axis ticks
-        minMajorTickY = min(newMajorList)
-        maxMajorTickY = max(newMajorList)
+        fluxTable = [["Time (MJD)", "Unabsorbed Flux\n" + unit, "Diskbb Flux\n" + unit, "Powerlaw Flux\n" + unit]]
 
-        tempList = []
-        for j in range(4, 0, -1):
-            tempList.append(minMajorTickY - j*minorInterval)
+        for key, val in fluxValuesDict.items():
+            tableRow = []
+            tableRow.append(float(format(key, ".1f")) + startDateMJD)
+            tableRow.append(format(val[0][1], ".4f") + "\n(-" + format(val[0][2], ".4f") + "/+" + format(val[0][3], ".4f") + ")")
+            tableRow.append(format(val[1][1], ".4f") + "\n(-" + format(val[1][2], ".4f") + "/+" + format(val[1][3], ".4f") + ")")
+            try:
+                tableRow.append(format(val[2][1], ".4f") + "\n(-" + format(val[2][2], ".4f") + "/+" + format(val[2][3], ".4f") + ")")
+            except:
+                tableRow.append("-")
+            
+            fluxTable.append(tableRow)
 
-        for j in newMajorList:
-            for k in range(1, round((newMajorList[1] - newMajorList[0]) / minorInterval) + 1):
-                tempList.append(j + minorInterval * k)
+        fluxTable.append([" ", " ", " ", " "])
+        fig, ax = plt.subplots(figsize=(12,rowNum))
 
-        newMinorList = tempList
+        table = ax.table(cellText=fluxTable, cellLoc='center', loc='center', edges='T')
+        table.auto_set_font_size(False)
+        table.set_fontsize(12)
+        table.scale(1.2, 2.7)  # Adjust the size of the table
 
-        axs[i].set_ylabel(parName)
-        axs[i].set_yticks(newMinorList, minor = True)
-        axs[i].set_yticks(newMajorList)
+        cellSize = 4 * len(fluxTable)
+        cellCounter = 0
+        for key, cell in table._cells.items():
+            if cellCounter > 7 and cellCounter < cellSize - 4:
+                cell.set_linewidth(0)
+            
+            cellCounter += 1
 
-        counter += 1
+        ax.axis('off')  # Turn off the axes
 
-    if eachDict == otherParsDict:
-        pngFile = commonDirectory + "/model_parameters.png"
-        pngPath = Path(pngFile)
-        if pngPath.exists():
-            subprocess.run(["rm", pngFile])
+        tablePng = commonDirectory + "/flux_table.png"
+        tablePath = Path(tablePng)
+        if tablePath.exists():
+            subprocess.run(["rm", tablePng])
 
-        plt.savefig(pngFile)
-    else:
-        pngFile = commonDirectory + "/flux_values.png"
-        pngPath = Path(pngFile)
-        if pngPath.exists():
-            subprocess.run(["rm", pngFile])
-
-        plt.savefig(pngFile)
-
-# This file is created after importing variables from another python file
-if Path(scriptDir + "/__pycache__").exists():
-    os.system("rm -rf " +scriptDir+"/__pycache__")
-
-try:
-    print("Creating the table: Flux values\n")
-    unit = list(fluxValuesDict.values())[0][0][4]
-    rowNum = len(list(fluxValuesDict.keys()))
-
-    fluxTable = [["Time (MJD)", "Unabsorbed Flux\n" + unit, "Diskbb Flux\n" + unit, "Powerlaw Flux\n" + unit]]
-
-    for key, val in fluxValuesDict.items():
-        tableRow = []
-        tableRow.append(float(format(key, ".1f")) + startDateMJD)
-        tableRow.append(format(val[0][1], ".4f") + "\n(-" + format(val[0][2], ".4f") + "/+" + format(val[0][3], ".4f") + ")")
-        tableRow.append(format(val[1][1], ".4f") + "\n(-" + format(val[1][2], ".4f") + "/+" + format(val[1][3], ".4f") + ")")
-        try:
-            tableRow.append(format(val[2][1], ".4f") + "\n(-" + format(val[2][2], ".4f") + "/+" + format(val[2][3], ".4f") + ")")
-        except:
-            tableRow.append("-")
-        
-        fluxTable.append(tableRow)
-
-    fluxTable.append([" ", " ", " ", " "])
-    fig, ax = plt.subplots(figsize=(12,rowNum))
-
-    table = ax.table(cellText=fluxTable, cellLoc='center', loc='center', edges='T')
-    table.auto_set_font_size(False)
-    table.set_fontsize(12)
-    table.scale(1.2, 2.7)  # Adjust the size of the table
-
-    cellSize = 4 * len(fluxTable)
-    cellCounter = 0
-    for key, cell in table._cells.items():
-        if cellCounter > 7 and cellCounter < cellSize - 4:
-            cell.set_linewidth(0)
-        
-        cellCounter += 1
-
-    ax.axis('off')  # Turn off the axes
-
-    tablePng = commonDirectory + "/flux_table.png"
-    tablePath = Path(tablePng)
-    if tablePath.exists():
-        subprocess.run(["rm", tablePng])
-
-    plt.savefig(tablePng)
-except:
-    print("Flux data could not be found: Flux table cannot be created.\n")
+        plt.savefig(tablePng)
+    except:
+        print("Flux data could not be found: Flux table cannot be created.\n")
+else:
+    print("\nCould not find any extracted set of parameters to create parameter graphs.")
