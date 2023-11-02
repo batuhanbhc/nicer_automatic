@@ -220,7 +220,7 @@ for obs in inputFile.readlines():
         else:
             otherParsDict[date].append(parTuple)
 
-if len(otherParsDict.keys()) != 0 and len(fluxValuesDict.keys()) == 0:
+if len(otherParsDict.keys()) != 0 and len(fluxValuesDict.keys()) != 0:
     # Set static x-axis ticks for all graphs
     mjdList = list(otherParsDict.keys())
     minMjd = min(mjdList)
