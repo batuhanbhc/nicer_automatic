@@ -126,7 +126,7 @@ for obs in obsList:
     # Run nicer pipeline commands
     print("==============================================================================")
     print("Starting to run pipeline commands for observation: " + obsid + "\n")
-    quit()
+
     # Run nicerl2
     print("Running nicerl2...")
     nicerl2 = "nicerl2 indir=" + obs + " clobber=yes history=yes detlist=launch,-14,-34 filtcolumns=NICERV5 niprefilter2_coltypes=base,3c50 cldir=" + outObsDir + " > " + pipelineLog

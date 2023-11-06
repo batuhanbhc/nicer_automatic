@@ -801,7 +801,7 @@ for x in range(2):
         #===============================================================================================
         # Add an edge around 1.8 keV
         addComp("edge", "TBabs", "after", "*", bestModel)
-        print("Adding edge to current model expression.\n")
+        print("Adding edge to current model expression...\n")
 
         edgePars = ["1.8,,1.5,1.5,2,2", "0.2"]
         assignParameters("edge", edgePars, 1)
@@ -817,7 +817,7 @@ for x in range(2):
         #===============================================================================================
         # Add 6.98 keV absorption gauss and fit
         addComp("gaussian", "diskbb", "before", "+", bestModel)
-        print("Adding 6.98 keV absorption gauss to the current model expression.")
+        print("Adding 6.98 keV absorption gauss to the current model expression...")
 
         gaussPars_2 = ["6.98,,6.8,6.8,7.5,7.5", "7e-2,,,,0.2,0.2", "-1e-3,,-1e12,-1e12,-1e-12,-1e-12"]
         gaussCount = wordCounter(AllModels(1).expression, "gaussian")
@@ -854,7 +854,7 @@ for x in range(2):
         #===============================================================================================
         # Add 6.7 keV absorption gauss and fit
         addComp("gaussian", "diskbb", "before", "+", bestModel)
-        print("Adding 6.7 keV absorption gauss to the current model expression.")
+        print("Adding 6.7 keV absorption gauss to the current model expression...")
 
         gaussPars_3 = ["6.7,,6.4,6.4,6.8,6.8", "0.07,,,,0.2,0.2", "-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"]
         gaussCount = wordCounter(AllModels(1).expression, "gaussian")
@@ -890,7 +890,7 @@ for x in range(2):
         #===============================================================================================
         # Add powerlaw
         addComp("powerlaw", "diskbb", "after", "+", bestModel)
-        print("Adding powerlaw to the current model expression.")
+        print("Adding powerlaw to the current model expression...")
 
         powerlawPars = ["1.8,,1.2,1.2,3,3", "0.1"]
         assignParameters("powerlaw", powerlawPars, 1)
@@ -1066,11 +1066,11 @@ for x in range(2):
                 shakefit(logFile)
 
         # Save the last model
-        print("Writing the best model parameters to ", resultsFile)
+        print("Writing the best model parameters to " + resultsFile + "...")
         modFileName = extractModFileName()
         writeBestFittingModel(logFile)
 
-        print("Saving the best model xspec file.\n")
+        print("Saving the best model xspec file...\n")
         saveModel(modFileName, obsid)
         saveModel(modFileName, obsid, commonDirectory)
         #==========================================================================
@@ -1116,7 +1116,7 @@ for x in range(2):
             
             # Create parameter files that will be used by nicer_plot for creating parameter graphs
             outputParameterFile = outObsDir + "/parameters_bestmodel.txt"
-            print("Creating", outputParameterFile, "file that will carry the necessary data for creating parameter graphs.\n")
+            print("Creating", outputParameterFile, "file that will carry the necessary data for creating parameter graphs...\n")
 
             # Create a temporary parameter file that will carry parameter values along with error boundaries
             if Path(outputParameterFile).exists():
@@ -1137,7 +1137,7 @@ for x in range(2):
 
         if calculateGaussEquivalentWidth:
             # Calculate and write equivalent widths of gausses to log file
-            print("Calculating equivalence widths for gaussians in model expression.\n")
+            print("Calculating equivalence widths for gaussians in model expression...\n")
             calculateGaussEqw(logFile)
         
         # Close all log files
@@ -1165,7 +1165,7 @@ for x in range(2):
         # The whole fitting process is looped twice for refitting purposes. If fixing nH option is False, do not try to refit
         break
     else:
-        print("Restarting the fitting procedure for all observations by fixing the nH parameters.\n")
+        print("Restarting the fitting procedure for all observations by fixing the nH parameters...\n")
 
 os.chdir(scriptDir)
 

@@ -24,16 +24,6 @@ if outputDir == "":
 if Path(outputDir).exists() == False:
     print("Directory defined by outputDir could not be found. Terminating the script...")
     quit()
-
-# Input check for startDateMJD
-if str(startDateMJD).isnumeric() == False:
-    while True:
-        print("\nThe 'startDateMJD' variable is not of type non-negative integer.")
-        startDateMJD = input("Please enter a non-negative integer value for startDateMJD: ")
-
-        if startDateMJD.isnumeric():
-            startDateMJD = int(startDateMJD)
-            break
 #===================================================================================================================================
 
 #===================================================================================================================================
@@ -138,6 +128,7 @@ if len(obsList) == 0:
     print("ERROR: Could not find any observation directory to process.")
     quit()
 
+allDates = []
 for obs in obsList:
     #Find observation id (e.g. 6130010120)
     pathLocations = obs.split("/")
@@ -172,7 +163,7 @@ for obs in obsList:
     
     # Check if there are any missing files
     if missingFiles:
-        print("WARNING: Necessary files for retrieving parameters and plotting are missing for observation: " + obsid)
+        print("\nWARNING: Necessary files for retrieving parameters and plotting are missing for observation: " + obsid)
         if foundSpectrum == False:
             print("Missing spectrum file")
         if foundModfile == False:
@@ -184,12 +175,7 @@ for obs in obsList:
     # Extract MJD
     hdu = fits.open(spectrumFile)
     date = float(format(hdu[1].header["MJD-OBS"], ".3f"))
-
-    if date < startDateMJD:
-        print("MJD smaller than " + str(startDateMJD)+" has been detected. The graphs are plotted starting from MJD "+str(startDateMJD)+". Please change 'startDateMJD' variable to account for older MJD.")
-        quit()
-    else:
-        date = date - startDateMJD
+    allDates.append(date)
     hdu.close()
 
     Xset.chatter = 0
@@ -238,18 +224,22 @@ for obs in obsList:
         else:
             otherParsDict[date].append(parTuple)
 
-if len(otherParsDict.keys()) != 0 and len(fluxValuesDict.keys()) != 0:
+#Find the referance point for the x-axis (date), and update the previously created dictionaries
+referanceMjd = round((min(otherParsDict) - 10) / 5) * 5
+fixedFluxDict = {}
+fixedParameterDict = {}
+for key, val in fluxValuesDict.items():
+    fixedFluxDict[key - referanceMjd] = val
+for key, val in otherParsDict.items():
+    fixedParameterDict[key - referanceMjd] = val
+
+if len(fixedParameterDict.keys()) != 0 and len(fixedFluxDict.keys()) != 0:
     # Set static x-axis ticks for all graphs
-    mjdList = list(otherParsDict.keys())
+    mjdList = list(fixedParameterDict.keys())
     minMjd = min(mjdList)
     maxMjd = max(mjdList)
 
     totalDifference = maxMjd - minMjd
-
-    if totalDifference == 0:
-        print("There is only one observation for creating parameter graphs.")
-        print("Parameter graphs will not be created.")
-        quit()
         
     majorTickInterval = round((totalDifference / 5) / 5) * 5
     if majorTickInterval < 5:
@@ -270,7 +260,7 @@ if len(otherParsDict.keys()) != 0 and len(fluxValuesDict.keys()) != 0:
             xAxisTicksMinor.append(i + k * minorTickInterval)
 
     dictionaryCounter = 0
-    dictList = [fluxValuesDict, otherParsDict]
+    dictList = [fixedFluxDict, fixedParameterDict]
     print("=============================================================================================================")
     for eachDict in dictList:
         dictionaryCounter += 1
@@ -338,7 +328,7 @@ if len(otherParsDict.keys()) != 0 and len(fluxValuesDict.keys()) != 0:
             if i < rows-1:
                 axs[i].xaxis.set_ticklabels([])
             else:
-                axs[i].set_xlabel("Time (MJD-"+str(startDateMJD)+ " days)")
+                axs[i].set_xlabel("Time (MJD-"+ str(referanceMjd) + " days)")
 
             # Rearrange major-minor y-axis ticks to prevent tick collision between subsequent graphs
             yTicksMajor = axs[i].get_yticks()
@@ -395,7 +385,7 @@ if len(otherParsDict.keys()) != 0 and len(fluxValuesDict.keys()) != 0:
 
             counter += 1
 
-        if eachDict == otherParsDict:
+        if eachDict == fixedParameterDict:
             pngFile = commonDirectory + "/model_parameters.png"
             pngPath = Path(pngFile)
             if pngPath.exists():
@@ -416,14 +406,14 @@ if len(otherParsDict.keys()) != 0 and len(fluxValuesDict.keys()) != 0:
 
     try:
         print("Creating the table: Flux values\n")
-        unit = list(fluxValuesDict.values())[0][0][4]
-        rowNum = len(list(fluxValuesDict.keys()))
+        unit = list(fixedFluxDict.values())[0][0][4]
+        rowNum = len(list(fixedFluxDict.keys()))
 
         fluxTable = [["Time (MJD)", "Unabsorbed Flux\n" + unit, "Diskbb Flux\n" + unit, "Powerlaw Flux\n" + unit]]
 
-        for key, val in fluxValuesDict.items():
+        for key, val in fixedFluxDict.items():
             tableRow = []
-            tableRow.append(float(format(key, ".1f")) + startDateMJD)
+            tableRow.append(float(format(key, ".1f")) + referanceMjd)
             tableRow.append(format(val[0][1], ".4f") + "\n(-" + format(val[0][2], ".4f") + "/+" + format(val[0][3], ".4f") + ")")
             tableRow.append(format(val[1][1], ".4f") + "\n(-" + format(val[1][2], ".4f") + "/+" + format(val[1][3], ".4f") + ")")
             try:

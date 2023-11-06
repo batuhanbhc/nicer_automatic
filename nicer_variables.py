@@ -80,6 +80,3 @@ calculateGaussEquivalentWidth = True
 
 #================================================ nicer.flux spesific variables =================================================
 writeParValuesAfterCflux = True
-
-#================================================ nicer.plot spesific variables =================================================
-startDateMJD = 60000

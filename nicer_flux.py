@@ -251,7 +251,7 @@ for obs in obsList:
     modelName = AllModels(1).expression.replace(" ", "")
 
     # Absorbed flux
-    print("Calculating the absorbed flux.\n")
+    print("Calculating the absorbed flux...\n")
     absFlux = calculateFlux("TBabs", modelName, -8.4)
     file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(absFlux) + "\n")
     if writeParValuesAfterCflux:
@@ -259,7 +259,7 @@ for obs in obsList:
     
     #============================================================================================================
     # Unabsorbed flux
-    print("Calculating the unabsorbed flux.")
+    print("Calculating the unabsorbed flux...")
     unabsFlux = calculateFlux("unabsorbed", modelName, -7.85)
     file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(unabsFlux) + "\n")
     if writeParValuesAfterCflux:
@@ -283,7 +283,7 @@ for obs in obsList:
         print("There is already data about unabsorbed flux in parameter file.\n")
     #============================================================================================================
     # Diskbb flux
-    print("Calculating diskbb flux.")
+    print("Calculating diskbb flux...")
     fluxDisk = calculateFlux("diskbb", modelName, -7.85)
     file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(fluxDisk) + "\n")
     if writeParValuesAfterCflux:
@@ -308,7 +308,7 @@ for obs in obsList:
     #============================================================================================================
     if "powerlaw" in modelName:
         # Powerlaw flux
-        print("Calculating powerlaw flux.")
+        print("Calculating powerlaw flux...")
         fluxPow = calculateFlux("powerlaw", modelName, -9)
         file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(fluxPow) + "\n")
         if writeParValuesAfterCflux:
