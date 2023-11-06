@@ -616,12 +616,28 @@ Emax = energyLimits[1]
 allDir = os.listdir(outputDir)
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
 
-# Open the input txt file
-with open("nicer_obs.txt", "r") as inputFile:
-    obsPaths = inputFile.readlines()
+# Open the txt file located within the same directory as the script.
+try:
+    inputFile = open(scriptDir + "/" + inputTxtFile, "r")
+except:
+    print("Could not find the input txt file under " + scriptDir + ". Terminating the script...")
+    quit()
+    
+#Extract observation paths from nicer_obs.txt
+obsList = []
+for line in inputFile.readlines():
+    line = line.replace(" ", "")
+    line = line.strip("\n")
+    if line != "" and Path(line).exists():
+        obsList.append(line)
+inputFile.close()
+
+if len(obsList) == 0:
+    print("ERROR: Could not find any observation directory to process.")
+    quit()
     
 # Find how many observations will be fitted to find an average value for nH parameters used throughout the script (If fixNH = True)
-obsCount = len(obsPaths)
+obsCount = len(obsList)
 if obsCount < sampleSize:
     iterationMax = obsCount
 else:
@@ -644,16 +660,15 @@ if chatterOn == False:
 
 for x in range(2):
     iteration = 0
-    for obs in obsPaths:
+    for obs in obsList:
         iteration += 1
 
-        # Extract the obsid from the path name written in nicer_obs.txt
-        obs = obs.strip("\n' ")
-        parentDir = obs[::-1]
-        obsid = parentDir[:parentDir.find("/")]         
-        parentDir = parentDir[parentDir.find("/")+1:]   
-        
-        obsid = obsid[::-1]         # e.g. 6130010120
+        #Find observation id (e.g. 6130010120)
+        pathLocations = obs.split("/")
+        if pathLocations[-1] == "":
+            obsid = pathLocations[-2]
+        else:
+            obsid = pathLocations[-1]
 
         print("=============================================================================================")
         print("Starting the fitting procedure for observation:", obsid)

@@ -118,15 +118,33 @@ otherParsDict = {}
 fluxValuesDict = {}
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
 
-inputFile = open("nicer_obs.txt")
-for obs in inputFile.readlines():
-    # Extract the obsid from the path name written in nicer_obs.txt
-    obs = obs.strip("\n' ")
-    parentDir = obs[::-1]
-    obsid = parentDir[:parentDir.find("/")]         
-    parentDir = parentDir[parentDir.find("/")+1:]   
+# Open the txt file located within the same directory as the script.
+try:
+    inputFile = open(scriptDir + "/" + inputTxtFile, "r")
+except:
+    print("Could not find the input txt file under " + scriptDir + ". Terminating the script...")
+    quit()
     
-    obsid = obsid[::-1]         # e.g. 6130010120
+#Extract observation paths from nicer_obs.txt
+obsList = []
+for line in inputFile.readlines():
+    line = line.replace(" ", "")
+    line = line.strip("\n")
+    if line != "" and Path(line).exists():
+        obsList.append(line)
+inputFile.close()
+
+if len(obsList) == 0:
+    print("ERROR: Could not find any observation directory to process.")
+    quit()
+
+for obs in obsList:
+    #Find observation id (e.g. 6130010120)
+    pathLocations = obs.split("/")
+    if pathLocations[-1] == "":
+        obsid = pathLocations[-2]
+    else:
+        obsid = pathLocations[-1]
 
     outObsDir = outputDir + "/" + obsid
     os.chdir(outObsDir)

@@ -18,13 +18,6 @@ scriptDir = scriptPathRev[::-1]
 if outputDir == "":
     outputDir = scriptDir
 
-# Open the txt file located within the same directory as the script.
-try:
-    inputFile = open(scriptDir + "/" + inputTxtFile, "r")
-except:
-    print("Could not find the input txt file under " + scriptDir + ". Terminating the script...")
-    quit()
-
 #=============================================== Input Checks ===========================================================
 # Input check for outputDir
 while(Path(outputDir).exists() == False):
@@ -63,31 +56,45 @@ if createHighResLightCurves:
             highResLcTimeResInPwrTwo = int(highResLcTimeResInPwrTwo)
             break
 #========================================================================================================================
+# Open the txt file located within the same directory as the script.
+try:
+    inputFile = open(scriptDir + "/" + inputTxtFile, "r")
+except:
+    print("Could not find the input txt file under " + scriptDir + ". Terminating the script...")
+    quit()
 
+print("Observation directories to be processed:")
+#Extract observation paths from nicer_obs.txt
 obsList = []
 for line in inputFile.readlines():
-    line = line.strip("\n' ")
-    obsList.append(line)
+    line = line.replace(" ", "")
+    line = line.strip("\n")
+    if line != "" and Path(line).exists():
+        print(line)
+        obsList.append(line)
+print()
 inputFile.close()
+
+if len(obsList) == 0:
+    print("ERROR: Could not find any observation directory to process.")
+    quit()
 
 if runNigeodown:
     # Update Nicer geomagnetic data
-    print("Running nigeodown command.\n")
-    os.system("nigeodown chatter=10")
-    print("Nigeodown is completed.\n")
+    print("Running nigeodown...")
+    os.system("nigeodown chatter=5")
+    print("Finished nigeodown.")
 
 counter = 0
 for obs in obsList:
     counter += 1
-    if obs == "":
-        print("Empty line detected in " + inputTxtFile + ": Line " + str(counter) + ".\n")
-        continue
 
-    parentDir = obs[::-1]
-    obsid = parentDir[:parentDir.find("/")]
-    parentDir = parentDir[parentDir.find("/")+1:]   
-    
-    obsid = obsid[::-1]         # e.g. 6130010120
+    #Find observation id (e.g. 6130010120)
+    pathLocations = obs.split("/")
+    if pathLocations[-1] == "":
+        obsid = pathLocations[-2]
+    else:
+        obsid = pathLocations[-1]
 
     # Create observation directory for storing event files and etc.
     outObsDir = outputDir +"/"+ obsid      # e.g. ~/NICER/analysis/6130010120
@@ -119,21 +126,21 @@ for obs in obsList:
     # Run nicer pipeline commands
     print("==============================================================================")
     print("Starting to run pipeline commands for observation: " + obsid + "\n")
-
+    quit()
     # Run nicerl2
-    print("Running nicerl2 pipeline command.")
+    print("Running nicerl2...")
     nicerl2 = "nicerl2 indir=" + obs + " clobber=yes history=yes detlist=launch,-14,-34 filtcolumns=NICERV5 niprefilter2_coltypes=base,3c50 cldir=" + outObsDir + " > " + pipelineLog
     os.system(nicerl2)
-    print("Nicerl2 is completed.\n")
+    print("Finished nicerl2.\n")
 
     # Run nicerl3-spect
-    print("Running nicerl3-spect pipeline command.")
+    print("Running nicerl3-spect...")
     nicerl3spect = "nicerl3-spect " + outObsDir + " grouptype=optmin groupscale=10 bkgmodeltype=3c50 suffix=3c50 clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
     os.system(nicerl3spect)
-    print("Nicerl3-spect is completed.\n")
+    print("Finished nicerl3-spect.\n")
     
     # Run nicerl3-lc and create default resolution (1s) light curve
-    print("Running nicerl3-lc pipeline command.")
+    print("Running nicerl3-lc...")
     nicerl3lc = "nicerl3-lc " + outObsDir + " pirange=50-1000 timebin=1 suffix=_50_1000_dt0 clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
     os.system(nicerl3lc)
 
@@ -151,7 +158,7 @@ for obs in obsList:
             nicerl3lc = "nicerl3-lc " + outObsDir + " pirange=" + str(each) + " timebin=" + str(2**highResLcTimeResInPwrTwo) +" suffix=_"+ str(each).replace("-", "_") + "_dt" + str(abs(highResLcTimeResInPwrTwo)).replace(".", "") + " clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
             os.system(nicerl3lc)
 
-    print("Nicerl3-lc is completed.\n")
+    print("Finished nicerl3-lc.\n")
 
     print("Please do not forget to check pipeline log file to detect potential issues that might have occured while creating output files.")
     print("==============================================================================")
