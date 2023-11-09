@@ -3,6 +3,7 @@
 # Contact: batuhan.bahceci@sabanciuniv.edu
 
 from nicer_variables import *
+from datetime import datetime, timezone
 
 print("==============================================================================")
 print("\t\t\tRunning the file: " + createScript + "\n")
@@ -32,16 +33,6 @@ if isinstance(createHighResLightCurves, bool) == False:
 
         if createHighResLightCurves == "True" or createHighResLightCurves == "False":
             createHighResLightCurves = bool(createHighResLightCurves)
-            break
-
-# Input check for runNigeodown
-if isinstance(runNigeodown, bool) == False:
-    while True:
-        print("\nThe 'runNigeodown' variable is not of type boolean.")
-        runNigeodown = input("Please enter a boolean value for 'runNigeodown' (True/False): ")
-
-        if runNigeodown == "True" or runNigeodown == "False":
-            runNigeodown = bool(runNigeodown)
             break
 
 # Input check for highResLcTimeResInPwrTwo
@@ -79,11 +70,45 @@ if len(obsList) == 0:
     print("ERROR: Could not find any observation directory to process.")
     quit()
 
-if runNigeodown:
-    # Update Nicer geomagnetic data
+cwd = os.getcwd()
+
+geomag_path = os.environ.get("GEOMAG_PATH")
+
+try:
+    os.chdir(geomag_path)
+except TypeError:
+    print("Environment variable $GEOMAG_PATH is not defined.")
+    quit()
+except:
+    print("Could not find the directory spesified by $GEOMAG_PATH. Please check whether it points to an existing directory.")
+    quit()
+
+# Extract file creation date
+hdu = fits.open("kp_potsdam.fits")
+date = hdu[0].header["DATE"]
+hdu.close()
+
+date = date.replace("T", " ")
+date_time_object = datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
+
+current_utc_time = datetime.now(timezone.utc)
+current_utc_time_str = current_utc_time.strftime('%Y-%m-%d %H:%M:%S')
+current_utc_time_object = datetime.strptime(current_utc_time_str, '%Y-%m-%d %H:%M:%S')
+
+difference = current_utc_time_object - date_time_object
+total_difference = difference.total_seconds()
+
+print("Time since Nicer geomagnetic files were last created (in seconds): " + str(total_difference))
+
+# Check if the difference between UTC time and last file creation time is bigger than ~ 1 day; run nigeodown if so.
+if (total_difference >= 87000):
     print("Running nigeodown...")
     os.system("nigeodown chatter=5")
     print("Finished nigeodown.")
+else:
+    print("Nicer geomagnetic data was updated recently, skipping nigeodown...")
+
+os.chdir(cwd)
 
 counter = 0
 for obs in obsList:

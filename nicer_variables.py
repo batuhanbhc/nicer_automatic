@@ -35,9 +35,6 @@ plotScript = "nicer_plot.py"
 fluxScript = "nicer_flux.py"
 
 #================================================= nicer.create spesific variables =============================================
-# Set to True if you want to update Nicer geomagnetic data prior to running creating output files
-runNigeodown = True
-
 # Set this variable to True if you want high resolution light curves. If set to False, light curves will have 1 second time resolution.
 createHighResLightCurves = True
 
