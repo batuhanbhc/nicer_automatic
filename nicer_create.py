@@ -166,7 +166,7 @@ for obs in obsList:
     
     # Run nicerl3-lc and create default resolution (1s) light curve
     print("Running nicerl3-lc...")
-    nicerl3lc = "nicerl3-lc " + outObsDir + " pirange=50-1000 timebin=1 suffix=_50_1000_dt0 clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
+    nicerl3lc = "nicerl3-lc " + outObsDir + " pirange=50-1000 timebin=1 suffix=_50_1000_1s clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
     os.system(nicerl3lc)
 
     # Input check for createHighResLightCurves
