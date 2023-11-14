@@ -432,32 +432,43 @@ def removeComp(compName, compNum, modelList):   # compNum is the n'th occurence 
     m = Model(modelName)
     getParsFromList(modelList)
 
-def addComp(compName, targetComp ,before_after, calcChar, modelList):
-    modelName = " " + modelList[0] + " "
+def addComp(compName, targetComp ,before_after, calcChar, modelList, encapsulate=False):
+    modelName = " " + AllModels(1).expression + " "
     if calcChar != "*" and calcChar != "+":
         print("\nIncorrect character for model expression. Terminating the script...\n")
         quit()
 
-    if calcChar == "+":
-        targetIdx = modelName.find(targetComp)
-        if modelName[targetIdx - 1] != "(" and modelName[targetIdx + len(targetComp)] != ")":
-            modelName = modelName.replace(targetComp, "(" + targetComp + ")", 1)
-
     modelName = modelName[1:-1]
     if before_after == "before":
-        targetIdx = modelName.find(targetComp)
-        insertionText = compName + calcChar
-        addedCompIndex = AllModels(1).componentNames.index(targetComp) + 1
+        if encapsulate:
+            targetIdx = modelName.find(targetComp)
+            insertionText =  "(" + compName + calcChar + targetComp + ")"
+            addedCompIndex = AllModels(1).componentNames.index(targetComp) + 1
+
+            newModelName = modelName[:targetIdx] + insertionText + modelName[targetIdx + len(targetComp):]
+        else:
+            targetIdx = modelName.find(targetComp)
+            insertionText = compName + calcChar
+            addedCompIndex = AllModels(1).componentNames.index(targetComp) + 1
+
+            newModelName = modelName[:targetIdx] + insertionText + modelName[targetIdx:]
     elif before_after == "after":
-        targetIdx = modelName.find(targetComp) + len(targetComp)
-        insertionText = calcChar + compName
-        addedCompIndex = AllModels(1).componentNames.index(targetComp) + 2
+        if encapsulate:
+            targetIdx = modelName.find(targetComp)
+            insertionText = "(" + targetComp + calcChar + compName + ")"
+            addedCompIndex = AllModels(1).componentNames.index(targetComp) + 2
+
+            newModelName = modelName[:targetIdx] + insertionText + modelName[targetIdx + len(targetComp):]
+        else:
+            targetIdx = modelName.find(targetComp)
+            insertionText = calcChar + compName
+            addedCompIndex = AllModels(1).componentNames.index(targetComp) + 2
+
+            newModelName = modelName[:targetIdx + len(targetComp)] + insertionText + modelName[targetIdx + len(targetComp):]
     else:
         print("\nIncorrect entry for the placement of new component around the target component. Terminating the script...\n")
         quit()
     
-    newModelName = modelName[:targetIdx] + insertionText + modelName[targetIdx:]
-
     alter_list_add(compName, addedCompIndex, modelList)
     m = Model(newModelName)
     modelList[0] = AllModels(1).expression.replace(" ", "")
