@@ -1,0 +1,50 @@
+MODEL model_1:
+
+load TBabs*pcfabs(gaussian+diskbb)
+assign diskbb_Tin:',,0.1,0.1,2.5,2.5' diskbb.norm:',,0.1,0.1' pcfabs.CvrFract:'0.95'
+search_modelfile
+assign gaussian_LineE:"1.8,,1.6,1.6,1.9,1.9" gaussian_Sigma:"0.07,,,,0.2,0.2" gaussian_norm:"0.1"
+fit
+save -model
+
+addcomp edge after TBabs operator:*
+assign edge_edgeE:'1.8,,1.5,1.5,2,2' edge_MaxTau:'0.2'
+fit
+ftest -nullhyp
+save -model
+
+addcomp gaussian before diskbb operator:+ -encapsulate
+assign gaussian_LineE:"6.98,,6.8,6.8,7.5,7.5" gaussian_Sigma:"7e-2,,,,0.2,0.2" gaussian_norm:"-1e-3,,-1e12,-1e12,-1e-12,-1e-12"
+fit
+ftest -alt
+save -model
+
+ftest -perform
+
+fit
+ftest -nullhyp
+
+addcomp gaussian before diskbb operator:+ -encapsulate
+assign gaussian_LineE:"6.7,,6.4,6.4,6.8,6.8" gaussian_Sigma:"0.07,,,,0.2,0.2" gaussian_norm"-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"
+fit
+ftest -alt
+save -model
+
+ftest -perform
+
+fit
+ftest -nullhyp
+
+addcomp powerlaw after diskbb operator:+ -encapsulate
+assign powerlaw_PhoIndex:"1.8,,1.2,1.2,3,3" powerlaw_norm:"0.1"
+fit
+save -model
+ftest -alt
+
+ftest -perform
+
+fit
+if edge.MaxTau < '1e-4': assign edge.MaxTau:'0.1'
+fit
+save -model
+#####################################################################################
