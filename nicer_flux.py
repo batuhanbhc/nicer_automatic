@@ -165,41 +165,43 @@ Emax = energyLimits[1]
 
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
 
+# Check whether filtered_directories.txt exists
+if Path(commonDirectory + "/filtered_directories.txt").exists() == False:
+    print("\nERROR: Could not find 'filtered_directories.txt' file under the 'commonFiles' directory.")
+    print("Please make sure both the 'commonFiles' directory and the 'filtered_directories.txt' file exist and are constructed as intended by nicer_create.py and nicer_fit.py.\n")
+    quit()
+
+validObservations = []
+# Open filtered_directories.txt and extract all the observation paths
+with open(commonDirectory + "/filtered_directories.txt", "r") as file:
+    lines = file.readlines()
+    
+    if len(lines) == 0:
+        print("\nFile 'filtered_directories.txt' is empty: Could not find any observation for calculating fluxes.\n")
+        quit()
+
+    for line in lines:
+        line = line.strip().split(" ")
+        path = line[0]
+        obsid = line[1]
+        validObservations.append((path, obsid))
+
+if len(validObservations) == 0:
+    print("Low exposure filter has discarded all observations inside filtered_directories.txt")
+    print("No flux calculation will be conducted..")
+    quit()
+else:
+    print("\nMoving onto the flux calculations..\n")
+
 if chatterOn == False:
     Xset.chatter = 0
 
-# Open the txt file located within the same directory as the script.
-try:
-    inputFile = open(scriptDir + "/" + inputTxtFile, "r")
-except:
-    print("Could not find the input txt file under " + scriptDir + ". Terminating the script...")
-    quit()
-    
-#Extract observation paths from nicer_obs.txt
-obsList = []
-for line in inputFile.readlines():
-    line = line.replace(" ", "")
-    line = line.strip("\n")
-    if line != "" and Path(line).exists():
-        obsList.append(line)
-inputFile.close()
-
-if len(obsList) == 0:
-    print("ERROR: Could not find any observation directory to process.")
-    quit()
-
-for obs in obsList:
-    #Find observation id (e.g. 6130010120)
-    pathLocations = obs.split("/")
-    if pathLocations[-1] == "":
-        obsid = pathLocations[-2]
-    else:
-        obsid = pathLocations[-1]
-
+# Start calculating fluxes for each valid observation
+for path, obsid in validObservations:
     print("====================================================================")
     print("Calculating fluxes for observation:", obsid, "\n")
 
-    outObsDir = outputDir + "/" + obsid
+    outObsDir = path
     os.chdir(outObsDir)
     allFiles = os.listdir(outObsDir)
 

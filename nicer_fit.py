@@ -292,11 +292,11 @@ def saveModel(fileName, obs, location = "default"):
     # the model file will be saved under default (outObsDir) directory
     
     if location == "default":
-        xcmPath = Path(outputDir + "/" + obs + "/" + fileName)
+        xcmPath = Path(outObsDir + "/" + fileName)
         if xcmPath.exists():
-            subprocess.run(["rm", outputDir + "/" + obs + "/" + fileName])
+            subprocess.run(["rm", outObsDir + "/" + fileName])
 
-        Xset.save(outputDir + "/" + obs + "/" + fileName, "m")
+        Xset.save(outObsDir + "/" + fileName, "m")
     else:
         xcmPath = Path(location + "/" + fileName)
         if xcmPath.exists():
@@ -627,32 +627,60 @@ Emax = energyLimits[1]
 allDir = os.listdir(outputDir)
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
 
-# Open the txt file located within the same directory as the script.
-try:
-    inputFile = open(scriptDir + "/" + inputTxtFile, "r")
-except:
-    print("Could not find the input txt file under " + scriptDir + ". Terminating the script...")
+# Check whether directories.txt exists
+if Path(commonDirectory + "/directories.txt").exists() == False:
+    print("\nERROR: Could not find 'directories.txt' file under the 'commonFiles' directory.")
+    print("Please make sure both the 'commonFiles' directory and the 'directories.txt' file exist and are constructed as intended by nicer_create.py.\n")
     quit()
-    
-#Extract observation paths from nicer_obs.txt
-obsList = []
-for line in inputFile.readlines():
-    line = line.replace(" ", "")
-    line = line.strip("\n")
-    if line != "" and Path(line).exists():
-        obsList.append(line)
-inputFile.close()
 
-if len(obsList) == 0:
-    print("ERROR: Could not find any observation directory to process.")
-    quit()
+fileContents = []
+# Open directories.txt and extract all the observation paths
+with open(commonDirectory + "/directories.txt", "r") as file:
+    lines = file.readlines()
     
-# Find how many observations will be fitted to find an average value for nH parameters used throughout the script (If fixNH = True)
-obsCount = len(obsList)
-if obsCount < sampleSize:
-    iterationMax = obsCount
+    if len(lines) == 0:
+        print("\nFile 'directories.txt' is empty: Could not find any observation for spectral fitting.\n")
+        quit()
+
+    for line in lines:
+        line = line.strip().split(" ")
+        path = line[0]
+        obsid = line[1]
+        fileContents.append((path, obsid))
+
+# Create a seperate file for storing filtered observation paths to not repeat filtering process for flux and graph scripts
+if Path(commonDirectory + "/filtered_directories.txt").exists() == False:
+    os.system("touch " + commonDirectory + "/filtered_directories.txt")
+filteredFile = open(commonDirectory + "/filtered_directories.txt", "w")
+
+validObservations = []
+print("Checking the exposure of all observations:")
+# Check the exposure of all observations, select the ones with exposure > 100 seconds
+for path, obsid in fileContents:
+    try:
+        hdu = fits.open(path + "/ni" + obsid + "mpu7_sr3c50.pha")
+        expo = hdu[1].header["EXPOSURE"]
+        if expo < 100:
+            print("\nWARNING: Spectral files under " + path + " has exposure < 100: (" + str(expo) + " s)")
+            print("Skipping the observation directory above..")
+        else:
+            validObservations.append((path, obsid, expo))
+            filteredFile.write(path + " " + obsid + "\n")
+    except:
+        print("\nWARNING: Pulse height amplitude (.pha) file is missing under " + path)
+        print("Skipping the observation directory above..")
+        break
+
+print("\nChecked all exposure values.")
+if len(validObservations) == 0:
+    print("Low exposure filter has discarded all observations inside directories.txt")
+    print("No spectral fitting will be applied..")
+    filteredFile.close()
+    quit()
 else:
-    iterationMax = sampleSize   
+    filteredFile.close()
+    iterationMax = len(validObservations)
+    print("\nMoving onto the spectral fitting stage..\n")
 
 # Initializing required variables/dictionaries in case fixNH is set to True.
 fixedValuesNH = {}
@@ -671,15 +699,8 @@ if chatterOn == False:
 
 for x in range(2):
     iteration = 0
-    for obs in obsList:
+    for path, obsid, exposure in validObservations:
         iteration += 1
-
-        #Find observation id (e.g. 6130010120)
-        pathLocations = obs.split("/")
-        if pathLocations[-1] == "":
-            obsid = pathLocations[-2]
-        else:
-            obsid = pathLocations[-1]
 
         print("=============================================================================================")
         print("Starting the fitting procedure for observation:", obsid)
@@ -688,7 +709,7 @@ for x in range(2):
         else:
             print("Fixing nH parameters: FALSE\n")
 
-        outObsDir = outputDir + "/" + obsid
+        outObsDir = path
         os.chdir(outObsDir)
         allFiles = os.listdir(outObsDir)
 
@@ -698,24 +719,26 @@ for x in range(2):
         foundArf = False
         foundRmf = False
         missingFiles = True
-        for file in allFiles:
-            if file == ("ni" + obsid + "mpu7_sr3c50.pha"):
-                spectrumFile = file
-                foundSpectrum = True
-            elif file == ("ni" + obsid + "mpu7_bg3c50.pha"):
-                backgroundFile = file
-                foundBackground = True
-            elif file == ("ni" + obsid + "mpu73c50.arf"):
-                arfFile = file
-                foundArf = True
-            elif file == ("ni" + obsid + "mpu73c50.rmf"):
-                rmfFile = file
-                foundRmf = True
 
-            if foundSpectrum and foundBackground and foundArf and foundRmf:
-                # All necessary files have been found
-                missingFiles = False
-                break
+        if Path("ni"+obsid+"mpu7_sr3c50.pha").exists():
+            spectrumFile = "ni"+obsid+"mpu7_sr3c50.pha"
+            foundSpectrum = True
+
+        if Path("ni" + obsid + "mpu7_bg3c50.pha").exists():
+            backgroundFile = "ni" + obsid + "mpu7_bg3c50.pha"
+            foundBackground = True
+
+        if Path("ni" + obsid + "mpu73c50.arf").exists():
+            arfFile = "ni" + obsid + "mpu73c50.arf"
+            foundArf = True
+
+        if Path("ni" + obsid + "mpu73c50.rmf").exists():
+            rmfFile = "ni" + obsid + "mpu73c50.rmf"
+            foundRmf= True
+
+        if foundSpectrum and foundBackground and foundArf and foundRmf:
+            # All necessary files have been found
+            missingFiles = False
         
         # Check if there are any missing files
         if missingFiles:
@@ -736,13 +759,6 @@ for x in range(2):
                 f.write("Missing spectrum file\n")
             f.close()
             continue
-
-        # First, check whether the observation has long enough exposure for meaningful data
-        hdu = fits.open(outObsDir + "/" + spectrumFile)
-        exposure = hdu[0].header["EXPOSURE"]
-        if exposure < 100:
-            print("Current observation has exposure less than 100, skipping the fitting procedure for current observation. Obsid: " + obsid +", exposure: " + format(exposure, ".2f") + "\n")
-            continue
         
         print("All the necessary spectral files are found. Please check if the correct files are in use.")
         print("Spectrum file:", spectrumFile)
@@ -751,10 +767,10 @@ for x in range(2):
         print("Rmf file:", rmfFile, "\n")
 
         if restartOnce and iteration == 1:
-            print("Removing all model files in '" + commonDirectory + "' for only once.\n")
+            print("Removing all model files under '" + commonDirectory + "'\n")
             os.system("rm " + commonDirectory + "/mod*")
         elif restartAlways:
-            print("Removing all model files in '" + commonDirectory + "'\n")
+            print("Removing all model files under '" + commonDirectory + "'\n")
             os.system("rm " + commonDirectory + "/mod*")
 
         #-------------------------------------------------------------------------------------    
@@ -1176,7 +1192,8 @@ for x in range(2):
         # The whole fitting process is looped twice for refitting purposes. If fixing nH option is False, do not try to refit
         break
     else:
-        print("Restarting the fitting procedure for all observations by fixing the nH parameters...\n")
+        if x == 0:
+            print("Restarting the fitting procedure for all observations by fixing the nH parameters...\n")
 
 os.chdir(scriptDir)
 
