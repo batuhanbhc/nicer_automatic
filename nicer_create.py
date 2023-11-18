@@ -246,7 +246,7 @@ for obs in validPaths:
 
         # Run nicerl2
         print("Running nicerl2...")
-        nicerl2 = "nicerl2 indir=" + obs + " clobber=yes history=yes detlist=launch,-14,-34 incremental=YES filtcolumns=NICERV5 cldir=" + outObsDir + " > " + pipelineLog
+        nicerl2 = "nicerl2 indir=" + obs + " clobber=yes history=yes detlist=launch,-14,-34 filtcolumns=NICERV5 cldir=" + outObsDir + " > " + pipelineLog
         os.system(nicerl2)
         print("Finished nicerl2.\n")
 
@@ -316,7 +316,7 @@ for obs in validPaths:
 
             # Run nicerl2
             print("Running nicerl2...")
-            nicerl2 = "nicerl2 indir=" + obs + " clobber=yes history=yes detlist=launch,-14,-34 incremental=YES thresh_range=" + threshRange + " filtcolumns=NICERV5 cldir=" + outObsDir + " > " + pipelineLog
+            nicerl2 = "nicerl2 indir=" + obs + " clobber=yes history=yes detlist=launch,-14,-34 thresh_range=" + threshRange + " filtcolumns=NICERV5 cldir=" + outObsDir + " > " + pipelineLog
             os.system(nicerl2)
             print("Finished nicerl2.\n")
 

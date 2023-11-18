@@ -292,11 +292,11 @@ def saveModel(fileName, obs, location = "default"):
     # the model file will be saved under default (outObsDir) directory
     
     if location == "default":
-        xcmPath = Path(outputDir + "/" + obs + "/" + fileName)
+        xcmPath = Path(outObsDir + "/" + fileName)
         if xcmPath.exists():
-            subprocess.run(["rm", outputDir + "/" + obs + "/" + fileName])
+            subprocess.run(["rm", outObsDir + "/" + fileName])
 
-        Xset.save(outputDir + "/" + obs + "/" + fileName, "m")
+        Xset.save(outObsDir + "/" + fileName, "m")
     else:
         xcmPath = Path(location + "/" + fileName)
         if xcmPath.exists():
@@ -616,12 +616,14 @@ Emax = energyLimits[1]
 allDir = os.listdir(outputDir)
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
 
+# Check whether directories.txt exists
 if Path(commonDirectory + "/directories.txt").exists() == False:
     print("\nERROR: Could not find 'directories.txt' file under the 'commonFiles' directory.")
     print("Please make sure both the 'commonFiles' directory and the 'directories.txt' file exist and are constructed as intended by nicer_create.py.\n")
     quit()
 
 fileContents = []
+# Open directories.txt and extract all the observation paths
 with open(commonDirectory + "/directories.txt", "r") as file:
     lines = file.readlines()
     
@@ -635,30 +637,39 @@ with open(commonDirectory + "/directories.txt", "r") as file:
         obsid = line[1]
         fileContents.append((path, obsid))
 
+# Create a seperate file for storing filtered observation paths to not repeat filtering process for flux and graph scripts
+if Path(commonDirectory + "/filtered_directories.txt").exists() == False:
+    os.system("touch " + commonDirectory + "/filtered_directories.txt")
+filteredFile = open(commonDirectory + "/filtered_directories.txt", "w")
+
 validObservations = []
 print("Checking the exposure of all observations:")
+# Check the exposure of all observations, select the ones with exposure > 100 seconds
 for path, obsid in fileContents:
     try:
         hdu = fits.open(path + "/ni" + obsid + "mpu7_sr3c50.pha")
         expo = hdu[1].header["EXPOSURE"]
         if expo < 100:
             print("\nWARNING: Spectral files under " + path + " has exposure < 100: (" + str(expo) + " s)")
-            print("Skipping the observation directory above...")
+            print("Skipping the observation directory above..")
         else:
             validObservations.append((path, obsid, expo))
+            filteredFile.write(path + " " + obsid + "\n")
     except:
         print("\nWARNING: Pulse height amplitude (.pha) file is missing under " + path)
-        print("Skipping the observation directory above...")
+        print("Skipping the observation directory above..")
         break
 
 print("\nChecked all exposure values.")
 if len(validObservations) == 0:
     print("Low exposure filter has discarded all observations inside directories.txt")
-    print("No spectral fitting will be applied...")
+    print("No spectral fitting will be applied..")
+    filteredFile.close()
     quit()
 else:
+    filteredFile.close()
     iterationMax = len(validObservations)
-    print("\nMoving onto the spectral fitting stage.\n")
+    print("\nMoving onto the spectral fitting stage..\n")
 
 # Initializing required variables/dictionaries in case fixNH is set to True.
 fixedValuesNH = {}
@@ -1170,7 +1181,8 @@ for x in range(2):
         # The whole fitting process is looped twice for refitting purposes. If fixing nH option is False, do not try to refit
         break
     else:
-        print("Restarting the fitting procedure for all observations by fixing the nH parameters...\n")
+        if x == 0:
+            print("Restarting the fitting procedure for all observations by fixing the nH parameters...\n")
 
 os.chdir(scriptDir)
 
