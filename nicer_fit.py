@@ -242,8 +242,7 @@ def listToStr(array):
     return result
 
 def getParsFromList(modList, ignoreList = []):
-    modelName = modList[0]
-    parameterList = modList[1]
+    parameterList = modList[0]
 
     parNum = AllModels(1).nParameters
 
@@ -270,8 +269,8 @@ def fitModel():
     Fit.perform()
 
 def updateParameters(modList):
-    modelDict = modList[1]
-    modelStats = modList[2]
+    modelDict = modList[0]
+    modelStats = modList[1]
 
     # Save the parameters loaded in the xspec model to lists
     components = AllModels(1).componentNames
@@ -287,7 +286,7 @@ def updateParameters(modList):
     modelStats["dof"] = Fit.dof
     modelStats["nullhyp"] = Fit.nullhyp
 
-def saveModel(fileName, obs, location = "default"):
+def saveModel(fileName, location = "default"):
     # This function saves the model file (.xcm) under spesified location. If no location has been given, 
     # the model file will be saved under default (outObsDir) directory
     
@@ -427,8 +426,7 @@ def removeComp(compName, compNum, modelList):   # compNum is the n'th occurence 
                         except:
                             modelName = modelName.replace(compName, "", 1)
 
-    modelList[1] = tempDict
-    modelList[0] = modelName
+    modelList[0] = tempDict
     m = Model(modelName)
     getParsFromList(modelList)
 
@@ -471,14 +469,13 @@ def addComp(compName, targetComp ,before_after, calcChar, modelList, encapsulate
     
     alter_list_add(compName, addedCompIndex, modelList)
     m = Model(newModelName)
-    modelList[0] = AllModels(1).expression.replace(" ", "")
     getParsFromList(modelList)
-    modelList[1] = {}
+    modelList[0] = {}
     updateParameters(modelList)
 
 def alter_list_add(compName, addedIdx, bestModelList):
-    modelKeys = list(bestModelList[1].keys())[::-1]
-    modelValues = list(bestModelList[1].values())[::-1]
+    modelKeys = list(bestModelList[0].keys())[::-1]
+    modelValues = list(bestModelList[0].values())[::-1]
     
     for i in range(len(modelKeys)):
         if "_" in modelKeys[i]:
@@ -508,7 +505,7 @@ def wordCounter(source, word):
     
     return count
 
-def assignParameters(compName, parameterList, nthOccurence):
+def assignParameters(compName, nthOccurence, parameterTuple):
     startAssign = False
     occurence = 0
     for comp in AllModels(1).componentNames:
@@ -516,28 +513,25 @@ def assignParameters(compName, parameterList, nthOccurence):
         if compName in comp:
             occurence += 1
             if occurence == nthOccurence:
-                listIndex = 0
-                for par in compObj.parameterNames:
-                    if listIndex < len(parameterList):
-                        parObj = getattr(compObj, par)
-                        parObj.values = parameterList[listIndex]
-                        listIndex += 1
-                    else:
-                        break
+                parameterName = parameterTuple[0]
+                value = parameterTuple[1]
+                
+                parObject = getattr(compObj, parameterName)
+                parObject.values = value
 
 def transferToNewList(sourceList):
-    newList = [sourceList[0]]
+    newList = []
     newParDict = {}
     newStatDict = {}
 
-    sourceParDict = sourceList[1]
+    sourceParDict = sourceList[0]
     keys = list(sourceParDict.keys())
     values = list(sourceParDict.values())
     for i in range(len(keys)):
         newParDict[keys[i]] = values[i]
     newList.append(newParDict)
 
-    sourceStatDict = sourceList[2]
+    sourceStatDict = sourceList[1]
     keys = list(sourceStatDict.keys())
     values = list(sourceStatDict.values())
     for i in range(len(keys)):
@@ -547,10 +541,10 @@ def transferToNewList(sourceList):
     return newList
 
 def performFtest(mainModelList, altModelList, logFile, infoTxt = ""):
-    newChi = altModelList[2]["chi"]
-    newDof = altModelList[2]["dof"]
-    oldChi = mainModelList[2]["chi"]
-    oldDof = mainModelList[2]["dof"]
+    newChi = altModelList[1]["chi"]
+    newDof = altModelList[1]["dof"]
+    oldChi = mainModelList[1]["chi"]
+    oldDof = mainModelList[1]["dof"]
 
     pValue = Fit.ftest(newChi, newDof, oldChi, oldDof)
     
@@ -619,6 +613,190 @@ def checkResults():
     for key, val in bestModel[1].items():
         print(key,val)
     quit()
+
+def loadModel(modelName):
+    m = Model(modelName)
+
+def assignTxtParameters(parameterList):
+    for tuple in parameterList:
+        compName = tuple[0]
+        compNum = tuple[1]
+        parTuple = tuple[1]
+        assignParameters(compName, compNum, parTuple)
+
+def searchPremodel(bestModelList, path = ""):
+    modelfile = extractModFileName()
+    foundFile = False
+    if path == "":
+        path = outputDir + "/commonFiles"
+        print("\nLooking for a model file '" + modelfile + "' under '" + path + "'")
+        if Path(path).exists():
+            foundFile = True
+            print("Found the spesified model file.")
+            print("Extracting all the model parameters..")
+            updateParameters(bestModelList)
+
+            Xset.restore(path + "/" + modelFile)
+    else:
+        print("\nLooking for a model file '" + modelfile + "' under '" + path + "'")
+        if Path(path).exists():
+            foundFile = True
+            print("Found the spesified model file.")
+            print("Extracting all the model parameters..")
+            updateParameters()
+
+            Xset.restore(path + "/" + modelFile)
+    
+    if foundFile == False:
+        print("Could not find the target model file under '" + path + "'")
+
+def saveCommand(saveType):
+    modelName = extractModFileName()
+    if saveType == "model":
+        saveModel(modelName)
+    elif saveType == "data":
+        saveData()
+    else:
+        saveModel(modelName)
+        saveData()
+
+def parseTxt(source, modelStack, bestModelList):
+    sourcefile = open(source, "r")
+    lines = sourcefile.readlines()
+    currentModel = ""
+    readValidCommand = False
+
+    lineCount = 0
+    for line in lines:
+        lineCount += 1
+        line = line.strip()
+        if len(line) == 0:
+            print("Empty line detected")
+            continue
+        
+        #CONTROL STATEMENT FOR DEBUGGING
+        line = line.split(" ")
+        if line[0] == "BREAK":
+            for i in modelStack[list(modelStack.keys())[0]]:
+                print(i)
+            quit()
+        
+        try:
+            if line[0].upper() == "MODEL":
+                currentModel = line[1]
+                modelStack[currentModel] = []
+                readValidCommand = True
+                continue
+        except:
+            print("\nERROR: Invalid implementation for a model name in models.txt -> Line: " + str(lineCount))
+            quit()
+
+        try:
+            if line[0].lower() == "load":
+                if currentModel != "":
+                    modelStack[currentModel].append([loadModel])
+                    modelName = ""
+                    for par in line[1:]:
+                        modelName += par
+                    modelStack[currentModel][-1].append(modelName)
+                else:
+                    print("\nERROR: Cannot load a model unless a model is defined first.")
+                    quit()
+        except:
+            print("\nERROR: Invalid implementation of load command in models.txt -> Line: " + str(lineCount))
+            quit()
+          
+        try:
+            if line[0].lower() == "assign":
+                if currentModel != "":
+                    modelStack[currentModel].append([assignTxtParameters])
+                    parameterList = []
+                    for eachPar in line[1:]:
+                        if eachPar[0] == "(":
+                            bracketIdx = eachPar.find(")")
+                            compNum = int(eachPar[1:bracketIdx])
+
+                            temp = eachPar.split(":")
+                            fullName = temp[0][bracketIdx+1:]
+                            compName = fullName.split("_")[0]
+                            parName = fullName.split("_")[1]
+                            parValue = temp[1]
+
+                            parameterList.append((compName, compNum, (parName, parValue)))
+                        else:
+                            compNum = 1
+                            temp = eachPar.split(":")
+                            compName = temp[0].split("_")[0]
+                            parName = temp[0].split("_")[1]
+                            parValue = temp[1]
+
+                            parameterList.append((compName, compNum, (parName, parValue)))
+                        
+                    modelStack[currentModel][-1].append(parameterList)
+                else:
+                    print("\nERROR: Cannot assign any parameters unless a model is defined first.")
+                    quit()
+        except:
+            print("\nERROR: Invalid implementation of assign command in models.txt -> Line: " + str(lineCount))
+            quit()
+        
+        try:
+            if line[0].lower() == "search" and line[1].lower() == "premodel":
+                if currentModel != "":
+                    modelStack[currentModel].append([searchPremodel])
+                    modelStack[currentModel][-1].append(bestModelList)
+
+                    if len(line) > 2:
+                        modelString = ""
+                        for i in line[2:]:
+                            modelString += i
+                        if modelString[-1] == "/":
+                            modelString = modelString[:-1]
+                        modelStack[currentModel][-1].append(modelString)
+                else:
+                    print("\nERROR: Cannot look to load any pre-existing model unless a model is defined first.")
+                    quit()
+
+        except:
+            print("\nERROR: Invalid implementation of 'search' command in models.txt -> Line: " + str(lineCount))
+            quit()
+                        
+        
+        try:
+            if line[0].lower() == "fit":
+                if currentModel != "":
+                    modelStack[currentModel].append([fitModel])
+                else:
+                    print("\nERROR: Cannot fit any model unless a model is defined first.")
+                    quit()
+        except:
+            print("\nERROR: Invalid implementation of fit command in models.txt -> Line: " + str(lineCount))
+            quit()
+        
+        try:
+            if line[0].lower() == "save":
+                if currentModel != "":
+                    modelStack[currentModel].append([saveCommand])
+                    if line[1].lower() == "model":
+                        modelStack[currentModel][-1].append("model")
+                    elif line[1].lower() == "data":
+                        modelStack[currentModel][-1].append("data")
+                    else:
+                        dummyvar = int("trigger error")
+                else:
+                    print("\nERROR: Cannot save any file unless a model is defined first.")
+                    quit()
+
+        except:
+            print("\nERROR: Invalid implementation of save command in models.txt -> Line: " + str(lineCount))
+            quit()
+        
+
+
+bestModelList = [{}, {}]
+stack = {}
+parseTxt("/home/batuhanbahceci/scripts/nicer/models.txt", stack, bestModelList)
+quit()
 #===================================================================================================================
 energyLimits = energyFilter.split(" ")
 Emin = energyLimits[0]
@@ -799,12 +977,12 @@ for x in range(2):
         # This list will carry the model name, model parameters and fit statistics for the best model throughout the script.
         # First element is the model name, second element is the dictionary for parameter name-value pairs, third element is the dictionary for fit statistics
         # such as chi-squared, degrees of freedom and null hypothesis probability.
-        bestModel = ["TBabs*pcfabs(gaussian+diskbb)", {"diskbb.Tin": ",,0.1,0.1,2.5,2.5", "diskbb.norm:":",,0.1,0.1", "pcfabs.CvrFract":0.95}, {}]
+        bestModel = [{"diskbb.Tin": ",,0.1,0.1,2.5,2.5", "diskbb.norm:":",,0.1,0.1", "pcfabs.CvrFract":0.95}, {}]
 
         #=================================================================================
         # Load the first model and fit
-        print("Loading the first model:", bestModel[0], "\n")
-        m = Model(bestModel[0])  
+        print("Loading the first model:", "TBabs*pcfabs(gaussian+diskbb)", "\n")
+        m = Model("TBabs*pcfabs(gaussian+diskbb)")  
 
         modelFile = extractModFileName()
         if Path(commonDirectory + "/" + modelFile).exists():

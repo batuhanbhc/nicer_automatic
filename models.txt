@@ -1,23 +1,23 @@
-MODEL model_1:
+MODEL model_1
 
 load TBabs*pcfabs(gaussian+diskbb)
-assign diskbb_Tin:',,0.1,0.1,2.5,2.5' diskbb.norm:',,0.1,0.1' pcfabs.CvrFract:'0.95'
-search_modelfile
+assign diskbb_Tin:',,0.1,0.1,2.5,2.5' diskbb_norm:',,0.1,0.1' pcfabs_CvrFract:'0.95'
+search premodel
 assign gaussian_LineE:"1.8,,1.6,1.6,1.9,1.9" gaussian_Sigma:"0.07,,,,0.2,0.2" gaussian_norm:"0.1"
 fit
-save -model
-
+save model
+BREAK
 addcomp edge after TBabs operator:*
 assign edge_edgeE:'1.8,,1.5,1.5,2,2' edge_MaxTau:'0.2'
 fit
 ftest -nullhyp
-save -model
+save model
 
 addcomp gaussian before diskbb operator:+ -encapsulate
-assign gaussian_LineE:"6.98,,6.8,6.8,7.5,7.5" gaussian_Sigma:"7e-2,,,,0.2,0.2" gaussian_norm:"-1e-3,,-1e12,-1e12,-1e-12,-1e-12"
+assign (2)gaussian_LineE:"6.98,,6.8,6.8,7.5,7.5" (2)gaussian_Sigma:"7e-2,,,,0.2,0.2" (2)gaussian_norm:"-1e-3,,-1e12,-1e12,-1e-12,-1e-12"
 fit
 ftest -alt
-save -model
+save model
 
 ftest -perform
 
