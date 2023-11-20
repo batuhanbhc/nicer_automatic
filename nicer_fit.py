@@ -788,7 +788,7 @@ for x in range(2):
         # This list will carry the model name, model parameters and fit statistics for the best model throughout the script.
         # First element is the model name, second element is the dictionary for parameter name-value pairs, third element is the dictionary for fit statistics
         # such as chi-squared, degrees of freedom and null hypothesis probability.
-        bestModel = ["TBabs*pcfabs(gaussian+diskbb)", {"diskbb.Tin": ",,0.1,0.1,2.5,2.5", "diskbb.norm:":",,0.1,0.1", "pcfabs.CvrFract":0.95}, {}]
+        bestModel = ["TBabs*diskbb", {"TBabs.nH":"0.6"}, {}]
 
         #=================================================================================
         # Load the first model and fit
@@ -801,9 +801,6 @@ for x in range(2):
         else:
             getParsFromList(bestModel)
 
-        gaussPars_1 = ["1.8,,1.6,1.6,1.9,1.9", "0.07,,,,0.2,0.2", "0.1"]
-        assignParameters("gaussian", gaussPars_1, 1)
-
         if startFixingNH:
             print("nH parameters has now been fixed.\n")
             fixAllNH(fixedValuesNH)
@@ -815,12 +812,12 @@ for x in range(2):
         saveModel(modelFile, obsid, commonDirectory)
 
         #===============================================================================================
-        # Add an edge around 1.8 keV
-        addComp("edge", "TBabs", "after", "*", bestModel)
-        print("Adding edge to current model expression...\n")
+        # Add an simpl around 1.8 keV
+        addComp("simpl", "TBabs", "after", "*", bestModel)
+        print("Adding simpl to current model expression...\n")
 
-        edgePars = ["1.8,,1.5,1.5,2,2", "0.2"]
-        assignParameters("edge", edgePars, 1)
+        simplPars = ["1.6", "0.5"]
+        assignParameters("simpl", simplPars, 1)
         
         fitModel()
         updateParameters(bestModel)
@@ -829,122 +826,6 @@ for x in range(2):
         saveModel(modelFile, obsid)
         saveModel(modelFile, obsid, commonDirectory)
 
-        nullhypModelList = transferToNewList(bestModel)
-        #===============================================================================================
-        # Add 6.98 keV absorption gauss and fit
-        addComp("gaussian", "diskbb", "before", "+", bestModel)
-        print("Adding 6.98 keV absorption gauss to the current model expression...")
-
-        gaussPars_2 = ["6.98,,6.8,6.8,7.5,7.5", "7e-2,,,,0.2,0.2", "-1e-3,,-1e12,-1e12,-1e-12,-1e-12"]
-        gaussCount = wordCounter(AllModels(1).expression, "gaussian")
-        assignParameters("gaussian", gaussPars_2, gaussCount)
-
-        fitModel()
-        updateParameters(bestModel)
-
-        modelFile = extractModFileName()
-        saveModel(modelFile, obsid)
-        saveModel(modelFile, obsid, commonDirectory)
-
-        altModelList = bestModel
-        #===============================================================================================
-        # Apply f-test and check whether last gaussian improves the fit significantly or not
-        pValue = performFtest(nullhypModelList, altModelList, logFile, "    (Adding 6.98 keV absorption gauss)")
-        print("Applying f-test to check the significance of 6.98 keV absorption gauss:")
-
-        if abs(pValue) >= ftestSignificance:
-            print("6.98 keV gaussian has been taken out of the model expression by the f-test:")
-            print("F-test significance: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
-            removeComp("gaussian", gaussCount, bestModel)
-            fitModel()
-            updateParameters(bestModel)
-
-            logFile.write("\n====================================================================================\n")
-            logFile.write("6.98 keV gauss is taken out from the model due to not improving the fit significantly.")
-            logFile.write("\n====================================================================================\n")
-        else:
-            print("6.98 keV gaussian has been found to be significant by f-test:")
-            print("F-test significance: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
-
-        nullhypModelList = transferToNewList(bestModel)
-        #===============================================================================================
-        # Add 6.7 keV absorption gauss and fit
-        addComp("gaussian", "diskbb", "before", "+", bestModel)
-        print("Adding 6.7 keV absorption gauss to the current model expression...")
-
-        gaussPars_3 = ["6.7,,6.4,6.4,6.8,6.8", "0.07,,,,0.2,0.2", "-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"]
-        gaussCount = wordCounter(AllModels(1).expression, "gaussian")
-        assignParameters("gaussian", gaussPars_3, gaussCount)
-
-        fitModel()
-        updateParameters(bestModel)
-
-        modelFile = extractModFileName()
-        saveModel(modelFile, obsid)
-        saveModel(modelFile, obsid, commonDirectory)
-
-        altModelList = bestModel
-        #===============================================================================================
-        # Apply f-test and check whether last gaussian improves the fit significantly or not
-        pValue = performFtest(nullhypModelList, altModelList, logFile, "    (adding 6.7 keV absorption gauss)")
-        
-        if abs(pValue) >= ftestSignificance:
-            print("6.7 keV gaussian has been taken out of the model expression by the f-test:")
-            print("F-test significance: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
-            removeComp("gaussian", gaussCount, bestModel)
-            fitModel()
-            updateParameters(bestModel)
-
-            logFile.write("\n====================================================================================\n")
-            logFile.write("6.7 keV gauss is taken out from the model due to not improving the fit significantly.")
-            logFile.write("\n====================================================================================\n")
-        else:
-            print("6.7 keV gaussian has been found to be significant by f-test:")
-            print("F-test significance: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
-
-        nullhypModelList = transferToNewList(bestModel)
-        #===============================================================================================
-        # Add powerlaw
-        addComp("powerlaw", "diskbb", "after", "+", bestModel)
-        print("Adding powerlaw to the current model expression...")
-
-        powerlawPars = ["1.8,,1.2,1.2,3,3", "0.1"]
-        assignParameters("powerlaw", powerlawPars, 1)
-
-        fitModel()
-        updateParameters(bestModel)
-
-        modelFile = extractModFileName()
-        saveModel(modelFile, obsid)
-        saveModel(modelFile, obsid, commonDirectory)
-
-        altModelList = bestModel
-        #===============================================================================================
-         # Apply f-test
-        pValue = performFtest(nullhypModelList, altModelList, logFile, "    (adding powerlaw)")
-
-        if abs(pValue) >= ftestSignificance:
-            print("Powerlaw has been taken out of the model expression by the f-test:")
-            print("F-test significance: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
-            removeComp("powerlaw", 1, bestModel)
-            fitModel()
-            updateParameters(bestModel)
-
-            logFile.write("\n====================================================================================\n")
-            logFile.write("Powerlaw is taken out from the model due to not improving the fit significantly.")
-            logFile.write("\n====================================================================================\n\n")
-        else:
-            print("Powerlaw has been found to be significant by f-test:")
-            print("F-test significance: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
-
-        nullhypModelList = transferToNewList(bestModel)
-
-        if AllModels(1).edge.MaxTau.values[0] < 1e-4:
-            logFile.write("Reset edge.MaxTau parameter to 0.1 for refitting due to having an extremely low value.\n\n")
-            AllModels(1).edge.MaxTau.values = 0.1
-            fitModel()
-            updateParameters(bestModel)
-        
         #========================================================================================================================================
         # Start recording nH values if fixNH is set to True.
         if iteration < iterationMax and takeAverages:
