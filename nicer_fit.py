@@ -3,6 +3,16 @@
 # Contact: batuhan.bahceci@sabanciuniv.edu
 
 from nicer_variables import *
+import operator
+
+operator_mapping = {
+    ">": operator.gt,
+    ">=": operator.ge,
+    "<": operator.lt,
+    "<=": operator.le,
+    "==": operator.eq,
+    "!=": operator.ne
+}
 
 print("==============================================================================")
 print("\t\t\tRunning the file: " + fitScript + "\n")
@@ -69,14 +79,14 @@ if str(sampleSize).isnumeric() == False or int(sampleSize) <= 0:
             sampleSize = int(sampleSize)
             break
 
-# Input check for fixNH
-if isinstance(fixNH, bool) == False:
+# Input check for fixParameters
+if isinstance(fixParameters, bool) == False:
     while True:
-        print("\nThe 'fixNH' variable is not of type boolean.")
-        fixNH = input("Please enter a boolean value for 'fixNH' (True/False): ")
+        print("\nThe 'fixParameters' variable is not of type boolean.")
+        fixParameters = input("Please enter a boolean value for 'fixParameters' (True/False): ")
 
-        if fixNH == "True" or fixNH == "False":
-            fixNH = bool(fixNH)
+        if fixParameters == "True" or fixParameters == "False":
+            fixParameters = bool(fixParameters)
             break
 
 # Input check for errorCalculations
@@ -112,7 +122,7 @@ if isinstance(calculateGaussEquivalentWidth, bool) == False:
 
 #===================================================================================================================================
 # Functions
-def shakefit(resultsFile):
+def shakefit(bestModelList, resultsFile):
 
     # Shakefit will only be run for these parameters
     parametersToCalculateError = []
@@ -176,7 +186,7 @@ def shakefit(resultsFile):
             break
 
         print("Performing shakefit error calculations for the model: " + AllModels(1).expression + ", obsid:" + str(obsid)+ ", shakefit number: " + str(k+1)+"\n")
-        fitModel()
+        fitModel(bestModelList)
         updateParameters(bestModel)
 
         for i in range(1, paramNum+1):
@@ -262,11 +272,14 @@ def getParsFromList(modList, ignoreList = []):
                 if fullName in parameterList:
                     AllModels(1)(indx).values = parameterList[fullName]
  
-def fitModel():
+def fitModel(bestModelList): 
+    print("\nFitting the model: " + AllModels(1).expression + "\n")
+
     Fit.nIterations = 100
     Fit.delta = 0.01
     Fit.renorm()
     Fit.perform()
+    updateParameters(bestModelList)
 
 def updateParameters(modList):
     modelDict = modList[0]
@@ -357,6 +370,12 @@ def removeComp(compName, compNum, modelList):   # compNum is the n'th occurence 
     modelFirstEncounter = True
     tempDict = {}
     modelName = AllModels(1).expression.replace(" ", "")
+
+    compCount = wordCounter(modelName, compName)
+    if compCount < compNum or compNum <= 0:
+        print("\nERROR: There are (" + str(compCount) + ") " + compName + " in the current model expression.")
+        print("Given component number should be in between 1 <= x <= " + str(compCount) + " (Given input: " + str(compNum) + ")\n")
+        quit()
 
     # This loop iterates over each component, and assigns the model parameters with their values only if they do not belong to the targeted model
     for comp in AllModels(1).componentNames:
@@ -482,14 +501,14 @@ def alter_list_add(compName, addedIdx, bestModelList):
             compNum = modelKeys[i][modelKeys[i].find("_") + 1: modelKeys[i].find(".")]
             if int(compNum) > addedIdx:
                 newKey = modelKeys[i].replace(compNum, str(int(compNum)+1))
-                bestModelList[1].pop(modelKeys[i])
-                bestModelList[1][newKey] = modelValues[i]
+                bestModelList[0].pop(modelKeys[i])
+                bestModelList[0][newKey] = modelValues[i]
         elif compName in modelKeys[i]:
             compIdx = AllModels(1).componentNames.index(compName) + 1
             if compIdx >= addedIdx:
                 newKey = modelKeys[i][: modelKeys[i].find(".")] + "_" + str(compIdx + 1) + modelKeys[i][modelKeys[i].find(".") :]
-                bestModelList[1].pop(modelKeys[i])
-                bestModelList[1][newKey] = modelValues[i]
+                bestModelList[0].pop(modelKeys[i])
+                bestModelList[0][newKey] = modelValues[i]
 
 def wordCounter(source, word):
     start = 0
@@ -515,7 +534,6 @@ def assignParameters(compName, nthOccurence, parameterTuple):
             if occurence == nthOccurence:
                 parameterName = parameterTuple[0]
                 value = parameterTuple[1]
-                
                 parObject = getattr(compObj, parameterName)
                 parObject.values = value
 
@@ -540,11 +558,11 @@ def transferToNewList(sourceList):
     
     return newList
 
-def performFtest(mainModelList, altModelList, logFile, infoTxt = ""):
+def performFtest(nullModelList, altModelList, logFile, infoTxt = ""):
     newChi = altModelList[1]["chi"]
     newDof = altModelList[1]["dof"]
-    oldChi = mainModelList[1]["chi"]
-    oldDof = mainModelList[1]["dof"]
+    oldChi = nullModelList[1]["chi"]
+    oldDof = nullModelList[1]["dof"]
 
     pValue = Fit.ftest(newChi, newDof, oldChi, oldDof)
     
@@ -553,7 +571,6 @@ def performFtest(mainModelList, altModelList, logFile, infoTxt = ""):
     if infoTxt != "":
         logFile.write(infoTxt)
 
-    logFile.write("\nNull hypothesis model: " + mainModelList[0] + "\nAlternative model: " + altModelList[0] +"\n")
     logFile.write("F-test significance: "+ str(ftestSignificance)+", p-value: " + str(pValue)+"\n\n")
     return pValue
 
@@ -578,12 +595,15 @@ def calculateGaussEqw(logFile):
         for each in eqwList:
             logFile.write(each)
 
-def fixAllNH(nhDict):
-    if "TBabs" in AllModels(1).expression:
-        AllModels(1).TBabs.nH.values = nhDict["TBabs.nH"]
-    
-    if "pcfabs" in AllModels(1).expression:
-        AllModels(1).pcfabs.nH.values = nhDict["pcfabs.nH"]
+def fixAllParameters(fixedValues):
+    for key, val in fixedValues.items():
+        temp = key.split(".")
+        compName = temp[0]
+        parName = temp[1]
+        compObj = getattr(AllModels(1), compName)
+        parObj = getattr(compObj, parName)
+
+        parObj.values = fixedValues[key]
 
 def filterOutliers(dataset):
     # Here I use Z-Score algorithm to filter out the outliers of the dataset
@@ -601,27 +621,43 @@ def filterOutliers(dataset):
     return filtered_dataset
 
 def closeAllFiles():
+    print("\nClosing all files..")
     logFile.close()
     Xset.closeLog()
     AllModels.clear()
     AllData.clear()
 
-def checkResults():
+def checkResults(bestModelList):
     for i in range(1, AllModels(1).nParameters+1):
         print(AllModels(1)(i).name, AllModels(1)(i).values[0])
     print("================")
-    for key, val in bestModel[1].items():
+    for key, val in bestModelList[0].items():
         print(key,val)
-    quit()
+
+def clearList(listInput):
+    for i in range(len(listInput)):
+        listInput.pop()
+
+def constructList(listToConstruct, sourceList):
+    clearList(listToConstruct)
+    listToConstruct.append({})
+    listToConstruct.append({})
+    for i in range(len(sourceList)):
+        for key, val in sourceList[i].items():
+            listToConstruct[i][key] = val
 
 def loadModel(modelName):
+    print("Loading model: " + modelName)
     m = Model(modelName)
 
 def assignTxtParameters(parameterList):
+    print()
     for tuple in parameterList:
         compName = tuple[0]
         compNum = tuple[1]
-        parTuple = tuple[1]
+        parTuple = tuple[2]
+
+        print("Assigning new values for parameter: " + compName + "." + parTuple[0])
         assignParameters(compName, compNum, parTuple)
 
 def searchPremodel(bestModelList, path = ""):
@@ -630,86 +666,147 @@ def searchPremodel(bestModelList, path = ""):
     if path == "":
         path = outputDir + "/commonFiles"
         print("\nLooking for a model file '" + modelfile + "' under '" + path + "'")
-        if Path(path).exists():
+        if Path(path + "/" + modelfile).exists():
             foundFile = True
             print("Found the spesified model file.")
             print("Extracting all the model parameters..")
             updateParameters(bestModelList)
 
-            Xset.restore(path + "/" + modelFile)
+            Xset.restore(path + "/" + modelfile)
     else:
         print("\nLooking for a model file '" + modelfile + "' under '" + path + "'")
-        if Path(path).exists():
+        if Path(path + "/" + modelfile).exists():
             foundFile = True
             print("Found the spesified model file.")
             print("Extracting all the model parameters..")
-            updateParameters()
+            updateParameters(bestModelList)
 
-            Xset.restore(path + "/" + modelFile)
+            Xset.restore(path + "/" + modelfile)
     
     if foundFile == False:
         print("Could not find the target model file under '" + path + "'")
 
 def saveCommand(saveType):
+    print("Saving requested xcm file as type: " + saveType)
     modelName = extractModFileName()
     if saveType == "model":
         saveModel(modelName)
+        saveModel(modelName, commonDirectory)
     elif saveType == "data":
         saveData()
     else:
         saveModel(modelName)
+        saveModel(modelName, commonDirectory)
         saveData()
 
-def parseTxt(source, modelStack, bestModelList):
+def ftestOptions(option, bestModelList, nullhypList, logfile, lastAddedModel, lastAddedModelNumber, orderSuffix, infoTxt = ""):
+    if option == "nullhyp":
+        print("\nSaved null hypothesis statistics\n")
+        constructList(nullhypList, bestModelList)
+    else:
+        print("\nPerforming ftest: " + infoTxt + "\n")
+        pvalue = performFtest(nullhypList, bestModelList, logFile, infoTxt)
+
+        if abs(pvalue) >= ftestSignificance:
+            print("\nFTEST: Choosing null hypothesis model")
+            print("F-test significance: " + str(ftestSignificance) + ", p-value: " + str(pvalue) + "\n")
+
+            print("Removing the model: " + str(lastAddedModelNumber) + orderSuffix + " " + lastAddedModel)
+            removeComp(lastAddedModel, lastAddedModelNumber, bestModelList)
+            fitModel(bestModelList)
+            updateParameters(bestModelList)
+        else:
+            print("\nFTEST: Keeping the alternative model")
+            print("F-test significance: " + str(ftestSignificance) + ", p-value: " + str(pvalue) + "\n")
+
+def calculateComponentOrder(compName, targetName):
+    modelExpression = AllModels(1).expression.replace(" ", "")
+    targetIdx = modelExpression.find(targetName)
+    newExpression = modelExpression[:targetIdx]
+    compCount = wordCounter(newExpression, compName)
+
+    return compCount + 1
+
+def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
     sourcefile = open(source, "r")
     lines = sourcefile.readlines()
     currentModel = ""
-    readValidCommand = False
+    inside_if = False
+    if_evaluation = False
+    lastAddedModel = ""
+    lastAddedModelNumber = 0
+    orderSuffix = ""
 
     lineCount = 0
     for line in lines:
         lineCount += 1
         line = line.strip()
+
         if len(line) == 0:
-            print("Empty line detected")
             continue
         
-        #CONTROL STATEMENT FOR DEBUGGING
-        line = line.split(" ")
-        if line[0] == "BREAK":
-            for i in modelStack[list(modelStack.keys())[0]]:
-                print(i)
-            quit()
+        if line[0] == "#":
+            continue
         
+        line = line.split(" ")
         try:
-            if line[0].upper() == "MODEL":
-                currentModel = line[1]
-                modelStack[currentModel] = []
-                readValidCommand = True
-                continue
+            if line[0].lower() == "model":
+                if line[1] == processPipeline:
+                    if currentModel == "":
+                        currentModel = processPipeline
+                        continue
+                    else:
+                        # A model pipeline has been defined before, but the current line tries to define another pipeline
+                        print("ERROR: Trying to process another model pipeline, probably due to not using ENDMODEL keyword.")
+                        quit()
         except:
-            print("\nERROR: Invalid implementation for a model name in models.txt -> Line: " + str(lineCount))
+            print("\nERROR: Invalid implementation for a pipeline name in models.txt -> Line: " + str(lineCount))
             quit()
 
+        if currentModel != processPipeline:
+            # If the current pipeline does not match
+            continue
+            
+        if line[0].lower() == "endmodel":
+            # End of model pipeline
+            break
+        
+        if inside_if:
+            if line[0] == "endif":
+                inside_if = False
+                continue
+            else:
+                if if_evaluation == False:
+                    continue
+
         try:
-            if line[0].lower() == "load":
-                if currentModel != "":
-                    modelStack[currentModel].append([loadModel])
-                    modelName = ""
-                    for par in line[1:]:
-                        modelName += par
-                    modelStack[currentModel][-1].append(modelName)
-                else:
-                    print("\nERROR: Cannot load a model unless a model is defined first.")
-                    quit()
+            if line[0] == "load":
+                modelName = ""
+                for par in line[1:]:
+                    modelName += par
+
+                loadModel(modelName)
+                continue
         except:
-            print("\nERROR: Invalid implementation of load command in models.txt -> Line: " + str(lineCount))
+            print("\nERROR: Invalid implementation of 'load' command in models.txt -> Line: " + str(lineCount))
             quit()
           
         try:
-            if line[0].lower() == "assign":
-                if currentModel != "":
-                    modelStack[currentModel].append([assignTxtParameters])
+            if line[0] == "assign":
+                if line[1] == "-last":
+                    parameterList = []
+                    for eachPar in line[2:]:
+                        temp = eachPar.split(":")
+                        compName = temp[0].split(".")[0]
+                        parName = temp[0].split(".")[1]
+                        parValue = temp[1]
+
+                        parameterList.append((compName, lastAddedModelNumber, (parName, parValue)))
+                        
+                    assignTxtParameters(parameterList)
+
+                    continue
+                else:
                     parameterList = []
                     for eachPar in line[1:]:
                         if eachPar[0] == "(":
@@ -718,85 +815,221 @@ def parseTxt(source, modelStack, bestModelList):
 
                             temp = eachPar.split(":")
                             fullName = temp[0][bracketIdx+1:]
-                            compName = fullName.split("_")[0]
-                            parName = fullName.split("_")[1]
+                            compName = fullName.split(".")[0]
+                            parName = fullName.split(".")[1]
                             parValue = temp[1]
 
                             parameterList.append((compName, compNum, (parName, parValue)))
                         else:
                             compNum = 1
                             temp = eachPar.split(":")
-                            compName = temp[0].split("_")[0]
-                            parName = temp[0].split("_")[1]
+                            compName = temp[0].split(".")[0]
+                            parName = temp[0].split(".")[1]
                             parValue = temp[1]
 
                             parameterList.append((compName, compNum, (parName, parValue)))
                         
-                    modelStack[currentModel][-1].append(parameterList)
-                else:
-                    print("\nERROR: Cannot assign any parameters unless a model is defined first.")
-                    quit()
+                    assignTxtParameters(parameterList)
+
+                    continue
+
         except:
-            print("\nERROR: Invalid implementation of assign command in models.txt -> Line: " + str(lineCount))
+            print("\nERROR: Invalid implementation of 'assign' command in models.txt -> Line: " + str(lineCount))
             quit()
         
         try:
-            if line[0].lower() == "search" and line[1].lower() == "premodel":
-                if currentModel != "":
-                    modelStack[currentModel].append([searchPremodel])
-                    modelStack[currentModel][-1].append(bestModelList)
-
-                    if len(line) > 2:
-                        modelString = ""
-                        for i in line[2:]:
-                            modelString += i
-                        if modelString[-1] == "/":
-                            modelString = modelString[:-1]
-                        modelStack[currentModel][-1].append(modelString)
+            if line[0] == "search" and line[1] == "premodel":
+                if len(line) > 2:
+                    modelString = ""
+                    for i in line[2:]:
+                        modelString += i
+                    if modelString[-1] == "/":
+                        modelString = modelString[:-1]
+                
+                    searchPremodel(bestModelList, modelString)
                 else:
-                    print("\nERROR: Cannot look to load any pre-existing model unless a model is defined first.")
-                    quit()
+                    searchPremodel(bestModelList)
 
+                continue
         except:
             print("\nERROR: Invalid implementation of 'search' command in models.txt -> Line: " + str(lineCount))
+            quit()               
+        
+        try:
+            if line[0] == "fit":
+                fitModel(bestModelList)
+                continue
+        except:
+            print("\nERROR: Invalid implementation of 'fit' command in models.txt -> Line: " + str(lineCount))
             quit()
+        
+        try:
+            if line[0] == "save":
+                if line[1] == "model":
+                    saveCommand("model")
+                elif line[1] == "data":
+                    saveCommand("data")
+                else:
+                    print("ERROR: Invalid parameter for the 'save' command")
+                    quit()
+
+                continue
+        except:
+            print("\nERROR: Invalid implementation of 'save' command in models.txt -> Line: " + str(lineCount))
+            quit()
+        
+        try:
+            if line[0] == "ftest":
+                if line[1] == "nullhyp" or line[1] == "null" or line[0] == "nullhypothesis":
+                    ftestOptions("nullhyp", bestModelList, nullhypList, logFile, lastAddedModel, lastAddedModelNumber, orderSuffix)
+                    continue
+
+                elif line[1] == "perform":
+                    if lastAddedModel == "":
+                        print("ERROR: You must use addcomp to add models before using f-test")
+                        quit()
                         
-        
-        try:
-            if line[0].lower() == "fit":
-                if currentModel != "":
-                    modelStack[currentModel].append([fitModel])
+                    if len(line) > 2:
+                        newStr = " ".join(line[2:])
+                        if (newStr[0] != "\"" and newStr[0] != "'") or (newStr[-1] != "\"" and newStr[-1] != "'") or (newStr[0] != newStr[-1]):
+                            print("ERROR: Invalid parameter entry for 'ftest' command")
+                            quit()
+                        else:
+                            newStr = newStr[1:-1]
+                            ftestOptions("perform", bestModelList, nullhypList, logFile, lastAddedModel, lastAddedModelNumber, orderSuffix, newStr)
+
+                            lastAddedModelNumber = 0
+                            lastAddedModel = ""
+                            continue
+
+                    ftestOptions("perform", bestModelList, nullhypList, logFile, lastAddedModel, lastAddedModelNumber, orderSuffix)
+
+                    lastAddedModelNumber = 0
+                    lastAddedModel = ""
+                    continue
                 else:
-                    print("\nERROR: Cannot fit any model unless a model is defined first.")
+                    print("\nERROR: Cannot process anything related to ftest unless a model is defined first.")
                     quit()
+
         except:
-            print("\nERROR: Invalid implementation of fit command in models.txt -> Line: " + str(lineCount))
+            print("\nERROR: Invalid implementation of 'ftest' command in models.txt -> Line: " + str(lineCount))
             quit()
         
         try:
-            if line[0].lower() == "save":
-                if currentModel != "":
-                    modelStack[currentModel].append([saveCommand])
-                    if line[1].lower() == "model":
-                        modelStack[currentModel][-1].append("model")
-                    elif line[1].lower() == "data":
-                        modelStack[currentModel][-1].append("data")
+            if line[0] == "addcomp" or line[0] == "addc":
+                if len(line) == 6:
+                    if line[5] == "-wrap":
+                        # addcomp edge after TBabs *
+                        lastAddedModel = line[1]
+                        lastAddedModelNumber = calculateComponentOrder(line[1], line[3])
+                        addComp(line[1], line[3], line[2], line[4], bestModelList, True)
+                        
+                        if lastAddedModelNumber == 1:
+                            orderSuffix = "st"
+                        elif lastAddedModelNumber == 2:
+                            orderSuffix = "nd"
+                        elif lastAddedModelNumber == 3:
+                            orderSuffix = "rd"
+                        else:
+                            orderSuffix = "th"
+                        continue
                     else:
-                        dummyvar = int("trigger error")
-                else:
-                    print("\nERROR: Cannot save any file unless a model is defined first.")
-                    quit()
+                        print("ERROR: Invalid input for the the optional 'wrap' parameter.")
+                        quit()
 
+                elif len(line) > 6:
+                    print("ERROR: addcomp function takes 6 parameters at maximum, more than 6 inputs were given.")
+                    quit()
+                
+                lastAddedModel = line[1]
+                lastAddedModelNumber = calculateComponentOrder(line[1], line[3])
+                addComp(line[1], line[3], line[2], line[4], bestModelList)
+
+                if lastAddedModelNumber == 1:
+                    orderSuffix = "st"
+                elif lastAddedModelNumber == 2:
+                    orderSuffix = "nd"
+                elif lastAddedModelNumber == 3:
+                    orderSuffix = "rd"
+                else:
+                    orderSuffix = "th"
+                continue
         except:
-            print("\nERROR: Invalid implementation of save command in models.txt -> Line: " + str(lineCount))
+            print("\nERROR: Invalid implementation of 'addcomp' command in models.txt -> Line: " + str(lineCount))
             quit()
         
+        try:
+            if line[0] == "if":
+                inside_if = True
+
+                fullName = line[1].split(".")
+                compObj = getattr(AllModels(1), fullName[0])
+                parName = fullName[1]
+                parObj = getattr(compObj, parName)
+                parValue = parObj.values[0]
+
+                lhs = float(parValue)
+                rhs = float(line[3])
+                actualOperator = operator_mapping.get(line[2])
+
+                result = actualOperator(lhs, rhs)
+                if result:
+                    if_evaluation = True
+                else:
+                    if_evaluation = False
+                continue
+        except:
+            print("\nERROR: Invalid implementation of 'if' command in models.txt -> Line: " + str(lineCount))
+            quit()
+        
+        try:
+            if line[0] == "delc" or line[0] == "delcomp":
+                if line[1][0] == "(":
+                    closingIdx = int(line[1].find(")"))
+                    compNum = line[1][1:closingIdx]
+
+                    removeComp(line[1][closingIdx +1:], int(compNum), bestModelList)
+                    continue
+
+                removeComp(line[1], 1, bestModelList)
+                continue
+        except:
+            print("\nERROR: Invalid implementation of 'delcomp' command in models.txt -> Line: " + str(lineCount))
+            quit()
+        
+        try:
+            if line[0] == "setpoint":
+                if line[1] == "fix":
+                    if enableFixing[0]:
+                        print("All parameters spesified by 'fixParameters' have now been fixed.\n")
+                        fixAllParameters(fixedValues)
+                        continue
+                    else:
+                        continue
+        except:
+            print("\nERROR: Invalid implementation of 'setpoint' command in models.txt -> Line: " + str(lineCount))
+            quit()
+        
+        try:
+            if line[0] == "shakefit":
+                shakefit(bestModelList, logFile)
+        except:
+            print("\nERROR: Invalid implementation of 'shakefit' command in models.txt -> Line: " + str(lineCount))
+            quit()
+
+        
+        while (True):
+            print("\nUndefined command in current line: '" + " ".join(line) + "' (Line "+ str(lineCount) +")")
+            userInput = input("The line will not be executed. Would you like to continue executing the script ? (y/n): ")
+            print()
+            if userInput.lower() == "n":
+                print("Terminating the script..")
+                quit()
+            elif userInput.lower() == "y":
+                print("Continuing to the script..")
+                break
 
 
-bestModelList = [{}, {}]
-stack = {}
-parseTxt("/home/batuhanbahceci/scripts/nicer/models.txt", stack, bestModelList)
-quit()
 #===================================================================================================================
 energyLimits = energyFilter.split(" ")
 Emin = energyLimits[0]
@@ -860,20 +1093,24 @@ else:
     iterationMax = len(validObservations)
     print("\nMoving onto the spectral fitting stage..\n")
 
-# Initializing required variables/dictionaries in case fixNH is set to True.
-fixedValuesNH = {}
+# Initializing required variables/dictionaries in case fixParameters is set to True.
+fixedValues = {}
 takeAverages = False
-startFixingNH = False
-if fixNH:
+startFixingParameters = [False]
+if fixParameters:
     takeAverages = True
 
 # If both restartOnce and restartAlways are set to True, set restartAlways to False.
 if restartOnce:
     restartAlways = False
 
+# Switch on/off chatter
 if chatterOn == False:
     print("Chatter has been disabled.\n") 
     Xset.chatter = 0
+
+# Set the correct path for the pipelineFile
+pipelineFile = scriptDir + "/" + pipelineFile
 
 for x in range(2):
     iteration = 0
@@ -882,7 +1119,7 @@ for x in range(2):
 
         print("=============================================================================================")
         print("Starting the fitting procedure for observation:", obsid)
-        if startFixingNH:
+        if startFixingParameters[0]:
             print("Fixing nH parameters: TRUE\n")
         else:
             print("Fixing nH parameters: FALSE\n")
@@ -953,11 +1190,6 @@ for x in range(2):
 
         #-------------------------------------------------------------------------------------    
         # From now on, PyXspec will be utilized for fitting and comparing models
-
-        # These are the energies of both emission and absorption gausses that will be tried to fit to the observation along the script.
-        # If you add/delete a gauss component along the script, make sure to update this list as well.
-        # The list has no significance for the fitting the gausses, this is rather to correctly name gauss components for plotting purposes
-        gaussEnergyList = [1.8, 6.98, 6.7]
         
         # Set some Xspec settings
         logFile = open(resultsFile, "w")
@@ -974,186 +1206,123 @@ for x in range(2):
         AllData(1).ignore("**-" + Emin + " " + Emax +"-**")
         saveData()
         
-        # This list will carry the model name, model parameters and fit statistics for the best model throughout the script.
-        # First element is the model name, second element is the dictionary for parameter name-value pairs, third element is the dictionary for fit statistics
-        # such as chi-squared, degrees of freedom and null hypothesis probability.
-        bestModel = [{"diskbb.Tin": ",,0.1,0.1,2.5,2.5", "diskbb.norm:":",,0.1,0.1", "pcfabs.CvrFract":0.95}, {}]
-
-        #=================================================================================
-        # Load the first model and fit
-        print("Loading the first model:", "TBabs*pcfabs(gaussian+diskbb)", "\n")
-        m = Model("TBabs*pcfabs(gaussian+diskbb)")  
-
-        modelFile = extractModFileName()
-        if Path(commonDirectory + "/" + modelFile).exists():
-            Xset.restore(commonDirectory + "/" + modelFile)
-        else:
-            getParsFromList(bestModel)
-
-        gaussPars_1 = ["1.8,,1.6,1.6,1.9,1.9", "0.07,,,,0.2,0.2", "0.1"]
-        assignParameters("gaussian", gaussPars_1, 1)
-
-        if startFixingNH:
-            print("nH parameters has now been fixed.\n")
-            fixAllNH(fixedValuesNH)
-            
-        fitModel()
-        updateParameters(bestModel)
-
-        saveModel(modelFile, obsid)
-        saveModel(modelFile, obsid, commonDirectory)
-
-        #===============================================================================================
-        # Add an edge around 1.8 keV
-        addComp("edge", "TBabs", "after", "*", bestModel)
-        print("Adding edge to current model expression...\n")
-
-        edgePars = ["1.8,,1.5,1.5,2,2", "0.2"]
-        assignParameters("edge", edgePars, 1)
+        # Lists that will store parameter values throughout the script
+        bestModel = [{}, {}]
+        nullhypList = [{}, {}]
         
-        fitModel()
-        updateParameters(bestModel)
-
-        modelFile = extractModFileName()
-        saveModel(modelFile, obsid)
-        saveModel(modelFile, obsid, commonDirectory)
-
-        nullhypModelList = transferToNewList(bestModel)
-        #===============================================================================================
-        # Add 6.98 keV absorption gauss and fit
-        addComp("gaussian", "diskbb", "before", "+", bestModel)
-        print("Adding 6.98 keV absorption gauss to the current model expression...")
-
-        gaussPars_2 = ["6.98,,6.8,6.8,7.5,7.5", "7e-2,,,,0.2,0.2", "-1e-3,,-1e12,-1e12,-1e-12,-1e-12"]
-        gaussCount = wordCounter(AllModels(1).expression, "gaussian")
-        assignParameters("gaussian", gaussPars_2, gaussCount)
-
-        fitModel()
-        updateParameters(bestModel)
-
-        modelFile = extractModFileName()
-        saveModel(modelFile, obsid)
-        saveModel(modelFile, obsid, commonDirectory)
-
-        altModelList = bestModel
-        #===============================================================================================
-        # Apply f-test and check whether last gaussian improves the fit significantly or not
-        pValue = performFtest(nullhypModelList, altModelList, logFile, "    (Adding 6.98 keV absorption gauss)")
-        print("Applying f-test to check the significance of 6.98 keV absorption gauss:")
-
-        if abs(pValue) >= ftestSignificance:
-            print("6.98 keV gaussian has been taken out of the model expression by the f-test:")
-            print("F-test significance: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
-            removeComp("gaussian", gaussCount, bestModel)
-            fitModel()
-            updateParameters(bestModel)
-
-            logFile.write("\n====================================================================================\n")
-            logFile.write("6.98 keV gauss is taken out from the model due to not improving the fit significantly.")
-            logFile.write("\n====================================================================================\n")
-        else:
-            print("6.98 keV gaussian has been found to be significant by f-test:")
-            print("F-test significance: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
-
-        nullhypModelList = transferToNewList(bestModel)
-        #===============================================================================================
-        # Add 6.7 keV absorption gauss and fit
-        addComp("gaussian", "diskbb", "before", "+", bestModel)
-        print("Adding 6.7 keV absorption gauss to the current model expression...")
-
-        gaussPars_3 = ["6.7,,6.4,6.4,6.8,6.8", "0.07,,,,0.2,0.2", "-1e-3, 1e-4, -1e12, -1e12, -1e-12, -1e-12"]
-        gaussCount = wordCounter(AllModels(1).expression, "gaussian")
-        assignParameters("gaussian", gaussPars_3, gaussCount)
-
-        fitModel()
-        updateParameters(bestModel)
-
-        modelFile = extractModFileName()
-        saveModel(modelFile, obsid)
-        saveModel(modelFile, obsid, commonDirectory)
-
-        altModelList = bestModel
-        #===============================================================================================
-        # Apply f-test and check whether last gaussian improves the fit significantly or not
-        pValue = performFtest(nullhypModelList, altModelList, logFile, "    (adding 6.7 keV absorption gauss)")
-        
-        if abs(pValue) >= ftestSignificance:
-            print("6.7 keV gaussian has been taken out of the model expression by the f-test:")
-            print("F-test significance: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
-            removeComp("gaussian", gaussCount, bestModel)
-            fitModel()
-            updateParameters(bestModel)
-
-            logFile.write("\n====================================================================================\n")
-            logFile.write("6.7 keV gauss is taken out from the model due to not improving the fit significantly.")
-            logFile.write("\n====================================================================================\n")
-        else:
-            print("6.7 keV gaussian has been found to be significant by f-test:")
-            print("F-test significance: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
-
-        nullhypModelList = transferToNewList(bestModel)
-        #===============================================================================================
-        # Add powerlaw
-        addComp("powerlaw", "diskbb", "after", "+", bestModel)
-        print("Adding powerlaw to the current model expression...")
-
-        powerlawPars = ["1.8,,1.2,1.2,3,3", "0.1"]
-        assignParameters("powerlaw", powerlawPars, 1)
-
-        fitModel()
-        updateParameters(bestModel)
-
-        modelFile = extractModFileName()
-        saveModel(modelFile, obsid)
-        saveModel(modelFile, obsid, commonDirectory)
-
-        altModelList = bestModel
-        #===============================================================================================
-         # Apply f-test
-        pValue = performFtest(nullhypModelList, altModelList, logFile, "    (adding powerlaw)")
-
-        if abs(pValue) >= ftestSignificance:
-            print("Powerlaw has been taken out of the model expression by the f-test:")
-            print("F-test significance: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
-            removeComp("powerlaw", 1, bestModel)
-            fitModel()
-            updateParameters(bestModel)
-
-            logFile.write("\n====================================================================================\n")
-            logFile.write("Powerlaw is taken out from the model due to not improving the fit significantly.")
-            logFile.write("\n====================================================================================\n\n")
-        else:
-            print("Powerlaw has been found to be significant by f-test:")
-            print("F-test significance: " + str(ftestSignificance) + ", p-value: " + str(pValue) + "\n")
-
-        nullhypModelList = transferToNewList(bestModel)
-
-        if AllModels(1).edge.MaxTau.values[0] < 1e-4:
-            logFile.write("Reset edge.MaxTau parameter to 0.1 for refitting due to having an extremely low value.\n\n")
-            AllModels(1).edge.MaxTau.values = 0.1
-            fitModel()
-            updateParameters(bestModel)
+        # Parse the txt file and start processing the commands within
+        parseTxt(pipelineFile, bestModel, nullhypList, logFile, startFixingParameters)
         
         #========================================================================================================================================
-        # Start recording nH values if fixNH is set to True.
+        # Start recording nH values if fixParameters is set to True.
         if iteration < iterationMax and takeAverages:
-            # Save tbabs.nH and pcfabs.nH values after finding the best fitting model (before calculating errors)
-            # These values will be used to calculate average nH values, which then will be used to refit all observations by fixing nH parameters  
-            # Save TBabs.nH values 
-            tbabsNH = AllModels(1).TBabs.nH.values[0]
-            finalInput = str(tbabsNH) + "," + str(exposure)
-            if "TBabs.nH" not in fixedValuesNH:
-                fixedValuesNH["TBabs.nH"] = [finalInput]
-            else:
-                fixedValuesNH["TBabs.nH"].append(finalInput)
+            for eachPar in parametersToFix:
+                fullName = eachPar
+                eachPar = eachPar.split(".")
+                compName = eachPar[0]
+                parName = eachPar[1]
+                if compName in AllModels(1).expression:
+                    compObj = getattr(AllModels(1), compName)
+                    parObj = getattr(compObj, parName)
+                    parVal = parObj.values[0]
 
-            # Save pcfabs.nH values
-            pcfabsNH = AllModels(1).pcfabs.nH.values[0]
-            finalInput = str(pcfabsNH) + "," + str(exposure)
-            if "pcfabs.nH" not in fixedValuesNH:
-                fixedValuesNH["pcfabs.nH"] = [finalInput]
-            else:
-                fixedValuesNH["pcfabs.nH"].append(finalInput)
+                    valueExposurePair = str(parVal) + "," + str(exposure)
+                    if fullName not in fixedValues:
+                        fixedValues[fullName] = [valueExposurePair]
+                    else:
+                        fixedValues[fullName].append(valueExposurePair)
+                else:
+                    print("\n" + compName + " is not included in the model expression for observation " + obsid)
+                    print("There will not be any value added to the sample for calculating parameter average for " + fullName)
+                    continue
+                    
+            writeBestFittingModel(logFile)
+
+            modFileName = extractModFileName()
+            # Remove any pre-existing best model files and save a new one
+            for eachFile in allFiles:
+                if "best_" in eachFile:
+                    os.system("rm " + eachFile)
+
+            saveModel("best_" + modFileName)
+            closeAllFiles()
+
+            print("Parameters from observation '" + obsid + "' have been saved.")
+            continue
+
+        elif iteration >= iterationMax and takeAverages:
+            for eachPar in parametersToFix:
+                fullName = eachPar
+                eachPar = eachPar.split(".")
+                compName = eachPar[0]
+                parName = eachPar[1]
+                if compName in AllModels(1).expression:
+                    compObj = getattr(AllModels(1), compName)
+                    parObj = getattr(compObj, parName)
+                    parVal = parObj.values[0]
+
+                    valueExposurePair = str(parVal) + "," + str(exposure)
+                    if fullName not in fixedValues:
+                        fixedValues[fullName] = [valueExposurePair]
+                    else:
+                        fixedValues[fullName].append(valueExposurePair)
+                else:
+                    print("\n" + compName + " is not included in the model expression for observation " + obsid)
+                    print("There will not be any value added to the sample for calculating parameter average for " + fullName)
+                    continue
+            
+            print("Parameters from observation '" + obsid + "' have been saved.")
+            print("=============================================================================================")
+            print("Collecting the sample for calculating parameter averages is now finished.")
+            print("Values from three observations with longest exposures will be used for fixing the target parameters.\n")
+            print()
+
+            startFixingParameters.pop()
+            startFixingParameters.append(True)
+            takeAverages = False
+
+            for eachPar in parametersToFix:
+                fullName = eachPar
+                eachPar = eachPar.split(".")
+                compName = eachPar[0]
+                parName = eachPar[1]
+                if compName in AllModels(1).expression:
+                    compObj = getattr(AllModels(1), compName)
+                    parObj = getattr(compObj, parName)
+                    parVal = parObj.values[0]
+                    
+                    parPairs = {}
+                    for pair in fixedValues[fullName]:
+                        parValue = float(pair.split(",")[0])
+                        expoValue = float(pair.split(",")[1])
+                        if expoValue in parPairs:
+                            parPairs[expoValue].append(parValue)
+                        else:
+                            parPairs[expoValue] = [parValue]
+                    
+                    sortedPairs = {key: parPairs[key] for key in sorted(parPairs, reverse=True)}
+
+                    countPar = 0
+                    totalParValue = 0
+
+                    try:
+                        print("Taking the average of " + fullName + " values:")
+                        keyList = list(sortedPairs.keys())
+                        valueList = list(sortedPairs.values())
+                        for i in range(3):
+                            for j in range(len(valueList[i])):
+                                print(fullName + " value:", valueList[i][j], "from an observation with exposure:", keyList[i])
+                                totalParValue += valueList[i][j]
+                                countPar += 1
+                    except:
+                        print("\nWARNING: Average " + fullName + " values will be calculated using data from less than 3 observations.\n")
+                    
+                    avgPar = totalParValue / countPar
+                    fixedValues[fullName] = str(avgPar) + " -1"
+                    print(fullName + " has been fixed to the value:", avgPar, "\n")
+                else:
+                    print("\n" + compName + " is not in the current model expression.")
+                    print("There will not be any parameter fixing applied for this model.")
 
             # Close all log files
             writeBestFittingModel(logFile)
@@ -1164,43 +1333,14 @@ for x in range(2):
                 if "best_" in eachFile:
                     os.system("rm " + eachFile)
 
-            saveModel("best_" + modFileName, obsid)
+            saveModel("best_" + modFileName)
             closeAllFiles()
 
-            print("nH values from observation '" + obsid + "' have been saved.")
-            continue
-
-        elif iteration >= iterationMax and takeAverages:
-            # The maximum sample size for calculating average nH values has been reached.
-            # Terminate the first iteration of fitting observations, calculate average nH values and refit all observations again.
-
-            # Save the nH values for calculating average one last time for the last observation
-            # Save TBabs.nH values
-            tbabsNH = AllModels(1).TBabs.nH.values[0]
-            finalInput = str(tbabsNH) + "," + str(exposure)
-            if "TBabs.nH" not in fixedValuesNH:
-                fixedValuesNH["TBabs.nH"] = [finalInput]
-            else:
-                fixedValuesNH["TBabs.nH"].append(finalInput)
-
-            # Save pcfabs.nH values
-            pcfabsNH = AllModels(1).pcfabs.nH.values[0]
-            finalInput = str(pcfabsNH) + "," + str(exposure)
-            if "pcfabs.nH" not in fixedValuesNH:
-                fixedValuesNH["pcfabs.nH"] = [finalInput]
-            else:
-                fixedValuesNH["pcfabs.nH"].append(finalInput)
-            
-            print("nH values from observation '" + obsid + "' have been saved.")
-            print("=============================================================================================")
-            print("Collecting the sample for determining the values to fix nH parameters is now finished.")
-            print("Values from three observations with longest exposures will be used for fixing nH parameters.\n")
-
-            startFixingNH = True
-            takeAverages = False
-            # Calculate average value for TBabs.nH from top 3 longest exposure observations
+            print("=============================================================================================\n")
+            break
+            """# Calculate average value for TBabs.nH from top 3 longest exposure observations
             expoNhPairs = {}
-            for i in fixedValuesNH["TBabs.nH"]:
+            for i in fixedValues["TBabs.nH"]:
                 nhValue = float(i.split(",")[0])
                 expoValue = float(i.split(",")[1])
                 expoNhPairs[expoValue] = nhValue
@@ -1221,12 +1361,12 @@ for x in range(2):
                 print("\nWARNING: Average nH values will be calculated using data from less than 3 observations.\n")
 
             avgTBabs = totalTBabsNH / countNh
-            fixedValuesNH["TBabs.nH"] = str(avgTBabs) + " -1"
+            fixedValues["TBabs.nH"] = str(avgTBabs) + " -1"
             print("TBabs.nH has been fixed to the value:", avgTBabs, "\n")
 
             # Calculate average value for pcfabs.nH from top 3 longest exposure observations
             expoNhPairs = {}
-            for i in fixedValuesNH["pcfabs.nH"]:
+            for i in fixedValues["pcfabs.nH"]:
                 nhValue = float(i.split(",")[0])
                 expoValue = float(i.split(",")[1])
                 expoNhPairs[expoValue] = nhValue
@@ -1248,7 +1388,7 @@ for x in range(2):
                 print("\nWARNING: Average nH values will be calculated using data from less than 3 observations.\n")
 
             avgPcfabs = totalPcfabsNH / countNh
-            fixedValuesNH["pcfabs.nH"] = str(avgPcfabs) + " -1"
+            fixedValues["pcfabs.nH"] = str(avgPcfabs) + " -1"
             print("pcfabs.nH has been fixed to the value:", avgPcfabs)
 
             # Close all log files5
@@ -1264,11 +1404,11 @@ for x in range(2):
             closeAllFiles()
 
             print("=============================================================================================\n")
-            break
+            break"""
         #========================================================================================================================================
         # Calculate uncertainity boundaries
         if errorCalculations:
-                shakefit(logFile)
+            shakefit(bestModel, logFile)
 
         # Save the last model
         print("Writing the best model parameters to " + resultsFile + "...")
@@ -1276,8 +1416,8 @@ for x in range(2):
         writeBestFittingModel(logFile)
 
         print("Saving the best model xspec file...\n")
-        saveModel(modFileName, obsid)
-        saveModel(modFileName, obsid, commonDirectory)
+        saveModel(modFileName)
+        saveModel(modFileName, commonDirectory)
         #==========================================================================
         if errorCalculations:
             # Initialize the strings that will be used as seperate lines for parameter file
@@ -1338,7 +1478,7 @@ for x in range(2):
         for eachFile in allFiles:
             if "best_" in eachFile:
                 os.system("rm " + eachFile)
-        saveModel("best_" + modFileName, obsid)
+        saveModel("best_" + modFileName)
 
         if calculateGaussEquivalentWidth:
             # Calculate and write equivalent widths of gausses to log file
@@ -1366,7 +1506,7 @@ for x in range(2):
             file.write("echo OBSID:" + obsid + "\n")
             file.close()
 
-    if fixNH == False:
+    if fixParameters == False:
         # The whole fitting process is looped twice for refitting purposes. If fixing nH option is False, do not try to refit
         break
     else:
