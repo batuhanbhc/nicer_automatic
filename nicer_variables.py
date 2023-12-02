@@ -75,6 +75,7 @@ errorCalculations = True    # If set to True, the script will run "shakefit" fun
 # Shakefit will only try to calculate errors for below parameters. The keys are xspec modelnames.parameternames, and values are the units.
 # If the parameter does not have a spesific unit (like normalizations, photon index etc), put "X" as value
 # Also important: You need to write models and parameters exactly like how they are written in Xspec. For instance, you need to write "TBabs" instead of "tbabs".
+# Do not forget to put "_" instead of spaces
 parametersForShakefit = {
     "diskbb.norm": "Normalization_(diskbb)",
     "diskbb.Tin": "Tin_(keV)",
@@ -86,4 +87,9 @@ parametersForShakefit = {
 calculateGaussEquivalentWidth = True
 
 #================================================ nicer.flux spesific variables =================================================
+# nicer_flux will add "cflux" component before the spesified models below to calculate flux.
+# unabsorbed is a special keyword that adds cflux right before the paranthesis in the model expression. If there is no paranthesis, it will be skipped.
+# If you want to calculate unabsorbed flux in a model that does not have paranthesis, such as TBabs*diskbb, you should spesify 'diskbb' instead of 'unabsorbed'
+modelsToAddCfluxBefore = ["TBabs", "unabsorbed", "diskbb", "powerlaw"]
+
 writeParValuesAfterCflux = True

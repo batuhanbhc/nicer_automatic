@@ -234,7 +234,7 @@ for path, obsid, expo in searchedObservations:
 
         parTuple = (line[0], line[1], line[2], line[3], line[4])
 
-        if "Flux" in parTuple[0]:
+        if "flux" in parTuple[0]:
             fluxValuesDict[date].append(parTuple)
         else:
             otherParsDict[date].append(parTuple)
@@ -420,7 +420,7 @@ if len(fixedParameterDict.keys()) != 0 and len(fixedFluxDict.keys()) != 0:
         os.system("rm -rf " +scriptDir+"/__pycache__")
 
     try:
-        print("Creating the table: Flux values\n")
+        print("\nCreating the table: Flux values")
         unit = list(fixedFluxDict.values())[0][0][4]
         rowNum = len(list(fixedFluxDict.keys()))
 

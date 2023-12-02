@@ -145,7 +145,7 @@ def shakefit(bestModelList, resultsFile):
         with open("xspec_output.log", "r") as testfile:
             lines = testfile.readlines()[-35:]
         
-        print("Checking powerlaw xspec error value...\n")
+        print("\nChecking powerlaw xspec error value...\n")
         retrievePhotonIndex = False
         for line in lines:
             line = line.strip("\n")
@@ -769,7 +769,7 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
             
         if line[0].lower() == "endmodel":
             # End of model pipeline
-            break
+            return True
         
         if inside_if:
             if line[0] == "endif":
@@ -1001,7 +1001,7 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
             if line[0] == "setpoint":
                 if line[1] == "fix":
                     if enableFixing[0]:
-                        print("All parameters spesified by 'fixParameters' have now been fixed.\n")
+                        print("\nAll parameters spesified by 'fixParameters' have now been fixed.")
                         fixAllParameters(fixedValues)
                         continue
                     else:
@@ -1028,7 +1028,8 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
             elif userInput.lower() == "y":
                 print("Continuing to the script..")
                 break
-
+    
+    return False
 
 #===================================================================================================================
 energyLimits = energyFilter.split(" ")
@@ -1201,7 +1202,11 @@ for x in range(2):
         nullhypList = [{}, {}]
         
         # Parse the txt file and start processing the commands within
-        parseTxt(pipelineFile, bestModel, nullhypList, logFile, startFixingParameters)
+        foundTargetModel = parseTxt(pipelineFile, bestModel, nullhypList, logFile, startFixingParameters)
+
+        if foundTargetModel == False:
+            print("\nModel pipeline identifier '" + processPipeline + "' could not be found.")
+            quit()
         
         #========================================================================================================================================
         # Start recording nH values if fixParameters is set to True.
@@ -1328,73 +1333,7 @@ for x in range(2):
 
             print("=============================================================================================\n")
             break
-            """# Calculate average value for TBabs.nH from top 3 longest exposure observations
-            expoNhPairs = {}
-            for i in fixedValues["TBabs.nH"]:
-                nhValue = float(i.split(",")[0])
-                expoValue = float(i.split(",")[1])
-                expoNhPairs[expoValue] = nhValue
-            
-            sortedDict = {key: expoNhPairs[key] for key in sorted(expoNhPairs, reverse=True)}
 
-            countNh = 0
-            totalTBabsNH = 0
-            try:
-                print("Taking the average of nH values for TBabs model:")
-                keyList = list(sortedDict.keys())
-                valueList = list(sortedDict.values())
-                for i in range(3):
-                    print("nH value:", valueList[countNh], "from an observation with exposure:", keyList[countNh])
-                    totalTBabsNH += valueList[countNh]
-                    countNh += 1
-            except:
-                print("\nWARNING: Average nH values will be calculated using data from less than 3 observations.\n")
-
-            avgTBabs = totalTBabsNH / countNh
-            fixedValues["TBabs.nH"] = str(avgTBabs) + " -1"
-            print("TBabs.nH has been fixed to the value:", avgTBabs, "\n")
-
-            # Calculate average value for pcfabs.nH from top 3 longest exposure observations
-            expoNhPairs = {}
-            for i in fixedValues["pcfabs.nH"]:
-                nhValue = float(i.split(",")[0])
-                expoValue = float(i.split(",")[1])
-                expoNhPairs[expoValue] = nhValue
-            
-            sortedDict = {key: expoNhPairs[key] for key in sorted(expoNhPairs, reverse=True)}
-
-            countNh = 0
-            totalPcfabsNH = 0
-
-            try:
-                print("Taking the average of nH values for pcfabs model:")
-                keyList = list(sortedDict.keys())
-                valueList = list(sortedDict.values())
-                for i in range(3):
-                    print("nH value:", valueList[countNh], "from an observation with exposure:", keyList[countNh])
-                    totalPcfabsNH += valueList[countNh]
-                    countNh += 1
-            except:
-                print("\nWARNING: Average nH values will be calculated using data from less than 3 observations.\n")
-
-            avgPcfabs = totalPcfabsNH / countNh
-            fixedValues["pcfabs.nH"] = str(avgPcfabs) + " -1"
-            print("pcfabs.nH has been fixed to the value:", avgPcfabs)
-
-            # Close all log files5
-            writeBestFittingModel(logFile)
-
-            modFileName = extractModFileName()
-            # Remove any pre-existing best model files and save a new one
-            for eachFile in allFiles:
-                if "best_" in eachFile:
-                    os.system("rm " + eachFile)
-
-            saveModel("best_" + modFileName, obsid)
-            closeAllFiles()
-
-            print("=============================================================================================\n")
-            break"""
         #========================================================================================================================================
         # Calculate uncertainity boundaries
         if errorCalculations:

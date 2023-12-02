@@ -124,27 +124,23 @@ def findFlux():
             upperFlux /= (10**-9)
             return [flux, lowerFlux, upperFlux]
 
-def calculateFlux(component, modelName, initialFlux = ""):
+def calculateFlux(component, modelName):
     if component == "unabsorbed":
-        if "pcfabs" in modelName:
-            # Assuming TBabs also exists, and pcfabs comes after TBabs. If not, please change this part.
-            absIndex = modelName.find("pcfabs")
-            newName = modelName[:absIndex + 6] + "*cflux" + modelName[absIndex + 6:]
+        if modelName.find("(") == 0:
+            newName = "cflux" + modelName
         else:
-            absIndex = modelName.find("TBabs")
-            newName = modelName[:absIndex + 5] + "*cflux" + modelName[absIndex + 5:]
+            newName = modelName[: modelName.find("(")] + "*cflux" + modelName[modelName.find("("):]
         
     else:
         compIndex = modelName.find(component)
         newName = modelName[:compIndex] + "cflux*" + modelName[compIndex:]
 
     m = Model(newName)
-    if initialFlux != "":
-        enterParameters(parameters, {"Emin":Emin, "Emax":Emax, "lg10Flux": initialFlux})
-    else:
-        enterParameters(parameters, {"Emin":Emin, "Emax":Emax})
+
+    enterParameters(parameters, {"Emin":Emin, "Emax":Emax})
     freezeNorm()
     fitModel()
+
     fluxVals = findFlux()
     
     return fluxVals
@@ -266,7 +262,40 @@ for path, obsid, expo in searchedObservations:
     file.write("Fluxes of model components (in 10^-9 ergs/cm^2/s) (90% confidence intervals)\n\n")
     modelName = AllModels(1).expression.replace(" ", "")
 
-    # Absorbed flux
+    for fluxModel in modelsToAddCfluxBefore:
+        if fluxModel != "unabsorbed" and (fluxModel not in modelName):
+            print("\nWARNING: Model '" + fluxModel + "' does not exist in current model expression.")
+            print("Skipping current iteration for calculating fluxes..\n")
+            continue
+        elif fluxModel == "unabsorbed" and ("(" not in modelName):
+            print("\nWARNING: Could not find any paranthesis in current model expression, location of adding cflux is unclear.")
+            print("Skipping current iteration for calculating fluxes..\n")
+            continue
+
+        print("Adding cflux before: " + fluxModel)
+        flux = calculateFlux(fluxModel, modelName)
+        file.write(energyFilter +" keV " + AllModels(1).expression + "\nFlux: " + listToStr(flux) + "\n")
+        if writeParValuesAfterCflux:
+            writeParsAfterFlux()
+        
+        # Write flux values to parameter file
+        parameterFile = open("parameters_bestmodel.txt", "r")
+        appendFlux = True
+        for line in parameterFile.readlines():
+            if  fluxModel +"_flux" in line:
+                appendFlux = False
+                break
+        parameterFile.close()
+
+        if appendFlux:
+            parameterFile = open("parameters_bestmodel.txt", "a")
+            parameterFile.write(fluxModel +"_flux " + listToStr(flux)+ " (10^-9_ergs_cm^-2_s^-1)\n")
+            parameterFile.close()
+            print("Successfully added flux data to the parameter file.\n")
+        else:
+            print("There is already flux data about '" + fluxModel + "' in parameter file.\n")
+
+    """# Absorbed flux
     print("Calculating the absorbed flux...\n")
     absFlux = calculateFlux("TBabs", modelName, -8.4)
     file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(absFlux) + "\n")
@@ -347,7 +376,7 @@ for path, obsid, expo in searchedObservations:
         else:
             print("There is already data about powerlaw flux in parameter file.\n")
     else:
-        file.write("Powerlaw flux is 0. There is no powerlaw component in the model expression.\n")
+        file.write("Powerlaw flux is 0. There is no powerlaw component in the model expression.\n")"""
 
     file.close()
     AllModels.clear()
