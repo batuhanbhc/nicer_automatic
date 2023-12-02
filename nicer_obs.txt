@@ -1,4 +1,10 @@
-/home/batuhanbahceci/NICER/data/4u1630/6588010101
-/home/batuhanbahceci/NICER/data/4u1630/6588010102
-/home/batuhanbahceci/NICER/data/4u1630/6588010103
-/home/batuhanbahceci/NICER/data/4u1630/6588010104
+/home/bbahceci/NICER/data/4u1630-47/6588010101
+/home/bbahceci/NICER/data/4u1630-47/6588010102
+/home/bbahceci/NICER/data/4u1630-47/6588010103
+/home/bbahceci/NICER/data/4u1630-47/6588010104
+/home/bbahceci/NICER/data/4u1630-47/6588010111
+/home/bbahceci/NICER/data/4u1630-47/6588010112
+/home/bbahceci/NICER/data/4u1630-47/6588010113
+/home/bbahceci/NICER/data/4u1630-47/6588010115
+/home/bbahceci/NICER/data/4u1630-47/6588010116
+/home/bbahceci/NICER/data/4u1630-47/6588010117

@@ -104,6 +104,11 @@ except:
     print("Could not find the directory spesified by $GEOMAG_PATH. Please check whether it points to an existing directory.")
     quit()
 
+if Path("kp_potsdam.fits").exists() == False:
+    print("Running nigeodown...")
+    os.system("nigeodown chatter=5")
+    print("Finished nigeodown.")
+
 # Extract file creation date
 hdu = fits.open("kp_potsdam.fits")
 date = hdu[0].header["DATE"]
@@ -347,6 +352,62 @@ for obs in validPaths:
             fitLog = outObsDir +"/" + resultsFile
             if Path(fitLog).exists() == False:
                 os.system("touch " + fitLog)
+
+# Check whether directories.txt exists
+if Path(commonDirectory + "/directories.txt").exists() == False:
+    print("\nERROR: Could not find 'directories.txt' file under the 'commonFiles' directory.")
+    print("Please make sure both the 'commonFiles' directory and the 'directories.txt' file exist and are constructed as intended by nicer_create.py.\n")
+    quit()
+
+fileContents = []
+# Open directories.txt and extract all the observation paths
+with open(commonDirectory + "/directories.txt", "r") as file:
+    lines = file.readlines()
+    
+    if len(lines) == 0:
+        print("\nFile 'directories.txt' is empty: Could not find any observation for spectral analysis.\n")
+        quit()
+
+    for line in lines:
+        line = line.strip().split(" ")
+        path = line[0]
+        obsid = line[1]
+        fileContents.append((path, obsid))
+
+# Create a seperate file for storing filtered observation paths to not repeat filtering process for other scripts
+if Path(commonDirectory + "/filtered_directories.txt").exists():
+    os.system("rm " + commonDirectory + "/filtered_directories.txt")
+os.system("touch " + commonDirectory + "/filtered_directories.txt")
+filteredFile = open(commonDirectory + "/filtered_directories.txt", "w")
+
+validObservations = []
+print("Checking the exposure of all observations:")
+# Check the exposure of all observations, select the ones with exposure > 100 seconds
+for path, obsid in fileContents:
+    try:
+        hdu = fits.open(path + "/ni" + obsid + "mpu7_sr3c50.pha")
+        expo = hdu[1].header["EXPOSURE"]
+        if expo < 100:
+            print("\nWARNING: Spectral files under " + path + " has exposure < 100: (" + str(expo) + " s)")
+            print("Skipping the observation directory above..")
+        else:
+            validObservations.append((path, obsid, expo))
+            filteredFile.write(path + " " + obsid + " " + str(expo) + "\n")
+    except:
+        print("\nWARNING: Pulse height amplitude (.pha) file is missing under " + path)
+        print("Skipping the observation directory above..")
+        break
+
+print("\nChecked all exposure values.")
+if len(validObservations) == 0:
+    print("Low exposure filter has discarded all observations inside directories.txt")
+    print("No spectral fitting will be applied..")
+    filteredFile.close()
+    quit()
+else:
+    filteredFile.close()
+    iterationMax = len(validObservations)
+    print("\nReady to proceed with the spectral fitting stage..\n")
 
 # This file is created after importing variables from another python file
 if Path(scriptDir + "/__pycache__").exists():

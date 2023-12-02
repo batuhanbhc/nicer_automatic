@@ -10,7 +10,7 @@ import math
 #============================================ Common variables for all scripts =================================================
 
 # The directory where the output files will be created at (Leave it blank [outputDir = ""] if you want output files to be created under the same directory as all scripts)
-outputDir = "/home/batuhanbahceci/NICER/analysis"
+outputDir = "/home/bbahceci/NICER/analysis"
 
 # The name of the file that contains paths of the observation folders
 inputTxtFile = "nicer_obs.txt"

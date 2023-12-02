@@ -165,39 +165,53 @@ Emax = energyLimits[1]
 
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
 
-# Check whether filtered_directories.txt exists
+searchedObsid = []
+with open(scriptDir + "/" + inputTxtFile, "r") as file:
+    allLines = file.readlines()
+    for line in allLines:
+        line = line.replace(" ", "")
+        line = line.strip("\n")
+        if line != "" and Path(line).exists():
+            if line[-1] != "/":
+                slashIdx = line.rfind("/")
+                obsid = line[slashIdx+1 :]
+            else:
+                slashIdx = line[:-1].rfind("/")
+                obsid = line[slashIdx+1:-1]
+            
+            searchedObsid.append(obsid)
+
+if len(searchedObsid) == 0:
+    print("\nCould not find any valid observation path, as given in the obs.txt file.")
+    quit()
+
+iterationMax = 0
+searchedObservations = []
 if Path(commonDirectory + "/filtered_directories.txt").exists() == False:
     print("\nERROR: Could not find 'filtered_directories.txt' file under the 'commonFiles' directory.")
-    print("Please make sure both the 'commonFiles' directory and the 'filtered_directories.txt' file exist and are constructed as intended by nicer_create.py and nicer_fit.py.\n")
-    quit()
-
-validObservations = []
-# Open filtered_directories.txt and extract all the observation paths
-with open(commonDirectory + "/filtered_directories.txt", "r") as file:
-    lines = file.readlines()
-    
-    if len(lines) == 0:
-        print("\nFile 'filtered_directories.txt' is empty: Could not find any observation for calculating fluxes.\n")
-        quit()
-
-    for line in lines:
-        line = line.strip().split(" ")
-        path = line[0]
-        obsid = line[1]
-        validObservations.append((path, obsid))
-
-if len(validObservations) == 0:
-    print("Low exposure filter has discarded all observations inside filtered_directories.txt")
-    print("No flux calculation will be conducted..")
+    print("Please make sure both the 'commonFiles' directory and the 'filtered_directories.txt' files exist and are constructed as intended by nicer_create.py.\n")
     quit()
 else:
-    print("\nMoving onto the flux calculations..\n")
+    with open(commonDirectory + "/filtered_directories.txt", "r") as filteredFile:
+        allLines = filteredFile.readlines()
+        for eachObsid in searchedObsid:
+            for line in allLines:
+                line = line.strip("\n")
+                lineElements = line.split(" ")
+
+                if lineElements[1] == eachObsid:
+                    iterationMax += 1
+                    searchedObservations.append((lineElements[0], lineElements[1], lineElements[2]))
+
+if len(searchedObservations) == 0:
+    print("\nCould not find the searched observation paths in 'filtered_directories.txt', most likely due to having low exposure.")
+    quit()
 
 if chatterOn == False:
     Xset.chatter = 0
 
 # Start calculating fluxes for each valid observation
-for path, obsid in validObservations:
+for path, obsid, expo in searchedObservations:
     print("====================================================================")
     print("Calculating fluxes for observation:", obsid, "\n")
 

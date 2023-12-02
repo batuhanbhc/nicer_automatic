@@ -1038,61 +1038,6 @@ Emax = energyLimits[1]
 allDir = os.listdir(outputDir)
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
 
-# Check whether directories.txt exists
-if Path(commonDirectory + "/directories.txt").exists() == False:
-    print("\nERROR: Could not find 'directories.txt' file under the 'commonFiles' directory.")
-    print("Please make sure both the 'commonFiles' directory and the 'directories.txt' file exist and are constructed as intended by nicer_create.py.\n")
-    quit()
-
-fileContents = []
-# Open directories.txt and extract all the observation paths
-with open(commonDirectory + "/directories.txt", "r") as file:
-    lines = file.readlines()
-    
-    if len(lines) == 0:
-        print("\nFile 'directories.txt' is empty: Could not find any observation for spectral fitting.\n")
-        quit()
-
-    for line in lines:
-        line = line.strip().split(" ")
-        path = line[0]
-        obsid = line[1]
-        fileContents.append((path, obsid))
-
-# Create a seperate file for storing filtered observation paths to not repeat filtering process for flux and graph scripts
-if Path(commonDirectory + "/filtered_directories.txt").exists() == False:
-    os.system("touch " + commonDirectory + "/filtered_directories.txt")
-filteredFile = open(commonDirectory + "/filtered_directories.txt", "w")
-
-validObservations = []
-print("Checking the exposure of all observations:")
-# Check the exposure of all observations, select the ones with exposure > 100 seconds
-for path, obsid in fileContents:
-    try:
-        hdu = fits.open(path + "/ni" + obsid + "mpu7_sr3c50.pha")
-        expo = hdu[1].header["EXPOSURE"]
-        if expo < 100:
-            print("\nWARNING: Spectral files under " + path + " has exposure < 100: (" + str(expo) + " s)")
-            print("Skipping the observation directory above..")
-        else:
-            validObservations.append((path, obsid, expo))
-            filteredFile.write(path + " " + obsid + "\n")
-    except:
-        print("\nWARNING: Pulse height amplitude (.pha) file is missing under " + path)
-        print("Skipping the observation directory above..")
-        break
-
-print("\nChecked all exposure values.")
-if len(validObservations) == 0:
-    print("Low exposure filter has discarded all observations inside directories.txt")
-    print("No spectral fitting will be applied..")
-    filteredFile.close()
-    quit()
-else:
-    filteredFile.close()
-    iterationMax = len(validObservations)
-    print("\nMoving onto the spectral fitting stage..\n")
-
 # Initializing required variables/dictionaries in case fixParameters is set to True.
 fixedValues = {}
 takeAverages = False
@@ -1112,9 +1057,54 @@ if chatterOn == False:
 # Set the correct path for the pipelineFile
 pipelineFile = scriptDir + "/" + pipelineFile
 
+searchedObsid = []
+with open(scriptDir + "/" + inputTxtFile, "r") as file:
+    allLines = file.readlines()
+    for line in allLines:
+        line = line.replace(" ", "")
+        line = line.strip("\n")
+        if line != "" and Path(line).exists():
+            if line[-1] != "/":
+                slashIdx = line.rfind("/")
+                obsid = line[slashIdx+1 :]
+            else:
+                slashIdx = line[:-1].rfind("/")
+                obsid = line[slashIdx+1:-1]
+            
+            searchedObsid.append(obsid)
+
+if len(searchedObsid) == 0:
+    print("\nCould not find any valid observation path, as given in the obs.txt file.")
+    quit()
+
+iterationMax = 0
+searchedObservations = []
+if Path(commonDirectory + "/filtered_directories.txt").exists() == False:
+    print("\nERROR: Could not find 'filtered_directories.txt' file under the 'commonFiles' directory.")
+    print("Please make sure both the 'commonFiles' directory and the 'filtered_directories.txt' files exist and are constructed as intended by nicer_create.py.\n")
+    quit()
+else:
+    with open(commonDirectory + "/filtered_directories.txt", "r") as filteredFile:
+        allLines = filteredFile.readlines()
+        for eachObsid in searchedObsid:
+            for line in allLines:
+                line = line.strip("\n")
+                lineElements = line.split(" ")
+
+                if lineElements[1] == eachObsid:
+                    iterationMax += 1
+                    searchedObservations.append((lineElements[0], lineElements[1], lineElements[2]))
+
+if len(searchedObservations) == 0:
+    print("\nCould not find the searched observation paths in 'filtered_directories.txt', most likely due to having low exposure.")
+    quit()
+
+if iterationMax > sampleSize:
+    iterationMax = sampleSize
+
 for x in range(2):
     iteration = 0
-    for path, obsid, exposure in validObservations:
+    for path, obsid, exposure in searchedObservations:
         iteration += 1
 
         print("=============================================================================================")
