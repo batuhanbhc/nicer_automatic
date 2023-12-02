@@ -2,7 +2,7 @@
 # Authors: Batuhan Bahçeci
 # Contact: batuhan.bahceci@sabanciuniv.edu
 
-from nicer_variables import *
+from parameter import *
 
 print("==============================================================================")
 print("\t\t\tRunning the file: " + fluxScript + "\n")

@@ -2,7 +2,7 @@
 # Authors: Batuhan Bahçeci
 # Contact: batuhan.bahceci@sabanciuniv.edu
 
-from nicer_variables import *
+from parameter import *
 from datetime import datetime, timezone, timedelta
 
 print("==============================================================================")
@@ -74,7 +74,7 @@ lightLeak_date = "2023/05/22"
 date_format = "%Y/%m/%d"
 lightleak_object = datetime.strptime(lightLeak_date, date_format)
 
-#Extract observation paths from nicer_obs.txt
+#Extract observation paths from observations.txt
 validPaths = []
 for line in inputFile.readlines():
     line = line.replace(" ", "")

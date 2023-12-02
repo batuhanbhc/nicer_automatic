@@ -13,7 +13,7 @@ import math
 outputDir = "/home/bbahceci/NICER/analysis"
 
 # The name of the file that contains paths of the observation folders
-inputTxtFile = "nicer_obs.txt"
+inputTxtFile = "observations.txt"
 
 # The log file where the fit results will be saved
 resultsFile = "fit_results.log"
