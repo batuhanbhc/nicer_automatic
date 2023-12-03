@@ -55,3 +55,32 @@ save model
 
 ENDMODEL
 #####################################################################################
+
+MODEL model_2
+load TBabs*powerlaw
+assign powerlaw.PhoIndex:2,,0.5,0.5 powerlaw.norm:1.5
+search premodel
+
+setpoint fix
+
+fit
+save model
+ftest nullhyp
+
+addcomp diskbb after powerlaw + -wrap
+assign diskbb.Tin:1.4 diskbb.norm:80
+search premodel
+
+if powerlaw.PhoIndex > 8
+assign powerlaw.PhoIndex:2 powerlaw.norm:1.5
+endif
+
+fit
+save model
+
+ftest perform
+
+fit
+save model
+
+ENDMODEL

@@ -139,43 +139,48 @@ def shakefit(bestModelList, resultsFile):
         else:
             pass
 
-    # Before proceeding with shakefit, check if powerlaw is in model expression. If so, check whether xspec error for photon index is bigger than 1 or not.
-    # If bigger than 1, fix photon index to 1.8 (may change in future) and only then continue with shakefit
-    if "powerlaw" in AllModels(1).expression:
-        with open("xspec_output.log", "r") as testfile:
-            lines = testfile.readlines()[-35:]
-        
-        print("\nChecking powerlaw xspec error value...\n")
-        retrievePhotonIndex = False
-        for line in lines:
-            line = line.strip("\n")
-            if " par  comp" in line:
-                retrievePhotonIndex = True
+    if checkPowerlawErrorAndFreeze:
+        # Before proceeding with shakefit, check if powerlaw is in model expression. If so, check whether xspec error for photon index is bigger than 1 or not.
+        # If bigger than 1, fix photon index to 1.7 (may change in future) and only then continue with shakefit
+        if "powerlaw" in AllModels(1).expression:
+            with open("xspec_output.log", "r") as testfile:
+                lines = testfile.readlines()[-35:]
             
-            if retrievePhotonIndex:
-                if "powerlaw" not in line:
-                    pass
-                else:
-                    words = line.split(" ")
+            print("\nChecking powerlaw xspec error value...\n")
+            retrievePhotonIndex = False
+            for line in lines:
+                line = line.strip("\n")
+                if " par  comp" in line:
+                    retrievePhotonIndex = True
+                
+                if retrievePhotonIndex:
+                    if "powerlaw" not in line:
+                        pass
+                    else:
+                        words = line.split(" ")
 
-                    # Remove all empty elements from the list
-                    while True:
-                        try:
-                            emptyIndex = words.index("")
-                            words.pop(emptyIndex)
-                        except:
+                        # Remove all empty elements from the list
+                        while True:
+                            try:
+                                emptyIndex = words.index("")
+                                words.pop(emptyIndex)
+                            except:
+                                break
+
+                        errorValue = words[-1]  # Xspec error value
+                        errorValue = errorValue.strip("\n")
+                        
+                        if errorValue == "frozen":
                             break
 
-                    errorValue = words[-1]  # Xspec error value
-                    errorValue = errorValue.strip("\n")
-                    errorValue = float(errorValue)
-                    if (1 >= errorValue > 0) == False:
-                        AllModels(1).powerlaw.PhoIndex.values = "1.7 -1"
-                        resultsFile.write("\nWARNING: Powerlaw photon index is frozen at " + str(AllModels(1).powerlaw.PhoIndex.values[0]) + " for having large xspec error: " + str(errorValue)+ "\n")
-                        print("Powerlaw xspec error value is: " + str(errorValue))
-                        print("\nWARNING: Powerlaw photon index is frozen at " + str(AllModels(1).powerlaw.PhoIndex.values[0]) + " for having xspec error bigger than 1: "+str(errorValue)+"\n")
-                    
-                    break
+                        errorValue = float(errorValue)
+                        if (1 >= errorValue > 0) == False:
+                            AllModels(1).powerlaw.PhoIndex.values = "1.7 -1"
+                            resultsFile.write("\nWARNING: Powerlaw photon index is frozen at " + str(AllModels(1).powerlaw.PhoIndex.values[0]) + " for having large xspec error: " + str(errorValue)+ "\n")
+                            print("Powerlaw xspec error value is: " + str(errorValue))
+                            print("\nWARNING: Powerlaw photon index is frozen at " + str(AllModels(1).powerlaw.PhoIndex.values[0]) + " for having xspec error bigger than 1: "+str(errorValue)+"\n")
+                        
+                        break
 
     Fit.query = "no"
     resultsFile.write("========== Proceeding with shakefit error calculations ==========\n")
@@ -203,7 +208,7 @@ def shakefit(bestModelList, resultsFile):
             counter = 0
             while continueError and counter < 100:
                 counter += 1
-                Fit.error("stopat 10 0.1 maximum 50 " + str(delChi) + " " + str(i))
+                Fit.error("stopat 10 0.1 maximum 100 " + str(delChi) + " " + str(i))
                 errorResult = AllModels(1)(i).error
                 errorString = errorResult[2]
 

@@ -46,7 +46,7 @@ highResLcTimeResInPwrTwo = -8    # Enter a value as a power of two smaller or eq
 # Name of the file that contains the definitions of model pipelines
 pipelineFile = "models.txt"
 
-# Named of the model pipeline defined in models.txt
+# Name of the model pipeline defined in models.txt
 # DO NOT ENTER ANY EMPTY SPACE, USE "_" INSTEAD
 processPipeline = "model_1"
 
@@ -57,7 +57,7 @@ sampleSize = 15
 # observations while fixing these parameters to their averages.
 parametersToFix = ["TBabs.nH", "pcfabs.nH"]
 
-# Set it to True if you have made changes in models, and do not want to use any previous model files in commonDirectory
+# Set it to True if you have made changes in models, and do not want to use any previous model files for parameter initialization in commonDirectory
 # restartOnce only deletes model files before the first observation, restartAlways deletes model files before all observations
 restartOnce = True
 restartAlways = False
@@ -71,6 +71,8 @@ makeXspecScript = True      # If set to True, the script will create an .xcm fil
 
 errorCalculations = True    # If set to True, the script will run "shakefit" function to calculate the error boundaries and possibly converge the
                             # fit to better parameter values.
+
+checkPowerlawErrorAndFreeze = True
 
 # Shakefit will only try to calculate errors for below parameters. The keys are xspec modelnames.parameternames, and values are the units.
 # If the parameter does not have a spesific unit (like normalizations, photon index etc), put "X" as value
