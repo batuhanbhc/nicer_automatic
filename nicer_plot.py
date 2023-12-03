@@ -240,17 +240,33 @@ for path, obsid, expo in searchedObservations:
             otherParsDict[date].append(parTuple)
 
 #Find the referance point for the x-axis (date), and update the previously created dictionaries
-referanceMjd = round((min(otherParsDict) - 10) / 5) * 5
-fixedFluxDict = {}
-fixedParameterDict = {}
-for key, val in fluxValuesDict.items():
-    fixedFluxDict[key - referanceMjd] = val
-for key, val in otherParsDict.items():
-    fixedParameterDict[key - referanceMjd] = val
+if len(otherParsDict) != 0:
+    referanceMjd = round((min(otherParsDict) - 10) / 5) * 5
+    fixedFluxDict = {}
+    fixedParameterDict = {}
+    for key, val in fluxValuesDict.items():
+        fixedFluxDict[key - referanceMjd] = val
+    for key, val in otherParsDict.items():
+        fixedParameterDict[key - referanceMjd] = val
+elif len(fluxValuesDict) != 0:
+    referanceMjd = round((min(fluxValuesDict) - 10) / 5) * 5
+    fixedFluxDict = {}
+    fixedParameterDict = {}
+    for key, val in fluxValuesDict.items():
+        fixedFluxDict[key - referanceMjd] = val
+    for key, val in otherParsDict.items():
+        fixedParameterDict[key - referanceMjd] = val
+else:
+    print("\nERROR: Both dictionaries (parameter/flux) are empty. There is no data to create any graph.")
+    quit()
 
-if len(fixedParameterDict.keys()) != 0 and len(fixedFluxDict.keys()) != 0:
+if len(fixedParameterDict.keys()) != 0 or len(fixedFluxDict.keys()) != 0:
     # Set static x-axis ticks for all graphs
-    mjdList = list(fixedParameterDict.keys())
+    if len(fixedFluxDict.keys()) != 0:
+        mjdList = list(fixedFluxDict.keys())
+    else:
+        mjdList = list(fixedParameterDict.keys())
+        
     minMjd = min(mjdList)
     maxMjd = max(mjdList)
 
