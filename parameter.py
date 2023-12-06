@@ -73,6 +73,7 @@ errorCalculations = True    # If set to True, the script will run "shakefit" fun
                             # fit to better parameter values.
 
 checkPowerlawErrorAndFreeze = True
+powerlawIndexToFreezeAt = 1.7
 
 # Shakefit will only try to calculate errors for below parameters. The keys are xspec modelnames.parameternames, and values are the units.
 # If the parameter does not have a spesific unit (like normalizations, photon index etc), put "X" as value

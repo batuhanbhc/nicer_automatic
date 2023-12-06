@@ -175,7 +175,7 @@ def shakefit(bestModelList, resultsFile):
 
                         errorValue = float(errorValue)
                         if (1 >= errorValue > 0) == False:
-                            AllModels(1).powerlaw.PhoIndex.values = "1.7 -1"
+                            AllModels(1).powerlaw.PhoIndex.values = str(powerlawIndexToFreezeAt) + " -1"
                             resultsFile.write("\nWARNING: Powerlaw photon index is frozen at " + str(AllModels(1).powerlaw.PhoIndex.values[0]) + " for having large xspec error: " + str(errorValue)+ "\n")
                             print("Powerlaw xspec error value is: " + str(errorValue))
                             print("\nWARNING: Powerlaw photon index is frozen at " + str(AllModels(1).powerlaw.PhoIndex.values[0]) + " for having xspec error bigger than 1: "+str(errorValue)+"\n")
@@ -502,10 +502,12 @@ def alter_list_add(compName, addedIdx, bestModelList):
     modelValues = list(bestModelList[0].values())[::-1]
     
     for i in range(len(modelKeys)):
-        if "_" in modelKeys[i]:
-            compNum = modelKeys[i][modelKeys[i].find("_") + 1: modelKeys[i].find(".")]
+        compPart = modelKeys[i][:modelKeys[i].find(".")]
+        rest = modelKeys[i][modelKeys[i].find("."):]
+        if "_" in compPart:
+            compNum = compPart[compPart.find("_") + 1 :]
             if int(compNum) > addedIdx:
-                newKey = modelKeys[i].replace(compNum, str(int(compNum)+1))
+                newKey = compPart.replace(compNum, str(int(compNum)+1)) + rest
                 bestModelList[0].pop(modelKeys[i])
                 bestModelList[0][newKey] = modelValues[i]
         elif compName in modelKeys[i]:
