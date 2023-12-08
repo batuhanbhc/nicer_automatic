@@ -375,10 +375,16 @@ with open(commonDirectory + "/directories.txt", "r") as file:
         fileContents.append((path, obsid))
 
 # Create a seperate file for storing filtered observation paths to not repeat filtering process for other scripts
-if Path(commonDirectory + "/filtered_directories.txt").exists():
-    os.system("rm " + commonDirectory + "/filtered_directories.txt")
-os.system("touch " + commonDirectory + "/filtered_directories.txt")
-filteredFile = open(commonDirectory + "/filtered_directories.txt", "w")
+if Path(commonDirectory + "/filtered_directories.txt").exists() == False:
+    os.system("touch " + commonDirectory + "/filtered_directories.txt")
+
+filteredObs = []
+filteredFile = open(commonDirectory + "/filtered_directories.txt", "r")
+for line in filteredFile.readlines():
+    line = line.strip(" \n")
+    filteredObs.append(line)
+
+filteredFile = open(commonDirectory + "/filtered_directories.txt", "a")
 
 validObservations = []
 print("Checking the exposure of all observations:")
@@ -392,7 +398,8 @@ for path, obsid in fileContents:
             print("Skipping the observation directory above..")
         else:
             validObservations.append((path, obsid, expo))
-            filteredFile.write(path + " " + obsid + " " + str(expo) + "\n")
+            if (path + " " + obsid + " " + str(expo)) not in filteredObs:
+                filteredFile.write(path + " " + obsid + " " + str(expo) + "\n")
     except:
         print("\nWARNING: Pulse height amplitude (.pha) file is missing under " + path)
         print("Skipping the observation directory above..")
@@ -406,7 +413,6 @@ if len(validObservations) == 0:
     quit()
 else:
     filteredFile.close()
-    iterationMax = len(validObservations)
     print("\nReady to proceed with the spectral fitting stage..\n")
 
 # This file is created after importing variables from another python file
