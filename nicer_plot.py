@@ -108,6 +108,9 @@ otherParsDict = {}
 fluxValuesDict = {}
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
 
+if Path(commonDirectory + "/results").exists() == False:
+    os.system("mkdir " + commonDirectory + "/results")
+
 searchedObsid = []
 with open(scriptDir + "/" + inputTxtFile, "r") as file:
     allLines = file.readlines()
@@ -150,6 +153,9 @@ if len(searchedObservations) == 0:
     print("\nCould not find the searched observation paths in 'filtered_directories.txt', most likely due to having low exposure.")
     quit()
 
+encounteredDates = []
+encounteredFluxes = []
+uniqueFluxes = 0
 allDates = []
 for path, obsid, expo in searchedObservations:
     outObsDir = path
@@ -193,6 +199,10 @@ for path, obsid, expo in searchedObservations:
     allDates.append(date)
     hdu.close()
 
+    # NOTE: THERE IS STILL AN ISSUE HERE WHEN THERE ARE MULTIPLE OBSERVATIONS WITH THE SAME DATE. THIS NEEDS TO BE FIXED SOONER OR LATER.
+    if date not in encounteredDates:
+        encounteredDates.append(date)
+
     Xset.chatter = 0
     Xset.restore(modFile)
     abundance = Xset.abund[:Xset.abund.find(":")]
@@ -202,17 +212,14 @@ for path, obsid, expo in searchedObservations:
     otherParsDict[date] = []
 
     file = open(parFile)
-    iterator = 0
-    for line in file:
-        iterator += 1
-        if iterator == 1:
-            continue
-
-        # Extract the parameter values with uncertainities
+    allLines = file.readlines()
+    for line in allLines[1:]:
+        # Extract the parameter values with associated uncertainities
         line = line.strip("\n")
         line = line.split(" ")
         for i in range(len(line)):
             line[i] = line[i].replace("_", " ")
+
         line[1] = float(line[1])
         line[2] = line[1] - float(line[2])
         line[3] = float(line[3]) - line[1]
@@ -236,6 +243,9 @@ for path, obsid, expo in searchedObservations:
 
         if "flux" in parTuple[0]:
             fluxValuesDict[date].append(parTuple)
+            if line[0] not in encounteredFluxes:
+                encounteredFluxes.append(line[0])
+                uniqueFluxes += 1
         else:
             otherParsDict[date].append(parTuple)
 
@@ -312,6 +322,7 @@ if len(fixedParameterDict.keys()) != 0 or len(fixedFluxDict.keys()) != 0:
                 else:
                     modelPars[tuple[0]] = ([tuple[1]], [tuple[2]], [tuple[3]], [key], tuple[4])
 
+        # Number of plots should be equal to the number of observation dates
         plotNum = len(modelPars.keys())
         
         if plotNum == 0:
@@ -320,16 +331,17 @@ if len(fixedParameterDict.keys()) != 0 or len(fixedFluxDict.keys()) != 0:
             else:
                 problematicGraph = "Model parameters"
 
-            print("WARNING: The script is trying to create graphs without any parameters. Skipping the following graph: " + problematicGraph + "\n")
+            print("WARNING: The script is trying to create a graph without any parameters. Skipping the following graph: " + problematicGraph + "\n")
 
             continue
         
+        # Rows for the parameter table should be equal to the number of plots (+1 including the header)
         rows = plotNum
         cols = 1
 
+        # Create a subplot for multiple graphs
         fig, axs = plt.subplots(rows, cols, figsize=(6, plotNum*2.5))
         plt.subplots_adjust(wspace=0, hspace=0)
-        counter = 0
 
         createCommonLabel = False
         commonLabel = ""
@@ -337,16 +349,70 @@ if len(fixedParameterDict.keys()) != 0 or len(fixedFluxDict.keys()) != 0:
             if val[4] != "":
                 createCommonLabel = True
                 commonLabel = val[4]
+                break
         
         if createCommonLabel:
+            # Y-axis as a common label for all graphs (only if it is given inside the parameter file)
             fig.text(0.93, 0.5, commonLabel, va='center', rotation='vertical')
+        
+        if dictionaryCounter == 1:
+            if Path(commonDirectory + "/results/flux_table.txt").exists() == False:
+                os.system("touch " + commonDirectory + "/results/flux_table.txt")
+            tableFile = open(commonDirectory + "/results/flux_table.txt", "w")
+        else:
+            if Path(commonDirectory + "/results/parameter_table.txt").exists() == False:
+                os.system("touch " + commonDirectory + "/results/parameter_table.txt")
+            tableFile = open(commonDirectory + "/results/parameter_table.txt", "w")
+        
+        # Just the number of rows for observations, header row not included
+        dataRowNum = len(encounteredDates)
 
+        # Create table structure using nested lists
+        tableRows = []
+        for i in range(dataRowNum + 1):
+            tableRows.append([])
+
+        # Initialize the first "column" of the table from dates of observations
+        tableRows[0].append("MJD")
+        idx = 1
+        for eachDate in encounteredDates:
+            tableRows[idx].append(str(eachDate))
+            idx += 1
+
+        counter = 0
         for i in range(rows):
             xAxis = list(modelPars.values())[counter][3]
             yAxis = list(modelPars.values())[counter][0]
             errorLow = list(modelPars.values())[counter][1]
             errorHigh = list(modelPars.values())[counter][2]
             parName = list(modelPars.keys())[counter]
+
+            idx = 0
+            tableRows[0].append(parName.replace(" ", "_"))
+            for j in range(dataRowNum):
+                if (encounteredDates[j] == (xAxis[idx]) + referanceMjd):
+                    tableRows[j + 1].append(str(yAxis[idx]))
+                    idx += 1
+                else:
+                    tableRows[j + 1].append("-")
+
+            idx = 0
+            tableRows[0].append(parName.replace(" ", "_")+ "_errneg")
+            for j in range(dataRowNum):
+                if (encounteredDates[j] == (xAxis[idx] + referanceMjd)):
+                    tableRows[j + 1].append(str(errorLow[idx]))
+                    idx += 1
+                else:
+                    tableRows[j + 1].append("-")
+
+            idx = 0
+            tableRows[0].append(parName.replace(" ", "_") + "_errpos")
+            for j in range(dataRowNum):
+                if (encounteredDates[j] == (xAxis[idx] + referanceMjd)):
+                    tableRows[j + 1].append(str(errorHigh[idx]))
+                    idx += 1
+                else:
+                    tableRows[j + 1].append("-")
 
             axs[i].errorbar(xAxis, yAxis, yerr=[errorLow, errorHigh], fmt='o', markersize=4, ecolor="black", color="black", capsize=0)
             axs[i].minorticks_on()
@@ -415,16 +481,22 @@ if len(fixedParameterDict.keys()) != 0 or len(fixedFluxDict.keys()) != 0:
             axs[i].set_yticks(newMajorList)
 
             counter += 1
+        
+        for eachLine in tableRows:
+            eachLine = " ".join(eachLine) + "\n"
+            tableFile.write(eachLine)
+        
+        tableFile.close()
 
         if eachDict == fixedParameterDict:
-            pngFile = commonDirectory + "/model_parameters.png"
+            pngFile = commonDirectory + "/results/model_parameters.png"
             pngPath = Path(pngFile)
             if pngPath.exists():
                 subprocess.run(["rm", pngFile])
 
             plt.savefig(pngFile)
         else:
-            pngFile = commonDirectory + "/flux_values.png"
+            pngFile = commonDirectory + "/results/flux_values.png"
             pngPath = Path(pngFile)
             if pngPath.exists():
                 subprocess.run(["rm", pngFile])
@@ -435,50 +507,60 @@ if len(fixedParameterDict.keys()) != 0 or len(fixedFluxDict.keys()) != 0:
     if Path(scriptDir + "/__pycache__").exists():
         os.system("rm -rf " +scriptDir+"/__pycache__")
 
-    try:
-        print("\nCreating the table: Flux values")
-        unit = list(fixedFluxDict.values())[0][0][4]
-        rowNum = len(list(fixedFluxDict.keys()))
+    # The below part will create a visual flux table, but since there is already a table in txt format, along with a graph, I might delete this part in future.
+    print("\nCreating the table: Flux values")
+    unit = list(fixedFluxDict.values())[0][0][4]
+    rowNum = len(list(fixedFluxDict.keys()))
 
-        fluxTable = [["Time (MJD)", "Unabsorbed Flux\n" + unit, "Diskbb Flux\n" + unit, "Powerlaw Flux\n" + unit]]
+    #Create the table dictionary, along with the title row
+    fluxTable = [["Time (MJD)"]]
+    for eachFlux in encounteredFluxes:
+        fluxTable[0].append(eachFlux.title())
 
-        for key, val in fixedFluxDict.items():
-            tableRow = []
-            tableRow.append(float(format(key, ".1f")) + referanceMjd)
-            tableRow.append(format(val[0][1], ".4f") + "\n(-" + format(val[0][2], ".4f") + "/+" + format(val[0][3], ".4f") + ")")
-            tableRow.append(format(val[1][1], ".4f") + "\n(-" + format(val[1][2], ".4f") + "/+" + format(val[1][3], ".4f") + ")")
-            try:
-                tableRow.append(format(val[2][1], ".4f") + "\n(-" + format(val[2][2], ".4f") + "/+" + format(val[2][3], ".4f") + ")")
-            except:
-                tableRow.append("-")
-            
-            fluxTable.append(tableRow)
+    
+    for key, val in fixedFluxDict.items():
+        index = 1
+        tableRow = ["-"]*(uniqueFluxes + 1)
+        tableRow[0] = (float(format(key, ".1f")) + referanceMjd)
 
-        fluxTable.append([" ", " ", " ", " "])
-        fig, ax = plt.subplots(figsize=(12,rowNum))
+        dataIndex = 0
+        for eachColumn in fluxTable[0][1:]:
+            if dataIndex >= len(val):
+                break
+            if eachColumn == val[dataIndex][0].title():
+                tableRow[index] = (format(val[dataIndex][1], ".4f") + "\n(-" + format(val[dataIndex][2], ".4f") + "/+" + format(val[dataIndex][3], ".4f") + ")")
+                dataIndex += 1
+            else:
+                tableRow[index] = "-"
+             
+            index += 1
 
-        table = ax.table(cellText=fluxTable, cellLoc='center', loc='center', edges='T')
-        table.auto_set_font_size(False)
-        table.set_fontsize(12)
-        table.scale(1.2, 2.7)  # Adjust the size of the table
+        fluxTable.append(tableRow)
 
-        cellSize = 4 * len(fluxTable)
-        cellCounter = 0
-        for key, cell in table._cells.items():
-            if cellCounter > 7 and cellCounter < cellSize - 4:
-                cell.set_linewidth(0)
-            
-            cellCounter += 1
+    fluxTable.append([" "] * (uniqueFluxes + 1))
+    fig, ax = plt.subplots(figsize=(12,rowNum))
 
-        ax.axis('off')  # Turn off the axes
+    table = ax.table(cellText=fluxTable, cellLoc='center', loc='center', edges='T')
+    table.auto_set_font_size(False)
+    table.set_fontsize(12)
+    table.scale(1.2, 2.7)  # Adjust the size of the table
 
-        tablePng = commonDirectory + "/flux_table.png"
-        tablePath = Path(tablePng)
-        if tablePath.exists():
-            subprocess.run(["rm", tablePng])
+    cellSize = 4 * len(fluxTable)
+    cellCounter = 0
+    for key, cell in table._cells.items():
+        if cellCounter > 2* (uniqueFluxes + 1) -1 and cellCounter < (len(fluxTable)*(uniqueFluxes+1) - (uniqueFluxes + 1)):
+            cell.set_linewidth(0)
+        
+        cellCounter += 1
 
-        plt.savefig(tablePng)
-    except:
-        print("Flux data could not be found: Flux table cannot be created.\n")
+    ax.axis('off')  # Turn off the axes
+
+    tablePng = commonDirectory + "/results/flux_table.png"
+    tablePath = Path(tablePng)
+    if tablePath.exists():
+        subprocess.run(["rm", tablePng])
+
+    plt.savefig(tablePng)
+
 else:
     print("\nCould not find any extracted set of parameters to create parameter graphs.")

@@ -7,6 +7,7 @@ from astropy.io import fits
 import matplotlib.pyplot as plt
 import numpy as np
 import math
+import re
 #============================================ Common variables for all scripts =================================================
 
 # The directory where the output files will be created at (Leave it blank [outputDir = ""] if you want output files to be created under the same directory as all scripts)
@@ -83,7 +84,8 @@ parametersForShakefit = {
     "diskbb.norm": "Normalization_(diskbb)",
     "diskbb.Tin": "Tin_(keV)",
     "powerlaw.PhoIndex": "index_(Γ)",
-    "powerlaw.norm": "Normalization_(powerlaw)"
+    "powerlaw.norm": "Normalization_(powerlaw)",
+    "TBabs.nH": "TBabs_nH"
 }
 
 # If set to True, gaussian equivalent widths will be calculated
@@ -93,6 +95,6 @@ calculateGaussEquivalentWidth = True
 # nicer_flux will add "cflux" component before the spesified models below to calculate flux.
 # unabsorbed is a special keyword that adds cflux right before the paranthesis in the model expression. If there is no paranthesis, it will be skipped.
 # If you want to calculate unabsorbed flux in a model that does not have paranthesis, such as TBabs*diskbb, you should spesify 'diskbb' instead of 'unabsorbed'
-modelsToAddCfluxBefore = ["TBabs", "unabsorbed", "diskbb", "powerlaw"]
+modelsToAddCfluxBefore = ["absorbed", "unabsorbed", "diskbb", "powerlaw"]
 
 writeParValuesAfterCflux = True

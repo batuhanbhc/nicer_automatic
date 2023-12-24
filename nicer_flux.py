@@ -2,6 +2,40 @@
 # Authors: Batuhan Bahçeci
 # Contact: batuhan.bahceci@sabanciuniv.edu
 
+additiveModels = {}
+additiveModelList =  "agauss      c6vmekl     eqpair      nei         rnei        vraymond \
+agnsed      carbatm     eqtherm     nlapec      sedov       vrnei \
+agnslim     cemekl      equil       npshock     sirf        vsedov \
+apec        cevmkl      expdec      nsa         slimbh      vtapec \
+bapec       cflow       ezdiskbb    nsagrav     smaug       vvapec \
+bbody       compLS      gadem       nsatmos     snapec      vvgnei \
+bbodyrad    compPS      gaussian    nsmax       srcut       vvnei \
+bexrav      compST      gnei        nsmaxg      sresc       vvnpshock \
+bexriv      compTT      grad        nsx         ssa         vvpshock \
+bkn2pow     compbb      grbcomp     nteea       step        vvrnei \
+bknpower    compmag     grbjet      nthComp     tapec       vvsedov \
+bmc         comptb      grbm        optxagn     vapec       vvtapec \
+bremss      compth      hatm        optxagnf    vbremss     vvwdem \
+brnei       cph         jet         pegpwrlw    vcph        vwdem \
+btapec      cplinear    kerrbb      pexmon      vequil      wdem \
+bvapec      cutoffpl    kerrd       pexrav      vgadem      zagauss \
+bvrnei      disk        kerrdisk    pexriv      vgnei       zbbody \
+bvtapec     diskbb      kyrline     plcabs      vmcflow     zbknpower \
+bvvapec     diskir      laor        posm        vmeka       zbremss \
+bvvrnei     diskline    laor2       powerlaw    vmekal      zcutoffpl \
+bvvtapec    diskm       logpar      pshock      vnei        zgauss \
+bwcycl      disko       lorentz     qsosed      vnpshock    zkerrbb \
+c6mekl      diskpbb     meka        raymond     voigt       zlogpar \
+c6pmekl     diskpn      mekal       redge       vpshock     zpowerlw \
+c6pvmkl     eplogpar    mkcflow     refsch"
+
+test = additiveModelList.split(" ")
+for i in test:
+    if i == "":
+        pass
+    else:
+        additiveModels[i] = 1
+
 from parameter import *
 
 print("==============================================================================")
@@ -124,14 +158,38 @@ def findFlux():
             upperFlux /= (10**-9)
             return [flux, lowerFlux, upperFlux]
 
-def calculateFlux(component, modelName):
-    if component == "unabsorbed":
-        if modelName.find("(") == 0:
-            newName = "cflux" + modelName
+def calculateFlux(component, modelName, parameters):
+    splitOperators = r'[)(+*]'
+    splittedList = re.split(splitOperators, modelName)
+    addedModelIndex = 1
+
+    if component.lower() == "unabsorbed":
+        if modelName.find("(") == -1:
+            counter = 0
+            for eachModel in splittedList:
+                if eachModel in additiveModels:
+                    addedModelIndex = counter + 1
+                    newName = modelName[:modelName.find(eachModel)] + "cflux*" + modelName[modelName.find(eachModel):]
+                    break
+                counter += 1
         else:
+            temp = modelName[:modelName.find("(")]
+            tempSplittedList = re.split(splitOperators, temp)
+            addedModelIndex = len(tempSplittedList)
+
             newName = modelName[: modelName.find("(")] + "*cflux" + modelName[modelName.find("("):]
+
+    elif component.lower() == "absorbed":
+        newName = "cflux*" + modelName
         
     else:
+        counter = 0
+        for eachModel in splittedList:
+            if eachModel.lower() == component.lower():
+                addedModelIndex = counter + 1
+                break
+            counter+=1
+
         compIndex = modelName.find(component)
         newName = modelName[:compIndex] + "cflux*" + modelName[compIndex:]
 
@@ -263,17 +321,14 @@ for path, obsid, expo in searchedObservations:
     modelName = AllModels(1).expression.replace(" ", "")
 
     for fluxModel in modelsToAddCfluxBefore:
-        if fluxModel != "unabsorbed" and (fluxModel not in modelName):
+        if (fluxModel != "unabsorbed" and fluxModel != "absorbed") and (fluxModel not in modelName):
             print("\nWARNING: Model '" + fluxModel + "' does not exist in current model expression.")
             print("Skipping current iteration for calculating fluxes..\n")
             continue
-        elif fluxModel == "unabsorbed" and ("(" not in modelName):
-            print("\nWARNING: Could not find any paranthesis in current model expression, location of adding cflux is unclear.")
-            print("Skipping current iteration for calculating fluxes..\n")
-            continue
 
-        print("Adding cflux before: " + fluxModel)
-        flux = calculateFlux(fluxModel, modelName)
+        print("Calculating flux for: " + fluxModel)
+        flux = calculateFlux(fluxModel, modelName, parameters)
+        
         file.write(energyFilter +" keV " + AllModels(1).expression + "\nFlux: " + listToStr(flux) + "\n")
         if writeParValuesAfterCflux:
             writeParsAfterFlux()
@@ -294,89 +349,6 @@ for path, obsid, expo in searchedObservations:
             print("Successfully added flux data to the parameter file.\n")
         else:
             print("There is already flux data about '" + fluxModel + "' in parameter file.\n")
-
-    """# Absorbed flux
-    print("Calculating the absorbed flux...\n")
-    absFlux = calculateFlux("TBabs", modelName, -8.4)
-    file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(absFlux) + "\n")
-    if writeParValuesAfterCflux:
-        writeParsAfterFlux()
-    
-    #============================================================================================================
-    # Unabsorbed flux
-    print("Calculating the unabsorbed flux...")
-    unabsFlux = calculateFlux("unabsorbed", modelName, -7.85)
-    file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(unabsFlux) + "\n")
-    if writeParValuesAfterCflux:
-        writeParsAfterFlux()
-
-    # Write unabsorbed flux values to parameter file
-    parameterFile = open("parameters_bestmodel.txt", "r")
-    appendFlux = True
-    for line in parameterFile.readlines():
-        if "Unabsorbed_Flux" in line:
-            appendFlux = False
-            break
-    parameterFile.close()
-
-    if appendFlux:
-        parameterFile = open("parameters_bestmodel.txt", "a")
-        parameterFile.write("Unabsorbed_Flux " + listToStr(unabsFlux)+ " (10^-9_ergs_cm^-2_s^-1)\n")
-        parameterFile.close()
-        print("Successfully added unabsorbed flux data to the parameter file.\n")
-    else:
-        print("There is already data about unabsorbed flux in parameter file.\n")
-    #============================================================================================================
-    # Diskbb flux
-    print("Calculating diskbb flux...")
-    fluxDisk = calculateFlux("diskbb", modelName, -7.85)
-    file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(fluxDisk) + "\n")
-    if writeParValuesAfterCflux:
-        writeParsAfterFlux()
-    
-    # Write diskbb flux values to parameter file
-    parameterFile = open("parameters_bestmodel.txt", "r")
-    appendFlux = True
-    for line in parameterFile.readlines():
-        if "Diskbb_Flux" in line:
-            appendFlux = False
-            break
-    parameterFile.close()
-
-    if appendFlux:
-        parameterFile = open("parameters_bestmodel.txt", "a")
-        parameterFile.write("Diskbb_Flux " + listToStr(fluxDisk)+ " (10^-9_ergs_cm^-2_s^-1)\n")
-        parameterFile.close()
-        print("Successfully added diskbb flux data to the parameter file.\n")
-    else:
-        print("There is already data about diskbb flux in parameter file.\n")
-    #============================================================================================================
-    if "powerlaw" in modelName:
-        # Powerlaw flux
-        print("Calculating powerlaw flux...")
-        fluxPow = calculateFlux("powerlaw", modelName, -9)
-        file.write(energyFilter +" keV "+AllModels(1).expression+"\nFlux: " + listToStr(fluxPow) + "\n")
-        if writeParValuesAfterCflux:
-            writeParsAfterFlux()
-        
-        # Write powerlaw flux values to parameter file
-        parameterFile = open("parameters_bestmodel.txt", "r")
-        appendFlux = True
-        for line in parameterFile.readlines():
-            if "Powerlaw_Flux" in line:
-                appendFlux = False
-                break
-        parameterFile.close()
-
-        if appendFlux:
-            parameterFile = open("parameters_bestmodel.txt", "a")
-            parameterFile.write("Powerlaw_Flux " + listToStr(fluxPow)+ " (10^-9_ergs_cm^-2_s^-1)\n")
-            parameterFile.close()
-            print("Successfully added powerlaw flux data to the parameter file.\n")
-        else:
-            print("There is already data about powerlaw flux in parameter file.\n")
-    else:
-        file.write("Powerlaw flux is 0. There is no powerlaw component in the model expression.\n")"""
 
     file.close()
     AllModels.clear()
