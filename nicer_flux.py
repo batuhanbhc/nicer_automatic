@@ -211,7 +211,9 @@ def writeParsAfterFlux():
             fullName = comp + "." + par
             file.write(fullName + "     " + str(parObj.values[0]) + "\n")
     
-    file.write("\n")
+    file.write("\n") 
+
+
 #===================================================================================================================
 energyLimits = energyFilter.split(" ")
 Emin = energyLimits[0]
@@ -316,6 +318,16 @@ for path, obsid, expo in searchedObservations:
     parameters = {}
     updateParameters(parameters)
 
+    # Open the parameter file and extract all non_flux lines
+    all_lines_file = {}
+    par_file = open("parameters_bestmodel.txt", "r")
+    all_lines = par_file.readlines()
+    par_file.close()
+
+    for line in all_lines:
+        if "flux" not in line:
+            all_lines_file[line] = 1
+
     file.write("\n===========================================================\n")
     file.write("Fluxes of model components (in 10^-9 ergs/cm^2/s) (90% confidence intervals)\n\n")
     modelName = AllModels(1).expression.replace(" ", "")
@@ -329,26 +341,20 @@ for path, obsid, expo in searchedObservations:
         print("Calculating flux for: " + fluxModel)
         flux = calculateFlux(fluxModel, modelName, parameters)
         
+        # Write flux data to 
         file.write(energyFilter +" keV " + AllModels(1).expression + "\nFlux: " + listToStr(flux) + "\n")
         if writeParValuesAfterCflux:
             writeParsAfterFlux()
         
-        # Write flux values to parameter file
-        parameterFile = open("parameters_bestmodel.txt", "r")
-        appendFlux = True
-        for line in parameterFile.readlines():
-            if  fluxModel +"_flux" in line:
-                appendFlux = False
-                break
-        parameterFile.close()
+        # Add new flux line to the all_lines_file
+        all_lines_file[fluxModel +"_flux " + listToStr(flux)+ " (10^-9_ergs_cm^-2_s^-1)\n"] = 1
+        
+    # Write flux values to parameter file
+    par_file = open("parameters_bestmodel.txt", "w")
+    for line in all_lines_file.keys():
+        par_file.write(line)
+    par_file.close()
 
-        if appendFlux:
-            parameterFile = open("parameters_bestmodel.txt", "a")
-            parameterFile.write(fluxModel +"_flux " + listToStr(flux)+ " (10^-9_ergs_cm^-2_s^-1)\n")
-            parameterFile.close()
-            print("Successfully added flux data to the parameter file.\n")
-        else:
-            print("There is already flux data about '" + fluxModel + "' in parameter file.\n")
 
     file.close()
     AllModels.clear()
