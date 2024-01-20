@@ -61,8 +61,7 @@ if isinstance(ftestSignificance, float) == False or not (0 < ftestSignificance <
         try:
             ftestSignificance = float(ftestSignificance)
             if ftestSignificance <= 0 or ftestSignificance >= 1:
-                # Make an error on purpose and trigger except block, since fTestSignificance is not on the correct interval
-                errorVariable = int("99.99")
+                raise Exception()
             else:
                 break
         except:
@@ -764,9 +763,14 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
                         continue
                     else:
                         # A model pipeline has been defined before, but the current line tries to define another pipeline
-                        print("ERROR: Trying to process another model pipeline, probably due to not using ENDMODEL keyword.")
-                        quit()
+                        raise Exception("Trying to process another model pipeline, probably due to not using ENDMODEL keyword.")
+
+        except Exception as e:
+            print(f"Exception occured: {e}")
+            print("\nERROR: Invalid implementation for a pipeline name in models.txt -> Line: " + str(lineCount))
+            quit()
         except:
+            print("Exception occured: Unknown")
             print("\nERROR: Invalid implementation for a pipeline name in models.txt -> Line: " + str(lineCount))
             quit()
 
@@ -795,6 +799,7 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
                 loadModel(modelName)
                 continue
         except:
+            print("Exception occured: Invalid model expression")
             print("\nERROR: Invalid implementation of 'load' command in models.txt -> Line: " + str(lineCount))
             quit()
           
@@ -841,6 +846,7 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
                     continue
 
         except:
+            print("Exception occured: Unknown")
             print("\nERROR: Invalid implementation of 'assign' command in models.txt -> Line: " + str(lineCount))
             quit()
         
@@ -859,6 +865,7 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
 
                 continue
         except:
+            print("Exception occured: Unknown")
             print("\nERROR: Invalid implementation of 'search' command in models.txt -> Line: " + str(lineCount))
             quit()               
         
@@ -867,6 +874,7 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
                 fitModel(bestModelList)
                 continue
         except:
+            print("Exception occured: Unknown")
             print("\nERROR: Invalid implementation of 'fit' command in models.txt -> Line: " + str(lineCount))
             quit()
         
@@ -877,11 +885,17 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
                 elif line[1] == "data":
                     saveCommand("data")
                 else:
-                    print("ERROR: Invalid parameter for the 'save' command")
-                    quit()
+                    raise Exception("Invalid parameter for the 'save' command")
 
                 continue
+
+        except Exception as e:
+            print(f"Exception occured: {e}")
+            print("\nERROR: Invalid implementation of 'save' command in models.txt -> Line: " + str(lineCount))
+            quit()
+
         except:
+            print("Exception occured: Unknown")
             print("\nERROR: Invalid implementation of 'save' command in models.txt -> Line: " + str(lineCount))
             quit()
         
@@ -893,14 +907,13 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
 
                 elif line[1] == "perform":
                     if lastAddedModel == "":
-                        print("ERROR: You must use addcomp to add models before using f-test")
-                        quit()
+                        raise Exception("You must use addcomp to add models before using f-test")
                         
                     if len(line) > 2:
                         newStr = " ".join(line[2:])
                         if (newStr[0] != "\"" and newStr[0] != "'") or (newStr[-1] != "\"" and newStr[-1] != "'") or (newStr[0] != newStr[-1]):
-                            print("ERROR: Invalid parameter entry for 'ftest' command")
-                            quit()
+                            raise Exception("Invalid parameter entry for 'ftest' command")
+                        
                         else:
                             newStr = newStr[1:-1]
                             ftestOptions("perform", bestModelList, nullhypList, logFile, lastAddedModel, lastAddedModelNumber, orderSuffix, newStr)
@@ -915,10 +928,14 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
                     lastAddedModel = ""
                     continue
                 else:
-                    print("\nERROR: Cannot process anything related to ftest unless a model is defined first.")
-                    quit()
-
+                    raise Exception("\nCannot process anything related to ftest unless a model is defined first.")
+                
+        except Exception as e:
+            print(f"Exception occured: {e}")
+            print("\nERROR: Invalid implementation of 'ftest' command in models.txt -> Line: " + str(lineCount))
+            quit()
         except:
+            print("Exception occured: Unknown")
             print("\nERROR: Invalid implementation of 'ftest' command in models.txt -> Line: " + str(lineCount))
             quit()
         
@@ -941,12 +958,10 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
                             orderSuffix = "th"
                         continue
                     else:
-                        print("ERROR: Invalid input for the the optional 'wrap' parameter.")
-                        quit()
+                        raise Exception("Invalid input for the the optional 'wrap' parameter.")
 
                 elif len(line) > 6:
-                    print("ERROR: addcomp function takes 6 parameters at maximum, more than 6 inputs were given.")
-                    quit()
+                    raise Exception("addcomp function takes 6 parameters at maximum, more than 6 inputs were given.")
                 
                 lastAddedModel = line[1]
                 lastAddedModelNumber = calculateComponentOrder(line[1], line[3])
@@ -961,7 +976,13 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
                 else:
                     orderSuffix = "th"
                 continue
+        
+        except Exception as e:
+            print(f"Exception occured: {e}")
+            print("\nERROR: Invalid implementation of 'addcomp' command in models.txt -> Line: " + str(lineCount))
+            quit()
         except:
+            print("Exception occured: Unknown")
             print("\nERROR: Invalid implementation of 'addcomp' command in models.txt -> Line: " + str(lineCount))
             quit()
         
@@ -969,23 +990,48 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
             if line[0] == "if":
                 inside_if = True
 
-                fullName = line[1].split(".")
-                compObj = getattr(AllModels(1), fullName[0])
-                parName = fullName[1]
-                parObj = getattr(compObj, parName)
-                parValue = parObj.values[0]
+                if line[1] == "model":
+                    if line[3].lower() == "exists":
+                        model_name = line[2]
 
-                lhs = float(parValue)
-                rhs = float(line[3])
-                actualOperator = operator_mapping.get(line[2])
+                        if model_name in AllModels(1).componentNames:
+                            if_evaluation = True
+                        else:
+                            if_evaluation = False
 
-                result = actualOperator(lhs, rhs)
-                if result:
-                    if_evaluation = True
+                    elif line[3].lower() == "missing":
+                        model_name = line[2]
+
+                        if model_name in AllModels(1).componentNames:
+                            if_evaluation = False
+                        else:
+                            if_evaluation = True
+                    else:
+                        raise Exception("Unknown parameter for checking models. Enter either 'missing' or 'exists'.")
                 else:
-                    if_evaluation = False
+                    fullName = line[1].split(".")
+                    compObj = getattr(AllModels(1), fullName[0])
+                    parName = fullName[1]
+                    parObj = getattr(compObj, parName)
+                    parValue = parObj.values[0]
+
+                    lhs = float(parValue)
+                    rhs = float(line[3])
+                    actualOperator = operator_mapping.get(line[2])
+
+                    result = actualOperator(lhs, rhs)
+                    if result:
+                        if_evaluation = True
+                    else:
+                        if_evaluation = False
+                    
                 continue
+        except Exception as e:
+            print(f"Exception occured: {e}")
+            print("\nERROR: Invalid implementation of 'if' command in models.txt -> Line: " + str(lineCount))
+            quit()
         except:
+            print("Exception occured: Unknown")
             print("\nERROR: Invalid implementation of 'if' command in models.txt -> Line: " + str(lineCount))
             quit()
         
@@ -1001,6 +1047,7 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
                 removeComp(line[1], 1, bestModelList)
                 continue
         except:
+            print("Exception occured: Unknown")
             print("\nERROR: Invalid implementation of 'delcomp' command in models.txt -> Line: " + str(lineCount))
             quit()
         
@@ -1014,6 +1061,7 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
                     else:
                         continue
         except:
+            print("Exception occured: Unknown")
             print("\nERROR: Invalid implementation of 'setpoint' command in models.txt -> Line: " + str(lineCount))
             quit()
         
@@ -1021,9 +1069,9 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
             if line[0] == "shakefit":
                 shakefit(bestModelList, logFile)
         except:
+            print("Exception occured: Unknown")
             print("\nERROR: Invalid implementation of 'shakefit' command in models.txt -> Line: " + str(lineCount))
             quit()
-
         
         while (True):
             print("\nUndefined command in current line: '" + " ".join(line) + "' (Line "+ str(lineCount) +")")
