@@ -65,9 +65,6 @@ except:
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
 if Path(commonDirectory).exists() == False:
     os.system("mkdir " + commonDirectory)
-if Path(commonDirectory + "/directories.txt").exists():
-    os.system("rm " + commonDirectory + "/directories.txt")
-os.system("touch " + commonDirectory+ "/directories.txt")
 
 # Create 22/05/2023 Nicer light leak date object
 lightLeak_date = "2023/05/22" 
@@ -87,8 +84,6 @@ inputFile.close()
 # If there is no valid observation path, do not proceed any further
 if len(validPaths) == 0:
     print("ERROR: Could not find any observation directory to process.")
-    with open(commonDirectory+"/directories.txt", "w") as tempFile:
-        tempFile.write("COULD NOT FIND ANY OBSERVATION TO PROCESS\n")
     quit()
 
 cwd = os.getcwd()
@@ -124,9 +119,11 @@ os.chdir(cwd)
 # This dictionary will carry obsid-(output directory, orbit time) key-value pairs for the observation made after the light leak
 lightleak_observations = {}
 
+processed_paths = []
+
 nigeodownFlag = True
+
 # Iterate through the filter files of observations, extract date of each observation
-# Determine whether geomag data needs to be updated, also extract the output directories for each observation and add them to ../commonFiles/output_directories.txt
 for obs in validPaths:
     #Find observation id (e.g. 6130010120)
     pathLocations = obs.split("/")
@@ -176,8 +173,7 @@ for obs in validPaths:
             if Path(outputDir + "/" + obsid + "/day").exists() == False:
                 os.system("mkdir " + outputDir + "/" + obsid + "/day")
 
-            with open(commonDirectory + "/directories.txt", "a") as file:
-                file.write(outputDir + "/" + obsid + "/day " + obsid + "\n")
+            processed_paths.append([outputDir + "/" + obsid + "/day", obsid])
 
         elif nightFlag and (not dayFlag):
             # Night observation after light leak
@@ -189,8 +185,7 @@ for obs in validPaths:
             if Path(outputDir + "/" + obsid + "/night").exists() == False:
                 os.system("mkdir " + outputDir + "/" + obsid + "/night")
 
-            with open(commonDirectory + "/directories.txt", "a") as file:
-                file.write(outputDir + "/" + obsid + "/night " + obsid + "\n")
+            processed_paths.append([outputDir + "/" + obsid + "/night", obsid])
 
         else:
             # Mixed observation (both day and night) after light leak
@@ -204,17 +199,15 @@ for obs in validPaths:
             if Path(outputDir + "/" + obsid + "/day").exists() == False:
                 os.system("mkdir " + outputDir + "/" + obsid + "/day")
 
-            with open(commonDirectory + "/directories.txt", "a") as file:
-                file.write(outputDir + "/" + obsid + "/day " + obsid + "\n")
-                file.write(outputDir + "/" + obsid + "/night " + obsid + "\n")
+            processed_paths.append([outputDir + "/" + obsid + "/day", obsid])
+            processed_paths.append([outputDir + "/" + obsid + "/night", obsid])
 
     else:
         # Observation before the light leak
         if Path(outputDir + "/" + obsid).exists() == False:
             os.system("mkdir " + outputDir + "/" + obsid)
 
-        with open(commonDirectory + "/directories.txt", "a") as file:
-            file.write(outputDir + "/" + obsid + " " + obsid +"\n")
+        processed_paths.append([outputDir + "/" + obsid, obsid])
 
 for obs in validPaths:
     #Find observation id (e.g. 6130010120)
@@ -353,67 +346,97 @@ for obs in validPaths:
             if Path(fitLog).exists() == False:
                 os.system("touch " + fitLog)
 
-# Check whether directories.txt exists
-if Path(commonDirectory + "/directories.txt").exists() == False:
-    print("\nERROR: Could not find 'directories.txt' file under the 'commonFiles' directory.")
-    print("Please make sure both the 'commonFiles' directory and the 'directories.txt' file exist and are constructed as intended by nicer_create.py.\n")
-    quit()
+# Extract the paths, obsid and exposure of observations with exposure > 100 only.
+expo_processed_paths = []
+for each_path in processed_paths:
+    folder_path = each_path[0]
+    obsid = each_path[1]
 
-fileContents = []
-# Open directories.txt and extract all the observation paths
-with open(commonDirectory + "/directories.txt", "r") as file:
-    lines = file.readlines()
-    
-    if len(lines) == 0:
-        print("\nFile 'directories.txt' is empty: Could not find any observation for spectral analysis.\n")
-        quit()
+    hdu = fits.open(folder_path + "/ni" + obsid + "mpu7_sr3c50.pha")
 
-    for line in lines:
-        line = line.strip().split(" ")
-        path = line[0]
-        obsid = line[1]
-        fileContents.append((path, obsid))
+    expo = hdu[1].header["EXPOSURE"]
 
-# Create a seperate file for storing filtered observation paths to not repeat filtering process for other scripts
-if Path(commonDirectory + "/filtered_directories.txt").exists() == False:
-    os.system("touch " + commonDirectory + "/filtered_directories.txt")
+    if expo >= 100:
+        # Filter out observations with exposure less than 100 seconds
+        expo_processed_paths.append([folder_path, obsid, expo])
 
-filteredObs = []
-filteredFile = open(commonDirectory + "/filtered_directories.txt", "r")
-for line in filteredFile.readlines():
-    line = line.strip(" \n")
-    filteredObs.append(line)
 
-filteredFile = open(commonDirectory + "/filtered_directories.txt", "a")
+# Create processed_obs.txt that will serve as a log of the previously processed observations
+if Path(commonDirectory + "/processed_obs.txt").exists() == False:
+    os.system("touch " + commonDirectory + "/processed_obs.txt")
 
-validObservations = []
-print("Checking the exposure of all observations:")
-# Check the exposure of all observations, select the ones with exposure > 100 seconds
-for path, obsid in fileContents:
-    try:
-        hdu = fits.open(path + "/ni" + obsid + "mpu7_sr3c50.pha")
-        expo = hdu[1].header["EXPOSURE"]
-        if expo < 100:
-            print("\nWARNING: Spectral files under " + path + " has exposure < 100: (" + str(expo) + " s)")
-            print("Skipping the observation directory above..")
-        else:
-            validObservations.append((path, obsid, expo))
-            if (path + " " + obsid + " " + str(expo)) not in filteredObs:
-                filteredFile.write(path + " " + obsid + " " + str(expo) + "\n")
-    except:
-        print("\nWARNING: Pulse height amplitude (.pha) file is missing under " + path)
-        print("Skipping the observation directory above..")
-        break
 
-print("\nChecked all exposure values.")
-if len(validObservations) == 0:
-    print("Low exposure filter has discarded all observations inside directories.txt")
-    print("No spectral fitting will be applied..")
-    filteredFile.close()
-    quit()
+if clean_obs_history == False:
+    all_file_lines = {}
+
+    file = open(commonDirectory + "/processed_obs.txt", "r")
+    all_lines = file.readlines()
+    file.close()
+
+    # Extract previously recorded paths
+    for line in all_lines:
+        line = line.strip("\n")
+        all_file_lines[line] = 1
+
+    # Add the exposure filtered paths into a single dictionary with the previous paths from processed_obs.txt
+    for each in expo_processed_paths:
+        path = each[0]
+        obsid = each[1]
+        expo = each[2]
+        line = path + " " + str(obsid) + " " + str(expo)
+
+        if line not in all_file_lines:
+            all_file_lines[line] = 1
+
+    # Convert the obsid value from int to string, and save all lines in a list of tuples
+    lines_to_be_sorted = []
+    for each_line in all_file_lines.keys():
+        each_line = each_line.split(" ")
+        each_line[1] = int(each_line[1])
+        each_line = tuple(each_line)
+
+        lines_to_be_sorted.append(each_line)
+
+    # Sort the tuples according to obsid values
+    sorted_lines = sorted(lines_to_be_sorted, key=lambda x: x[1])
+
+    # Convert the sorted tuples to a line format in string
+    lines_to_be_written = []
+    for line in sorted_lines:
+        line_str = ""
+
+        for elem in line:
+            line_str += (str(elem) + " ")
+        
+        line_str = line_str[:-1]
+        line_str += "\n"
+
+        lines_to_be_written.append(line_str)
+
+    # Rewrite the contents of the processed_obs.txt
+    file = open(commonDirectory + "/processed_obs.txt", "w")
+    for line in lines_to_be_written:
+        file.write(line)
+
+    file.close()
+
 else:
-    filteredFile.close()
-    print("\nReady to proceed with the spectral fitting stage..\n")
+    # The previous records of paths will not be kept
+
+    # Write the contents of the processed_obs.txt with only the currently filtered observations
+    file = open(commonDirectory + "/processed_obs.txt", "w")
+    for each in expo_processed_paths:
+        line = ""
+
+        for elem in each:
+            line += (str(elem) + " ")
+        
+        line = line[:-1]
+        line += "\n"
+
+        file.write(line)
+        
+    file.close()
 
 # This file is created after importing variables from another python file
 if Path(scriptDir + "/__pycache__").exists():

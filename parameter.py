@@ -36,6 +36,11 @@ plotScript = "nicer_plot.py"
 fluxScript = "nicer_flux.py"
 
 #================================================= nicer.create spesific variables =============================================
+# nicer_create will keep the records of processed file paths in processed_obs.txt and update it when you filter new observations.
+# If you ever want to clean the contents of processed_obs.txt (in cases where certain observations may no longer be valid for spectral analysis), set
+# clean_obs_history to True.
+clean_obs_history = False
+
 # Set this variable to True if you want high resolution light curves. If set to False, light curves will have 1 second time resolution.
 createHighResLightCurves = True
 
