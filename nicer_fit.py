@@ -1087,12 +1087,12 @@ if len(searchedObsid) == 0:
 
 iterationMax = 0
 searchedObservations = []
-if Path(commonDirectory + "/filtered_directories.txt").exists() == False:
-    print("\nERROR: Could not find 'filtered_directories.txt' file under the 'commonFiles' directory.")
-    print("Please make sure both the 'commonFiles' directory and the 'filtered_directories.txt' files exist and are constructed as intended by nicer_create.py.\n")
+if Path(commonDirectory + "/processed_obs.txt").exists() == False:
+    print("\nERROR: Could not find 'processed_obs.txt' file under the 'commonFiles' directory.")
+    print("Please make sure both the 'commonFiles' directory and the 'processed_obs.txt' files exist and are constructed as intended by nicer_create.py.\n")
     quit()
 else:
-    with open(commonDirectory + "/filtered_directories.txt", "r") as filteredFile:
+    with open(commonDirectory + "/processed_obs.txt", "r") as filteredFile:
         allLines = filteredFile.readlines()
         for eachObsid in searchedObsid:
             for line in allLines:
@@ -1104,7 +1104,7 @@ else:
                     searchedObservations.append((lineElements[0], lineElements[1], lineElements[2]))
 
 if len(searchedObservations) == 0:
-    print("\nCould not find the searched observation paths in 'filtered_directories.txt', most likely due to having low exposure.")
+    print("\nCould not find the searched observation paths in 'processed_obs.txt', most likely due to having low exposure.")
     quit()
 
 if iterationMax > sampleSize:
