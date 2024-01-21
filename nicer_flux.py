@@ -203,16 +203,21 @@ def calculateFlux(component, modelName, parameters):
     
     return fluxVals
 
-def writeParsAfterFlux():
+def writeParsAfterFlux(line_list):
     for comp in AllModels(1).componentNames:
         compObj = getattr(AllModels(1), comp)
         for par in compObj.parameterNames:
             parObj = getattr(compObj, par)
             fullName = comp + "." + par
-            file.write(fullName + "     " + str(parObj.values[0]) + "\n")
-    
-    file.write("\n") 
 
+            line_list.append(fullName + "     " + str(parObj.values[0]) + "\n")
+    
+    line_list.append("\n") 
+
+def write_lines_to_file(file_name, line_list):
+    while open(file_name, "a"):
+        for line in line_list:
+            file_name.write(line)
 
 #===================================================================================================================
 energyLimits = energyFilter.split(" ")
@@ -291,20 +296,33 @@ for path, obsid, expo in searchedObservations:
             # All necessary files have been found
             missingFiles = False
             break
+    
+    fit_file_name = resultsFile
+    fit_file_lines = []
 
-    file = open(resultsFile, "a")
+    with open("fit_results.log") as fit_file:
+        lines = fit_file.readlines()
+
+        for line in lines:
+            if "Fluxes of model components" in line:
+                fit_file_lines = fit_file_lines[:-1]    # To exclude the "======" line before
+                break
+            else:
+                fit_file_lines.append(line)
 
     # Check if there are any missing files
     if missingFiles:
         print("ERROR: Necessary files for calculating fluxes are missing for the observation: " + obsid)
-        file.write("\nERROR: Necessary files for calculating fluxes are missing for the observation: " + obsid + "\n")
+        fit_file_lines.append("\nERROR: Necessary files for calculating fluxes are missing for the observation: " + obsid + "\n")
+
         if foundModfile == False:
             print("->Missing model file")
-            file.write("->Missing model file\n")
+            fit_file_lines.append("->Missing model file\n")
         if foundDatafile == False:
             print("->Missing data file")
-            file.write("->Missing data file\n")
-        file.close()
+            fit_file_lines.append("->Missing data file\n")
+        
+        write_lines_to_file(fit_file_name, fit_file_lines)
         continue
     
     print("All the necessary files for flux calculations are found. Please check if the correct files are in use.")
@@ -328,8 +346,8 @@ for path, obsid, expo in searchedObservations:
         if "flux" not in line:
             all_lines_file[line] = 1
 
-    file.write("\n===========================================================\n")
-    file.write("Fluxes of model components (in 10^-9 ergs/cm^2/s) (90% confidence intervals)\n\n")
+    fit_file_lines.append("\n===========================================================\n")
+    fit_file_lines.append("Fluxes of model components (in 10^-9 ergs/cm^2/s) (90% confidence intervals)\n\n")
     modelName = AllModels(1).expression.replace(" ", "")
 
     for fluxModel in modelsToAddCfluxBefore:
@@ -342,9 +360,9 @@ for path, obsid, expo in searchedObservations:
         flux = calculateFlux(fluxModel, modelName, parameters)
         
         # Write flux data to 
-        file.write(energyFilter +" keV " + AllModels(1).expression + "\nFlux: " + listToStr(flux) + "\n")
+        fit_file_lines.append(energyFilter +" keV " + AllModels(1).expression + "\nFlux: " + listToStr(flux) + "\n")
         if writeParValuesAfterCflux:
-            writeParsAfterFlux()
+            writeParsAfterFlux(fit_file_lines)
         
         # Add new flux line to the all_lines_file
         all_lines_file[fluxModel +"_flux " + listToStr(flux)+ " (10^-9_ergs_cm^-2_s^-1)\n"] = 1
@@ -355,8 +373,6 @@ for path, obsid, expo in searchedObservations:
         par_file.write(line)
     par_file.close()
 
-
-    file.close()
     AllModels.clear()
     AllData.clear()
 
