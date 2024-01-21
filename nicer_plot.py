@@ -3,6 +3,7 @@
 # Contact: batuhan.bahceci@sabanciuniv.edu
 
 from parameter import *
+from matplotlib.ticker import MultipleLocator, AutoMinorLocator
 
 print("==============================================================================")
 print("\t\t\tRunning the file: " + plotScript + "\n")
@@ -108,9 +109,71 @@ otherParsDict = {}
 fluxValuesDict = {}
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
 
+#===========================================================================================
+# Create output directories of not created already
 if Path(commonDirectory + "/results").exists() == False:
     os.system("mkdir " + commonDirectory + "/results")
 
+if Path(commonDirectory + "/results/model_graphs").exists() == False:
+    os.system("mkdir " + commonDirectory + "/results/model_graphs")
+
+if Path(commonDirectory + "/results/flux_graphs").exists() == False:
+    os.system("mkdir " + commonDirectory + "/results/flux_graphs")
+
+if Path(commonDirectory + "/results/flux_tables").exists() == False:
+    os.system("mkdir " + commonDirectory + "/results/flux_tables")
+
+if Path(commonDirectory + "/results/model_tables").exists() == False:
+    os.system("mkdir " + commonDirectory + "/results/model_tables")
+
+if Path(commonDirectory + "/version_counter.txt").exists() == False:
+    os.system("touch " + commonDirectory + "/version_counter.txt")
+
+    temp_file = open(commonDirectory + "/version_counter.txt", "w")
+    temp_file.write("CREATED BY NICER_PLOT.PY, DO NOT MODIFY, DO NOT CHANGE THE FILE PATH\n")
+    temp_file.write("0\n")
+    temp_file.close()
+#===========================================================================================
+# If clear variable is True, clear the contents of the output directories
+if delete_previous_files:
+    all_files = os.listdir(commonDirectory + "/results/model_graphs")
+    for file in all_files:
+        if "model" in file:
+            os.system("rm " + commonDirectory + "/results/model_graphs/" + file)
+    
+    all_files = os.listdir(commonDirectory + "/results/model_tables")
+    for file in all_files:
+        if "model" in file:
+            os.system("rm " + commonDirectory + "/results/model_tables/" + file)
+    
+    all_files = os.listdir(commonDirectory + "/results/flux_graphs")
+    for file in all_files:
+        if "flux" in file:
+            os.system("rm " + commonDirectory + "/results/flux_graphs/" + file)
+
+    all_files = os.listdir(commonDirectory + "/results/flux_tables")
+    for file in all_files:
+        if "flux" in file:
+            os.system("rm " + commonDirectory + "/results/flux_tables/" + file)
+    
+    temp_file = open(commonDirectory + "/version_counter.txt", "w")
+    temp_file.write("CREATED BY NICER_PLOT.PY, DO NOT MODIFY, DO NOT CHANGE THE FILE PATH\n")
+    temp_file.write("0\n")
+    temp_file.close()
+
+# Check whether enable_versioning is True, update the version file and extract the current version if that is the case.
+current_version = 0
+if enable_versioning:
+    with open(commonDirectory + "/version_counter.txt", "r") as file:
+        all_lines = file.readlines()
+        prev_version = int(all_lines[1].strip("\n"))
+        current_version  = prev_version + 1
+
+    with open(commonDirectory + "/version_counter.txt", "w") as file:
+        file.write("CREATED BY NICER_PLOT.PY, DO NOT MODIFY, DO NOT CHANGE THE FILE PATH\n")
+        file.write(str(current_version) + "\n")
+
+# Open the input txt file, and extract the obsid numbers to a list
 searchedObsid = []
 with open(scriptDir + "/" + inputTxtFile, "r") as file:
     allLines = file.readlines()
@@ -131,6 +194,7 @@ if len(searchedObsid) == 0:
     print("\nCould not find any valid observation path, as given in the obs.txt file.")
     quit()
 
+# Check whether any of the searched observations are processed, extract the necessary data if that is the case.
 iterationMax = 0
 searchedObservations = []
 if Path(commonDirectory + "/processed_obs.txt").exists() == False:
@@ -153,15 +217,24 @@ if len(searchedObservations) == 0:
     print("\nCould not find the searched observation paths in 'processed_obs.txt', most likely due to having low exposure.")
     quit()
 
-encounteredDates = []
-encounteredFluxes = []
-uniqueFluxes = 0
-allDates = []
+
+# Iterate through each of the observation data, and extract the necessary data from the parameter files
 for path, obsid, expo in searchedObservations:
     outObsDir = path
     os.chdir(outObsDir)
 
     allFiles = os.listdir(outObsDir)
+
+    additional_info = ""
+    if path[-3:] == "day":
+        additional_info = "day"
+    elif path[-5:] == "night":
+        additional_info = "night"
+
+    dict_key = str(obsid)
+    if additional_info != "":
+        dict_key += "_" + additional_info
+
     # Find the data file and the best fitting model file for the current observation
     missingFiles = True
     foundParameterfile = False
@@ -196,20 +269,14 @@ for path, obsid, expo in searchedObservations:
     # Extract MJD
     hdu = fits.open(spectrumFile)
     date = float(format(hdu[1].header["MJD-OBS"], ".3f"))
-    allDates.append(date)
     hdu.close()
-
-    # NOTE: THERE IS STILL AN ISSUE HERE WHEN THERE ARE MULTIPLE OBSERVATIONS WITH THE SAME DATE. THIS NEEDS TO BE FIXED SOONER OR LATER.
-    if date not in encounteredDates:
-        encounteredDates.append(date)
 
     Xset.chatter = 0
     Xset.restore(modFile)
-    abundance = Xset.abund[:Xset.abund.find(":")]
     
     # Initialize the values of keys as lists
-    fluxValuesDict[date] = []
-    otherParsDict[date] = []
+    fluxValuesDict[dict_key] = []
+    otherParsDict[dict_key] = []
 
     file = open(parFile)
     allLines = file.readlines()
@@ -220,347 +287,382 @@ for path, obsid, expo in searchedObservations:
         for i in range(len(line)):
             line[i] = line[i].replace("_", " ")
 
-        line[1] = float(line[1])
-        line[2] = line[1] - float(line[2])
-        line[3] = float(line[3]) - line[1]
+        line[1] = float(line[1])    # Parameter value
+        line[2] = line[1] - float(line[2])  # Error low
+        line[3] = float(line[3]) - line[1]  # Error high
 
-        # Try to see whether the parameter has a unit associated with in in parameter file.
+        # Check whether the parameter has a given unit in parameter file.
         try:
             test = line[4]
         except:
             line.append("")
 
+        par_list = [line[0], line[1], line[2], line[3], line[4], date]
 
-        # If the parameter is a float number with fractional part having more than 5 digits, round the fractional part to 5 digits.
-        tempList = [line[1], line[2], line[3]]
-        tempCounter = 0
-        for i in tempList:
-            tempCounter += 1
-            if i > 10**-5 and len(str(i)[str(i).find(".") +1:]) > 5:
-                line[tempCounter] = float(format(i, ".5f"))
-
-        parTuple = (line[0], line[1], line[2], line[3], line[4])
-
-        if "flux" in parTuple[0]:
-            fluxValuesDict[date].append(parTuple)
-            if line[0] not in encounteredFluxes:
-                encounteredFluxes.append(line[0])
-                uniqueFluxes += 1
+        if "flux" in par_list[0]:
+            fluxValuesDict[dict_key].append(par_list)
         else:
-            otherParsDict[date].append(parTuple)
+            otherParsDict[dict_key].append(par_list)
 
-#Find the referance point for the x-axis (date), and update the previously created dictionaries
+otherpars_ref = 0
+fluxes_ref = 0
+empty_flag = True
+
+#Find the referance point for the x-axis (date) for model parameters
 if len(otherParsDict) != 0:
-    referanceMjd = round((min(otherParsDict) - 10) / 5) * 5
-    fixedFluxDict = {}
-    fixedParameterDict = {}
-    for key, val in fluxValuesDict.items():
-        fixedFluxDict[key - referanceMjd] = val
-    for key, val in otherParsDict.items():
-        fixedParameterDict[key - referanceMjd] = val
-elif len(fluxValuesDict) != 0:
-    referanceMjd = round((min(fluxValuesDict) - 10) / 5) * 5
-    fixedFluxDict = {}
-    fixedParameterDict = {}
-    for key, val in fluxValuesDict.items():
-        fixedFluxDict[key - referanceMjd] = val
-    for key, val in otherParsDict.items():
-        fixedParameterDict[key - referanceMjd] = val
-else:
+    empty_flag = False
+    dates = []
+
+    # Extract all dates in MJD
+    for obs_list in otherParsDict.values():
+        for value_list in obs_list:
+            dates.append(value_list[5])
+
+    referanceMjd = round((min(dates) - 5) / 5) * 5
+    otherpars_ref = referanceMjd
+
+    for key, obs_list in otherParsDict.items():
+        for value_list in obs_list:
+            value_list[5] = value_list[5] - referanceMjd
+
+
+#Find the referance point for the x-axis (date) for flux values
+if len(fluxValuesDict) != 0:
+    empty_flag = False
+    dates = []
+
+    # Extract all dates in MJD
+    for obs_list in fluxValuesDict.values():
+        for value_list in obs_list:
+            dates.append(value_list[5])
+
+    referanceMjd = round((min(dates) - 5) / 5) * 5
+    fluxes_ref = referanceMjd
+
+    for key, obs_list in fluxValuesDict.items():
+        for value_list in obs_list:
+            value_list[5] = value_list[5] - referanceMjd
+
+# Both flux dictionary and model dictionary are empty.
+if empty_flag:
     print("\nERROR: Both dictionaries (parameter/flux) are empty. There is no data to create any graph.")
     quit()
 
-if len(fixedParameterDict.keys()) != 0 or len(fixedFluxDict.keys()) != 0:
-    # Set static x-axis ticks for all graphs
-    if len(fixedFluxDict.keys()) != 0:
-        mjdList = list(fixedFluxDict.keys())
-    else:
-        mjdList = list(fixedParameterDict.keys())
-        
-    minMjd = min(mjdList)
-    maxMjd = max(mjdList)
 
-    totalDifference = maxMjd - minMjd
-        
-    majorTickInterval = round((totalDifference / 5) / 5) * 5
-    if majorTickInterval < 5:
-        majorTickInterval = 5
+# If otherParsDict is not empty, create the model parameter graphs and the table file
+if len(otherParsDict) != 0:
+    parameter_dict = {}
 
-    xAxisStart = round((minMjd - majorTickInterval) / majorTickInterval) * majorTickInterval
-    xAxisEnd = round((maxMjd + majorTickInterval) / majorTickInterval) * majorTickInterval + 1
-    xAxisTicksMajor = []
-    xAxisTicksMinor = []
-
-    for i in range(xAxisStart, xAxisEnd):
-        if i % majorTickInterval == 0:
-            xAxisTicksMajor.append(i)
-
-    for i in xAxisTicksMajor:
-        minorTickInterval = majorTickInterval / 5
-        for k in range(1, 5):
-            xAxisTicksMinor.append(i + k * minorTickInterval)
-
-    dictionaryCounter = 0
-    dictList = [fixedFluxDict, fixedParameterDict]
-    print("=============================================================================================================")
-    for eachDict in dictList:
-        dictionaryCounter += 1
-
-        if dictionaryCounter == 1:
-            print("Plotting the graph: Flux values")
-        else:
-            print("Plotting the graph: Model parameters")
-
-        modelPars = {}
-        for key, val in eachDict.items():
-            for tuple in val:
-                if tuple[0] in modelPars:
-                    modelPars[tuple[0]][0].append(tuple[1])     # Value
-                    modelPars[tuple[0]][1].append(tuple[2])     # Error lower
-                    modelPars[tuple[0]][2].append(tuple[3])     # Error upper
-                    modelPars[tuple[0]][3].append(key)          # MJD
-                else:
-                    modelPars[tuple[0]] = ([tuple[1]], [tuple[2]], [tuple[3]], [key], tuple[4])
-
-        # Number of plots should be equal to the number of observation dates
-        plotNum = len(modelPars.keys())
-        
-        if plotNum == 0:
-            if dictionaryCounter == 1:
-                problematicGraph = "Flux values"
+    # Extract the the data from each observation to parameter_dict, where each key will be parameter names whereas values will be lists of parameter values
+    for obs_identifier, obs_list in otherParsDict.items():
+        for value_list in obs_list:
+            if value_list[0] not in parameter_dict:
+                parameter_dict[value_list[0]] = [[value_list[1]], [value_list[2]], [value_list[3]], [value_list[5]], value_list[4]]
             else:
-                problematicGraph = "Model parameters"
+                parameter_dict[value_list[0]][0].append(value_list[1])  # Value
+                parameter_dict[value_list[0]][1].append(value_list[2])  # Error low
+                parameter_dict[value_list[0]][2].append(value_list[3])  # Error high
+                parameter_dict[value_list[0]][3].append(value_list[5])  # Date
 
-            print("WARNING: The script is trying to create a graph without any parameters. Skipping the following graph: " + problematicGraph + "\n")
 
-            continue
-        
-        # Rows for the parameter table should be equal to the number of plots (+1 including the header)
-        rows = plotNum
-        cols = 1
+    fig, axs = plt.subplots(len(parameter_dict), 1, figsize=(8, 14), sharex=True)
 
-        # Create a subplot for multiple graphs
-        fig, axs = plt.subplots(rows, cols, figsize=(6, plotNum*2.5))
-        plt.subplots_adjust(wspace=0, hspace=0)
+    shared_yaxis_flag = False
+    all_parameters = []
+    ax_num = 0
+    for par_name, par_list in parameter_dict.items():
 
-        createCommonLabel = False
-        commonLabel = ""
-        for key, val in modelPars.items():
-            if val[4] != "":
-                createCommonLabel = True
-                commonLabel = val[4]
-                break
-        
-        if createCommonLabel:
-            # Y-axis as a common label for all graphs (only if it is given inside the parameter file)
-            fig.text(0.93, 0.5, commonLabel, va='center', rotation='vertical')
-        
-        if dictionaryCounter == 1:
-            if Path(commonDirectory + "/results/flux_table.txt").exists() == False:
-                os.system("touch " + commonDirectory + "/results/flux_table.txt")
-            tableFile = open(commonDirectory + "/results/flux_table.txt", "w")
-        else:
-            if Path(commonDirectory + "/results/parameter_table.txt").exists() == False:
-                os.system("touch " + commonDirectory + "/results/parameter_table.txt")
-            tableFile = open(commonDirectory + "/results/parameter_table.txt", "w")
-        
-        # Just the number of rows for observations, header row not included
-        dataRowNum = len(encounteredDates)
+        # Add all unique parameters to all_parameters list
+        if par_name not in all_parameters:
+            all_parameters.append(par_name)
 
-        # Create table structure using nested lists
-        tableRows = []
-        for i in range(dataRowNum + 1):
-            tableRows.append([])
+        # Extract all lists necessary for graphs
+        x_axis = par_list[3]
+        y_axis = par_list[0]
+        err_low = par_list[1]
+        err_high = par_list[2]
 
-        # Initialize the first "column" of the table from dates of observations
-        tableRows[0].append("MJD")
-        idx = 1
-        for eachDate in encounteredDates:
-            tableRows[idx].append(str(eachDate))
-            idx += 1
+        # Check if shared y-axis title is given
+        shared_yaxis_title = par_list[4]
+        if shared_yaxis_title != "":
+            shared_yaxis_flag = True
 
-        counter = 0
-        for i in range(rows):
-            xAxis = list(modelPars.values())[counter][3]
-            yAxis = list(modelPars.values())[counter][0]
-            errorLow = list(modelPars.values())[counter][1]
-            errorHigh = list(modelPars.values())[counter][2]
-            parName = list(modelPars.keys())[counter]
+        axs[ax_num].errorbar(x_axis, y_axis, yerr=[err_low, err_high], fmt='o', color='black', ecolor="black", markersize=4, capsize=0)
 
-            idx = 0
-            tableRows[0].append(parName.replace(" ", "_"))
-            for j in range(dataRowNum):
-                if (encounteredDates[j] == (xAxis[idx]) + referanceMjd):
-                    tableRows[j + 1].append(str(yAxis[idx]))
-                    idx += 1
-                else:
-                    tableRows[j + 1].append("-")
+        axs[ax_num].tick_params(which = "both", direction="in")
+        axs[ax_num].yaxis.tick_left()
 
-            idx = 0
-            tableRows[0].append(parName.replace(" ", "_")+ "_errneg")
-            for j in range(dataRowNum):
-                if (encounteredDates[j] == (xAxis[idx] + referanceMjd)):
-                    tableRows[j + 1].append(str(errorLow[idx]))
-                    idx += 1
-                else:
-                    tableRows[j + 1].append("-")
+        axs[ax_num].set_ylabel(par_name)
+        axs[ax_num].set_xlabel(f"Time (MJD-{otherpars_ref} days)")
 
-            idx = 0
-            tableRows[0].append(parName.replace(" ", "_") + "_errpos")
-            for j in range(dataRowNum):
-                if (encounteredDates[j] == (xAxis[idx] + referanceMjd)):
-                    tableRows[j + 1].append(str(errorHigh[idx]))
-                    idx += 1
-                else:
-                    tableRows[j + 1].append("-")
-
-            axs[i].errorbar(xAxis, yAxis, yerr=[errorLow, errorHigh], fmt='o', markersize=4, ecolor="black", color="black", capsize=0)
-            axs[i].minorticks_on()
-
-            axs[i].set_xticks(xAxisTicksMajor)
-            axs[i].set_xticks(xAxisTicksMinor, minor = True)
-            axs[i].tick_params(which = "both", direction="in")
-
-            # If the plot is not the bottom one, hide the x-axis tick labels
-            if i < rows-1:
-                axs[i].xaxis.set_ticklabels([])
-            else:
-                axs[i].set_xlabel("Time (MJD-"+ str(referanceMjd) + " days)")
-
-            # Rearrange major-minor y-axis ticks to prevent tick collision between subsequent graphs
-            yTicksMajor = axs[i].get_yticks()
-            yTicksMinor = axs[i].get_yticks(minor = True)
-            minMajorTickY = min(yTicksMajor)
-            maxMajorTickY = max(yTicksMajor)
-
-            # Divide major tick gaps into 5 equal intervals
-            minorInterval = (yTicksMajor[1] - yTicksMajor[0]) / 5
-
-            newMajorList = []
-            for elem in yTicksMajor:
-                newMajorList.append(elem)
-            
-            # Check whether the lowest major y-axis tick in current tick list is truly the minimum, or is there another tick that is also lower than all y-axis values
-            testList = newMajorList
-            testList.remove(minMajorTickY)
-            secondMinimum = min(testList)
-            trueMinimum = False
-            for val in yAxis:
-                if val < secondMinimum:
-                    trueMinimum = True
-            if trueMinimum == False:
-                newMajorList = testList
-
-            # Check whether the highest major y-axis tick in current tick list is truly the maximum, or is there another tick that is also higher than all y-axis values
-            testList = newMajorList
-            testList.remove(maxMajorTickY)
-            secondMaximum = max(testList)
-            trueMaximum = False
-            for val in yAxis:
-                if val > secondMaximum:
-                    trueMaximum = True
-            if trueMaximum == False:
-                newMajorList = testList
-            
-            # Get new minimum/maximum major y-axis ticks
-            minMajorTickY = min(newMajorList)
-            maxMajorTickY = max(newMajorList)
-
-            tempList = []
-            for j in range(4, 0, -1):
-                tempList.append(minMajorTickY - j*minorInterval)
-
-            for j in newMajorList:
-                for k in range(1, round((newMajorList[1] - newMajorList[0]) / minorInterval) + 1):
-                    tempList.append(j + minorInterval * k)
-
-            newMinorList = tempList
-
-            axs[i].set_ylabel(parName)
-            axs[i].set_yticks(newMinorList, minor = True)
-            axs[i].set_yticks(newMajorList)
-
-            counter += 1
-        
-        for eachLine in tableRows:
-            eachLine = " ".join(eachLine) + "\n"
-            tableFile.write(eachLine)
-        
-        tableFile.close()
-
-        if eachDict == fixedParameterDict:
-            pngFile = commonDirectory + "/results/model_parameters.png"
-            pngPath = Path(pngFile)
-            if pngPath.exists():
-                subprocess.run(["rm", pngFile])
-
-            plt.savefig(pngFile)
-        else:
-            pngFile = commonDirectory + "/results/flux_values.png"
-            pngPath = Path(pngFile)
-            if pngPath.exists():
-                subprocess.run(["rm", pngFile])
-
-            plt.savefig(pngFile)
-
-    # This file is created after importing variables from another python file
-    if Path(scriptDir + "/__pycache__").exists():
-        os.system("rm -rf " +scriptDir+"/__pycache__")
-
-    # The below part will create a visual flux table, but since there is already a table in txt format, along with a graph, I might delete this part in future.
-    print("\nCreating the table: Flux values")
-    unit = list(fixedFluxDict.values())[0][0][4]
-    rowNum = len(list(fixedFluxDict.keys()))
-
-    #Create the table dictionary, along with the title row
-    fluxTable = [["Time (MJD)"]]
-    for eachFlux in encounteredFluxes:
-        fluxTable[0].append(eachFlux.title())
-
+        ax_num += 1
     
-    for key, val in fixedFluxDict.items():
-        index = 1
-        tableRow = ["-"]*(uniqueFluxes + 1)
-        tableRow[0] = (float(format(key, ".1f")) + referanceMjd)
+    # Set minor ticks, also hide x-axis tick labels from all graphs except the last one
+    for ax in axs:
+        ax.xaxis.set_minor_locator(AutoMinorLocator())
 
-        dataIndex = 0
-        for eachColumn in fluxTable[0][1:]:
-            if dataIndex >= len(val):
-                break
-            if eachColumn == val[dataIndex][0].title():
-                tableRow[index] = (format(val[dataIndex][1], ".4f") + "\n(-" + format(val[dataIndex][2], ".4f") + "/+" + format(val[dataIndex][3], ".4f") + ")")
-                dataIndex += 1
-            else:
-                tableRow[index] = "-"
-             
-            index += 1
+        if ax != axs[-1]:
+            ax.xaxis.set_tick_params(labelbottom=False)
 
-        fluxTable.append(tableRow)
+    # Set the title of the figure
+    fig.suptitle('Model Parameters', fontsize=20, y=0.95)
 
-    fluxTable.append([" "] * (uniqueFluxes + 1))
-    fig, ax = plt.subplots(figsize=(12,rowNum))
+    # Set a shared y-axis title, if it is given
+    if shared_yaxis_flag:
+        fig.text(0.9, 0.5, shared_yaxis_title, va='center', rotation='vertical')
 
-    table = ax.table(cellText=fluxTable, cellLoc='center', loc='center', edges='T')
-    table.auto_set_font_size(False)
-    table.set_fontsize(12)
-    table.scale(1.2, 2.7)  # Adjust the size of the table
+    plt.subplots_adjust(wspace=0, hspace=0, right=0.85)  
 
-    cellSize = 4 * len(fluxTable)
-    cellCounter = 0
-    for key, cell in table._cells.items():
-        if cellCounter > 2* (uniqueFluxes + 1) -1 and cellCounter < (len(fluxTable)*(uniqueFluxes+1) - (uniqueFluxes + 1)):
-            cell.set_linewidth(0)
+    # Construct the file name of the graph
+    if enable_versioning:
+        png_name = commonDirectory + "/results/model_graphs/model_graph_" + str(current_version) + ".png"
+    else:
+        png_name = commonDirectory + "/results/model_graphs/model_graph.png"
+
+    # Delete any existing file with the same name, and create a new file
+    if Path(png_name).exists():
+        os.system("rm " + png_name)
+
+    # Save the graph file
+    plt.savefig(png_name)
+
+    # Initialize the table structure with lists, where each list denotes a column 
+    table_columns = []
+    for i in range(len(all_parameters)*3 + 2):
+        table_columns.append([])
+
+    # Column name of the first two columns
+    table_columns[0].append("Obsid")
+    table_columns[1].append("MJD")
+
+    # Column names of the rest of the columns
+    start_index = 2
+    for par in all_parameters:
+        par = par.replace(" ", "_")
+        table_columns[start_index].append(par)
+        table_columns[start_index + 1].append(par + "_errlow")
+        table_columns[start_index + 2].append(par + "_errhigh")
+        start_index += 3
+
+    # Create the obsid column
+    for obsid in otherParsDict.keys():
+        table_columns[0].append(obsid)
+
+    # Create the date column
+    for val in otherParsDict.values():
+        table_columns[1].append(val[0][5] + otherpars_ref)
+
+    # Create the rest of the columns
+    start_index = 2
+    for i in range(len(all_parameters)):
+        # Calculate the current column index (each parameter will have three columns: value, low error, high error)
+        current_index = start_index  + i*3
+
+        # Change the parameter name from the column to match with the name format in the dictionary
+        searched_par = table_columns[current_index][0].replace("_", " ")
+
+        for key, obs_list in otherParsDict.items():
+            added_par_flag = False
+
+            for val in obs_list:
+
+                par_name = val[0]
+                if par_name == searched_par:
+                    # The current parameter in the dictionary matches with the column name, extract the parameter values and set the flag to True
+                    added_par_flag = True
+
+                    table_columns[current_index].append(val[1])
+                    table_columns[current_index + 1].append(val[1] - val[2])
+                    table_columns[current_index + 2].append(val[1] + val[3])
+                    break
+            
+            # If the flag has not been set to True, it means the current observation does not have the searched parameter of the column. Set values as "-"
+            if added_par_flag == False:
+                table_columns[current_index].append("-")
+                table_columns[current_index + 1].append("-")
+                table_columns[current_index + 2].append("-")
+
+    # Set the table file name according to enable_versioning variable
+    table_file_name = ""
+    if enable_versioning:
+        table_file_name = "model_table_" + str(current_version) + ".txt"
+    else:
+        table_file_name = "model_table.png"
+    
+    # Create the table file if it has not been already created
+    if Path(commonDirectory + "/results/model_tables/" + table_file_name).exists() == False:
+        os.system("touch " + commonDirectory + "/results/model_tables/" + table_file_name)
+    
+    # Override the table file's contents with the columns created within table_columns
+    with open(commonDirectory + "/results/model_tables/" + table_file_name, "w") as file:
+        for i in range(len(table_columns[0])):
+            line = ""
+            for each_line in table_columns:
+                line += str(each_line[i]) + " "
         
-        cellCounter += 1
+            line = line[:-1]
+            line += "\n"
 
-    ax.axis('off')  # Turn off the axes
+            file.write(line)
 
-    tablePng = commonDirectory + "/results/flux_table.png"
-    tablePath = Path(tablePng)
-    if tablePath.exists():
-        subprocess.run(["rm", tablePng])
 
-    plt.savefig(tablePng)
 
-else:
-    print("\nCould not find any extracted set of parameters to create parameter graphs.")
+
+
+# If fluxValuesDict is not empty, create the model parameter graphs and the table file
+if len(fluxValuesDict) != 0:
+    parameter_dict = {}
+
+    # Extract the the data from each observation to parameter_dict, where each key will be parameter names whereas values will be lists of parameter values
+    for obs_identifier, obs_list in fluxValuesDict.items():
+        for value_list in obs_list:
+            if value_list[0] not in parameter_dict:
+                parameter_dict[value_list[0]] = [[value_list[1]], [value_list[2]], [value_list[3]], [value_list[5]], value_list[4]]
+            else:
+                parameter_dict[value_list[0]][0].append(value_list[1])  # Value
+                parameter_dict[value_list[0]][1].append(value_list[2])  # Error low
+                parameter_dict[value_list[0]][2].append(value_list[3])  # Error high
+                parameter_dict[value_list[0]][3].append(value_list[5])  # Date
+
+
+    fig, axs = plt.subplots(len(parameter_dict), 1, figsize=(8, 14), sharex=True)
+
+    shared_yaxis_flag = False
+    all_parameters = []
+    ax_num = 0
+    for par_name, par_list in parameter_dict.items():
+
+        # Add all unique parameters to all_parameters list
+        if par_name not in all_parameters:
+            all_parameters.append(par_name)
+
+        # Extract all lists necessary for graphs
+        x_axis = par_list[3]
+        y_axis = par_list[0]
+        err_low = par_list[1]
+        err_high = par_list[2]
+
+        # Check if shared y-axis title is given
+        shared_yaxis_title = par_list[4]
+        if shared_yaxis_title != "":
+            shared_yaxis_flag = True
+
+        axs[ax_num].errorbar(x_axis, y_axis, yerr=[err_low, err_high], fmt='o', color='black', ecolor="black", markersize=4, capsize=0)
+
+        axs[ax_num].tick_params(which = "both", direction="in")
+        axs[ax_num].yaxis.tick_left()
+
+        axs[ax_num].set_ylabel(par_name)
+        axs[ax_num].set_xlabel(f"Time (MJD-{fluxes_ref} days)")
+
+        ax_num += 1
+    
+    # Set minor ticks, also hide x-axis tick labels from all graphs except the last one
+    for ax in axs:
+        ax.xaxis.set_minor_locator(AutoMinorLocator())
+
+        if ax != axs[-1]:
+            ax.xaxis.set_tick_params(labelbottom=False)
+
+    # Set the title of the figure
+    fig.suptitle('Flux Values', fontsize=20, y=0.95)
+
+    # Set a shared y-axis title, if it is given
+    if shared_yaxis_flag:
+        fig.text(0.9, 0.5, shared_yaxis_title, va='center', rotation='vertical')
+
+    plt.subplots_adjust(wspace=0, hspace=0, right=0.85)  
+
+    # Construct the file name of the graph
+    if enable_versioning:
+        png_name = commonDirectory + "/results/flux_graphs/flux_graph_" + str(current_version) + ".png"
+    else:
+        png_name = commonDirectory + "/results/flux_graphs/flux_graph.png"
+
+    # Delete any existing file with the same name, and create a new file
+    if Path(png_name).exists():
+        os.system("rm " + png_name)
+
+    # Save the graph file
+    plt.savefig(png_name)
+
+    # Initialize the table structure with lists, where each list denotes a column 
+    table_columns = []
+    for i in range(len(all_parameters)*3 + 2):
+        table_columns.append([])
+
+    # Column name of the first two columns
+    table_columns[0].append("Obsid")
+    table_columns[1].append("MJD")
+
+    # Column names of the rest of the columns
+    start_index = 2
+    for par in all_parameters:
+        par = par.replace(" ", "_")
+        table_columns[start_index].append(par)
+        table_columns[start_index + 1].append(par + "_errlow")
+        table_columns[start_index + 2].append(par + "_errhigh")
+        start_index += 3
+
+    # Create the obsid column
+    for obsid in otherParsDict.keys():
+        table_columns[0].append(obsid)
+
+    # Create the date column
+    for val in otherParsDict.values():
+        table_columns[1].append(val[0][5] + fluxes_ref)
+
+    # Create the rest of the columns
+    start_index = 2
+    for i in range(len(all_parameters)):
+        # Calculate the current column index (each parameter will have three columns: value, low error, high error)
+        current_index = start_index  + i*3
+
+        # Change the parameter name from the column to match with the name format in the dictionary
+        searched_par = table_columns[current_index][0]
+
+        for key, obs_list in fluxValuesDict.items():
+            added_par_flag = False
+
+            for val in obs_list:
+                
+                # Fix the parameter name to match searched parameter name format
+                par_name = val[0].replace(" ", "_")
+
+                if par_name == searched_par:
+                    # The current parameter in the dictionary matches with the column name, extract the parameter values and set the flag to True
+                    added_par_flag = True
+
+                    table_columns[current_index].append(val[1])
+                    table_columns[current_index + 1].append(val[1] - val[2])
+                    table_columns[current_index + 2].append(val[1] + val[3])
+                    break
+            
+            # If the flag has not been set to True, it means the current observation does not have the searched parameter of the column. Set values as "-"
+            if added_par_flag == False:
+                table_columns[current_index].append("-")
+                table_columns[current_index + 1].append("-")
+                table_columns[current_index + 2].append("-")
+
+    # Set the table file name according to enable_versioning variable
+    table_file_name = ""
+    if enable_versioning:
+        table_file_name = "flux_table_" + str(current_version) + ".txt"
+    else:
+        table_file_name = "flux_table.png"
+    
+    # Create the table file if it has not been already created
+    if Path(commonDirectory + "/results/flux_tables/" + table_file_name).exists() == False:
+        os.system("touch " + commonDirectory + "/results/flux_tables/" + table_file_name)
+    
+    # Override the table file's contents with the columns created within table_columns
+    with open(commonDirectory + "/results/flux_tables/" + table_file_name, "w") as file:
+        for i in range(len(table_columns[0])):
+            line = ""
+            for each_line in table_columns:
+                line += str(each_line[i]) + " "
+        
+            line = line[:-1]
+            line += "\n"
+
+            file.write(line)

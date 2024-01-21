@@ -103,3 +103,13 @@ calculateGaussEquivalentWidth = True
 modelsToAddCfluxBefore = ["absorbed", "unabsorbed", "diskbb", "powerlaw"]
 
 writeParValuesAfterCflux = True
+
+#================================================ nicer.plot spesific variables =================================================
+# If set to True, the script will create new graphs with a count/version number at the end instead of updating only one file.
+# e.g. model_parameters_1.png, model_parameters_2.png, ... As you continue to run the script, previous files will not be deleted.
+# If set to False, the script will only create one file, and delete the previous one (e.g. model_parameters.png, without a count/version number at the end)
+enable_versioning = True
+
+# Setting this variable to True will clear all the previously created files (graphs and tables), and reset the count/version number
+# to 1 if enable_versioning is set to True
+delete_previous_files = False
