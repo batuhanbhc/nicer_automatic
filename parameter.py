@@ -36,6 +36,11 @@ plotScript = "nicer_plot.py"
 fluxScript = "nicer_flux.py"
 
 #================================================= nicer.create spesific variables =============================================
+# nicer_create will keep the records of processed file paths in processed_obs.txt and update it when you filter new observations.
+# If you ever want to clean the contents of processed_obs.txt (in cases where certain observations may no longer be valid for spectral analysis), set
+# clean_obs_history to True.
+clean_obs_history = False
+
 # Set this variable to True if you want high resolution light curves. If set to False, light curves will have 1 second time resolution.
 createHighResLightCurves = True
 
@@ -98,3 +103,13 @@ calculateGaussEquivalentWidth = True
 modelsToAddCfluxBefore = ["absorbed", "unabsorbed", "diskbb", "powerlaw"]
 
 writeParValuesAfterCflux = True
+
+#================================================ nicer.plot spesific variables =================================================
+# If set to True, the script will create new graphs with a count/version number at the end instead of updating only one file.
+# e.g. model_parameters_1.png, model_parameters_2.png, ... As you continue to run the script, previous files will not be deleted.
+# If set to False, the script will only create one file, and delete the previous one (e.g. model_parameters.png, without a count/version number at the end)
+enable_versioning = True
+
+# Setting this variable to True will clear all the previously created files (graphs and tables), and reset the count/version number
+# to 1 if enable_versioning is set to True
+delete_previous_files = False

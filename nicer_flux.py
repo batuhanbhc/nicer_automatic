@@ -203,15 +203,22 @@ def calculateFlux(component, modelName, parameters):
     
     return fluxVals
 
-def writeParsAfterFlux():
+def writeParsAfterFlux(line_list):
     for comp in AllModels(1).componentNames:
         compObj = getattr(AllModels(1), comp)
         for par in compObj.parameterNames:
             parObj = getattr(compObj, par)
             fullName = comp + "." + par
-            file.write(fullName + "     " + str(parObj.values[0]) + "\n")
+
+            line_list.append(fullName + "     " + str(parObj.values[0]) + "\n")
     
-    file.write("\n")
+    line_list.append("\n") 
+
+def write_lines_to_file(file_name, line_list):
+    while open(file_name, "a"):
+        for line in line_list:
+            file_name.write(line)
+
 #===================================================================================================================
 energyLimits = energyFilter.split(" ")
 Emin = energyLimits[0]
@@ -241,12 +248,12 @@ if len(searchedObsid) == 0:
 
 iterationMax = 0
 searchedObservations = []
-if Path(commonDirectory + "/filtered_directories.txt").exists() == False:
-    print("\nERROR: Could not find 'filtered_directories.txt' file under the 'commonFiles' directory.")
-    print("Please make sure both the 'commonFiles' directory and the 'filtered_directories.txt' files exist and are constructed as intended by nicer_create.py.\n")
+if Path(commonDirectory + "/processed_obs.txt").exists() == False:
+    print("\nERROR: Could not find 'processed_obs.txt' file under the 'commonFiles' directory.")
+    print("Please make sure both the 'commonFiles' directory and the 'processed_obs.txt' files exist and are constructed as intended by nicer_create.py.\n")
     quit()
 else:
-    with open(commonDirectory + "/filtered_directories.txt", "r") as filteredFile:
+    with open(commonDirectory + "/processed_obs.txt", "r") as filteredFile:
         allLines = filteredFile.readlines()
         for eachObsid in searchedObsid:
             for line in allLines:
@@ -258,7 +265,7 @@ else:
                     searchedObservations.append((lineElements[0], lineElements[1], lineElements[2]))
 
 if len(searchedObservations) == 0:
-    print("\nCould not find the searched observation paths in 'filtered_directories.txt', most likely due to having low exposure.")
+    print("\nCould not find the searched observation paths in 'processed_obs.txt', most likely due to having low exposure.")
     quit()
 
 if chatterOn == False:
@@ -289,20 +296,33 @@ for path, obsid, expo in searchedObservations:
             # All necessary files have been found
             missingFiles = False
             break
+    
+    fit_file_name = resultsFile
+    fit_file_lines = []
 
-    file = open(resultsFile, "a")
+    with open("fit_results.log") as fit_file:
+        lines = fit_file.readlines()
+
+        for line in lines:
+            if "Fluxes of model components" in line:
+                fit_file_lines = fit_file_lines[:-1]    # To exclude the "======" line before
+                break
+            else:
+                fit_file_lines.append(line)
 
     # Check if there are any missing files
     if missingFiles:
         print("ERROR: Necessary files for calculating fluxes are missing for the observation: " + obsid)
-        file.write("\nERROR: Necessary files for calculating fluxes are missing for the observation: " + obsid + "\n")
+        fit_file_lines.append("\nERROR: Necessary files for calculating fluxes are missing for the observation: " + obsid + "\n")
+
         if foundModfile == False:
             print("->Missing model file")
-            file.write("->Missing model file\n")
+            fit_file_lines.append("->Missing model file\n")
         if foundDatafile == False:
             print("->Missing data file")
-            file.write("->Missing data file\n")
-        file.close()
+            fit_file_lines.append("->Missing data file\n")
+        
+        write_lines_to_file(fit_file_name, fit_file_lines)
         continue
     
     print("All the necessary files for flux calculations are found. Please check if the correct files are in use.")
@@ -316,8 +336,18 @@ for path, obsid, expo in searchedObservations:
     parameters = {}
     updateParameters(parameters)
 
-    file.write("\n===========================================================\n")
-    file.write("Fluxes of model components (in 10^-9 ergs/cm^2/s) (90% confidence intervals)\n\n")
+    # Open the parameter file and extract all non_flux lines
+    all_lines_file = {}
+    par_file = open("parameters_bestmodel.txt", "r")
+    all_lines = par_file.readlines()
+    par_file.close()
+
+    for line in all_lines:
+        if "flux" not in line:
+            all_lines_file[line] = 1
+
+    fit_file_lines.append("\n===========================================================\n")
+    fit_file_lines.append("Fluxes of model components (in 10^-9 ergs/cm^2/s) (90% confidence intervals)\n\n")
     modelName = AllModels(1).expression.replace(" ", "")
 
     for fluxModel in modelsToAddCfluxBefore:
@@ -329,28 +359,20 @@ for path, obsid, expo in searchedObservations:
         print("Calculating flux for: " + fluxModel)
         flux = calculateFlux(fluxModel, modelName, parameters)
         
-        file.write(energyFilter +" keV " + AllModels(1).expression + "\nFlux: " + listToStr(flux) + "\n")
+        # Write flux data to 
+        fit_file_lines.append(energyFilter +" keV " + AllModels(1).expression + "\nFlux: " + listToStr(flux) + "\n")
         if writeParValuesAfterCflux:
-            writeParsAfterFlux()
+            writeParsAfterFlux(fit_file_lines)
         
-        # Write flux values to parameter file
-        parameterFile = open("parameters_bestmodel.txt", "r")
-        appendFlux = True
-        for line in parameterFile.readlines():
-            if  fluxModel +"_flux" in line:
-                appendFlux = False
-                break
-        parameterFile.close()
+        # Add new flux line to the all_lines_file
+        all_lines_file[fluxModel +"_flux " + listToStr(flux)+ " (10^-9_ergs_cm^-2_s^-1)\n"] = 1
+        
+    # Write flux values to parameter file
+    par_file = open("parameters_bestmodel.txt", "w")
+    for line in all_lines_file.keys():
+        par_file.write(line)
+    par_file.close()
 
-        if appendFlux:
-            parameterFile = open("parameters_bestmodel.txt", "a")
-            parameterFile.write(fluxModel +"_flux " + listToStr(flux)+ " (10^-9_ergs_cm^-2_s^-1)\n")
-            parameterFile.close()
-            print("Successfully added flux data to the parameter file.\n")
-        else:
-            print("There is already flux data about '" + fluxModel + "' in parameter file.\n")
-
-    file.close()
     AllModels.clear()
     AllData.clear()
 
