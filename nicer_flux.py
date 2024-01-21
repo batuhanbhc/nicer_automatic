@@ -215,9 +215,9 @@ def writeParsAfterFlux(line_list):
     line_list.append("\n") 
 
 def write_lines_to_file(file_name, line_list):
-    while open(file_name, "a"):
+    with open(file_name, "a") as file:
         for line in line_list:
-            file_name.write(line)
+            file.write(line)
 
 #===================================================================================================================
 energyLimits = energyFilter.split(" ")
@@ -372,6 +372,8 @@ for path, obsid, expo in searchedObservations:
     for line in all_lines_file.keys():
         par_file.write(line)
     par_file.close()
+
+    write_lines_to_file(fit_file_name, fit_file_lines)
 
     AllModels.clear()
     AllData.clear()
