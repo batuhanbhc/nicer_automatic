@@ -136,6 +136,8 @@ if Path(commonDirectory + "/version_counter.txt").exists() == False:
 #===========================================================================================
 # If clear variable is True, clear the contents of the output directories
 if delete_previous_files:
+    print("Deleting all the previous graph and table files under 'results' directory..\n")
+
     all_files = os.listdir(commonDirectory + "/results/model_graphs")
     for file in all_files:
         if "model" in file:
@@ -191,7 +193,7 @@ with open(scriptDir + "/" + inputTxtFile, "r") as file:
             searchedObsid.append(obsid)
 
 if len(searchedObsid) == 0:
-    print("\nCould not find any valid observation path, as given in the obs.txt file.")
+    print("\nCould not find any valid observation path given in the observations.txt file.")
     quit()
 
 # Check whether any of the searched observations are processed, extract the necessary data if that is the case.
@@ -214,7 +216,7 @@ else:
                     searchedObservations.append((lineElements[0], lineElements[1], lineElements[2]))
 
 if len(searchedObservations) == 0:
-    print("\nCould not find the searched observation paths in 'processed_obs.txt', most likely due to having low exposure.")
+    print("\nCould not find any matching observation paths in 'processed_obs.txt' with those in 'observations.txt', most likely them being filtered out due to having low exposure.")
     quit()
 
 
@@ -308,6 +310,8 @@ otherpars_ref = 0
 fluxes_ref = 0
 empty_flag = True
 
+print("\n")
+
 #Find the referance point for the x-axis (date) for model parameters
 if len(otherParsDict) != 0:
     empty_flag = False
@@ -324,6 +328,9 @@ if len(otherParsDict) != 0:
     for key, obs_list in otherParsDict.items():
         for value_list in obs_list:
             value_list[5] = value_list[5] - referanceMjd
+else:
+    print("WARNING: Could not find any model parameters inside the parameter_bestmodel.txt file.")
+    print("Creating graph and table files will be skipped..\n")
 
 
 #Find the referance point for the x-axis (date) for flux values
@@ -342,10 +349,13 @@ if len(fluxValuesDict) != 0:
     for key, obs_list in fluxValuesDict.items():
         for value_list in obs_list:
             value_list[5] = value_list[5] - referanceMjd
+else:
+    print("WARNING: Could not find any flux values inside the parameter_bestmodel.txt file.")
+    print("Creating graph and table files will be skipped..\n")
 
 # Both flux dictionary and model dictionary are empty.
 if empty_flag:
-    print("\nERROR: Both dictionaries (parameter/flux) are empty. There is no data to create any graph.")
+    print("\nERROR: Both dictionaries (parameter/flux) are empty. There is no data to create any graph.\n")
     quit()
 
 
@@ -485,16 +495,16 @@ if len(otherParsDict) != 0:
     # Set the table file name according to enable_versioning variable
     table_file_name = ""
     if enable_versioning:
-        table_file_name = "model_table_" + str(current_version) + ".txt"
+        table_file_name = commonDirectory + "/results/model_tables/model_table_" + str(current_version) + ".txt"
     else:
-        table_file_name = "model_table.png"
+        table_file_name = commonDirectory + "/results/model_tables/model_table.png"
     
     # Create the table file if it has not been already created
-    if Path(commonDirectory + "/results/model_tables/" + table_file_name).exists() == False:
-        os.system("touch " + commonDirectory + "/results/model_tables/" + table_file_name)
+    if Path(table_file_name).exists() == False:
+        os.system("touch " + table_file_name)
     
     # Override the table file's contents with the columns created within table_columns
-    with open(commonDirectory + "/results/model_tables/" + table_file_name, "w") as file:
+    with open(table_file_name, "w") as file:
         for i in range(len(table_columns[0])):
             line = ""
             for each_line in table_columns:
@@ -505,7 +515,9 @@ if len(otherParsDict) != 0:
 
             file.write(line)
 
-
+    print("Graph and table files for model parameters have been successfully created:")
+    print("Graph path: " + png_name)
+    print("Table path: " + table_file_name + "\n")
 
 
 
@@ -647,16 +659,16 @@ if len(fluxValuesDict) != 0:
     # Set the table file name according to enable_versioning variable
     table_file_name = ""
     if enable_versioning:
-        table_file_name = "flux_table_" + str(current_version) + ".txt"
+        table_file_name = commonDirectory + "/results/flux_tables/flux_table_" + str(current_version) + ".txt"
     else:
-        table_file_name = "flux_table.png"
+        table_file_name = commonDirectory + "/results/flux_tables/flux_table.png"
     
     # Create the table file if it has not been already created
-    if Path(commonDirectory + "/results/flux_tables/" + table_file_name).exists() == False:
-        os.system("touch " + commonDirectory + "/results/flux_tables/" + table_file_name)
+    if Path(table_file_name).exists() == False:
+        os.system("touch " + table_file_name)
     
     # Override the table file's contents with the columns created within table_columns
-    with open(commonDirectory + "/results/flux_tables/" + table_file_name, "w") as file:
+    with open(table_file_name, "w") as file:
         for i in range(len(table_columns[0])):
             line = ""
             for each_line in table_columns:
@@ -666,3 +678,7 @@ if len(fluxValuesDict) != 0:
             line += "\n"
 
             file.write(line)
+
+    print("Graph and table files for flux values have been successfully created:")
+    print("Graph path: " + png_name)
+    print("Table path: " + table_file_name + "\n")
