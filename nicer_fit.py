@@ -126,17 +126,21 @@ def shakefit(bestModelList, resultsFile):
     # Shakefit will only be run for these parameters
     parametersToCalculateError = []
 
-    for key in parametersForShakefit.keys():
-        model = key[:key.find(".")]
-        parameter = key[key.find(".") + 1:]
-        if model in AllModels(1).expression:
-            compObj = getattr(AllModels(1), model)
-            parObj = getattr(compObj, parameter)
-            index = parObj.index
+    try:
+        for key in parametersForShakefit.keys():
+            model = key[:key.find(".")]
+            parameter = key[key.find(".") + 1:]
+            if model in AllModels(1).expression:
+                compObj = getattr(AllModels(1), model)
+                parObj = getattr(compObj, parameter)
+                index = parObj.index
 
-            parametersToCalculateError.append(index)
-        else:
-            pass
+                parametersToCalculateError.append(index)
+            else:
+                pass
+    except Exception as e:
+        print(f"Exception occured while reading the contents of 'parametersForShakefit' variable in parameter.py: {e}")
+        quit()
 
     if checkPowerlawErrorAndFreeze:
         # Before proceeding with shakefit, check if powerlaw is in model expression. If so, check whether xspec error for photon index is bigger than 1 or not.
@@ -181,7 +185,6 @@ def shakefit(bestModelList, resultsFile):
                         
                         break
 
-    Fit.query = "no"
     resultsFile.write("========== Proceeding with shakefit error calculations ==========\n")
     paramNum = AllModels(1).nParameters
     rerunShakefit = False
@@ -339,23 +342,26 @@ def saveData(location = "default"):
 def writeBestFittingModel(resultsFile):
     # This function writes the current model in AllModels container in a log file, assuming that all the models
     # have been compared and the last remaining model is the best fitting model.
-    resultsFile.write("====================== Best Fitting Model ======================\n")
-    resultsFile.write("Model Name: " + AllModels(1).expression + "\n")
-    
-    resultsFile.write("Fit results:\n")
-    fitString = "Null Probability: " + str(Fit.nullhyp) +", Chi-squared: " + str(Fit.statistic) + ", Dof: " + str(Fit.dof) + "\n"
-    resultsFile.write(fitString)
+    try:
+        resultsFile.write("====================== Best Fitting Model ======================\n")
+        resultsFile.write("Model Name: " + AllModels(1).expression + "\n")
+        
+        resultsFile.write("Fit results:\n")
+        fitString = "Null Probability: " + str(Fit.nullhyp) +", Chi-squared: " + str(Fit.statistic) + ", Dof: " + str(Fit.dof) + "\n"
+        resultsFile.write(fitString)
 
-    parameterString = ""
-    for comp in AllModels(1).componentNames:
-        compObj = getattr(AllModels(1), comp)
-        for par in compObj.parameterNames:
-            parVal = getattr(compObj, par).values
-            fullName = comp + "." + par
-            parameterString += fullName + ":\t" + str(parVal) + "\n"
+        parameterString = ""
+        for comp in AllModels(1).componentNames:
+            compObj = getattr(AllModels(1), comp)
+            for par in compObj.parameterNames:
+                parVal = getattr(compObj, par).values
+                fullName = comp + "." + par
+                parameterString += fullName + ":\t" + str(parVal) + "\n"
 
-    resultsFile.write("Parameters: \n" + parameterString)
-    resultsFile.write("=================================================================\n")
+        resultsFile.write("Parameters: \n" + parameterString)
+        resultsFile.write("=================================================================\n")
+    except Exception as e:
+        print(f"Exception occured while writing the best fitting model to {resultsFile}: {e}")
 
 def extractModFileName():
     fileName = "model_"
@@ -593,8 +599,9 @@ def calculateGaussEqw(logFile):
             try:
                 AllModels.eqwidth(counter, err=True, number=1000, level=90)
                 eqwList.append("Equivalent width: " + str(listToStr(AllData(1).eqwidth)) + " (" + str(format(energyVal, ".2f")) + " keV gauss)\n")
-            except:
+            except Exception as e:
                 eqwList.append("Calculating eqw failed for component: " + comp + "\n")
+                print(f"Exception: {e}")
     
     if eqwList != []:
         logFile.write("Gauss equivalent widths: (90% confidence intervals) \n")
@@ -1114,42 +1121,50 @@ if chatterOn == False:
 pipelineFile = scriptDir + "/" + pipelineFile
 
 searchedObsid = []
-with open(scriptDir + "/" + inputTxtFile, "r") as file:
-    allLines = file.readlines()
-    for line in allLines:
-        line = line.replace(" ", "")
-        line = line.strip("\n")
-        if line != "" and Path(line).exists():
-            if line[-1] != "/":
-                slashIdx = line.rfind("/")
-                obsid = line[slashIdx+1 :]
-            else:
-                slashIdx = line[:-1].rfind("/")
-                obsid = line[slashIdx+1:-1]
-            
-            searchedObsid.append(obsid)
+try:
+    with open(scriptDir + "/" + inputTxtFile, "r") as file:
+        allLines = file.readlines()
+        for line in allLines:
+            line = line.replace(" ", "")
+            line = line.strip("\n")
+            if line != "" and Path(line).exists():
+                if line[-1] != "/":
+                    slashIdx = line.rfind("/")
+                    obsid = line[slashIdx+1 :]
+                else:
+                    slashIdx = line[:-1].rfind("/")
+                    obsid = line[slashIdx+1:-1]
+                
+                searchedObsid.append(obsid)
+except Exception as e:
+    print(f"Exception occured while opening {inputTxtFile}: {e}")
+    quit()
 
 if len(searchedObsid) == 0:
-    print("\nCould not find any valid observation path, as given in the obs.txt file.")
+    print("\nCould not find any valid observation path given in the observations.txt file.")
     quit()
 
 iterationMax = 0
 searchedObservations = []
 if Path(commonDirectory + "/processed_obs.txt").exists() == False:
-    print("\nERROR: Could not find 'processed_obs.txt' file under the 'commonFiles' directory.")
+    print("\nCould not find 'processed_obs.txt' file under the 'commonFiles' directory.")
     print("Please make sure both the 'commonFiles' directory and the 'processed_obs.txt' files exist and are constructed as intended by nicer_create.py.\n")
     quit()
 else:
-    with open(commonDirectory + "/processed_obs.txt", "r") as filteredFile:
-        allLines = filteredFile.readlines()
-        for eachObsid in searchedObsid:
-            for line in allLines:
-                line = line.strip("\n")
-                lineElements = line.split(" ")
+    try:
+        with open(commonDirectory + "/processed_obs.txt", "r") as filteredFile:
+            allLines = filteredFile.readlines()
+            for eachObsid in searchedObsid:
+                for line in allLines:
+                    line = line.strip("\n")
+                    lineElements = line.split(" ")
 
-                if lineElements[1] == eachObsid:
-                    iterationMax += 1
-                    searchedObservations.append((lineElements[0], lineElements[1], lineElements[2]))
+                    if lineElements[1] == eachObsid:
+                        iterationMax += 1
+                        searchedObservations.append((lineElements[0], lineElements[1], lineElements[2]))
+    except Exception as e:
+        print(f"Exception occured while opening processed_obs.txt: {e}")
+        quit()
 
 if len(searchedObservations) == 0:
     print("\nCould not find the searched observation paths in 'processed_obs.txt', most likely due to having low exposure.")
@@ -1171,7 +1186,13 @@ for x in range(2):
             print("Fixing nH parameters: FALSE\n")
 
         outObsDir = path
-        os.chdir(outObsDir)
+
+        try:
+            os.chdir(outObsDir)
+        except Exception as e:
+            print(f"Exception occured while trying to change directory to {outObsDir}: {e}")
+            continue
+
         allFiles = os.listdir(outObsDir)
 
         # Find the spectrum, background, arf and response files
@@ -1226,6 +1247,34 @@ for x in range(2):
         print("Background file:", backgroundFile)
         print("Arf file:", arfFile)
         print("Rmf file:", rmfFile, "\n")
+        
+        #==========================================================================================
+        # Check whether the spectral files can be opened successfully or not
+        try:
+            hdu = fits.open(spectrumFile)
+        except Exception as e:
+            print(f"Exception occured opening the file {spectrumFile}: {e}")
+            continue
+
+        try:
+            hdu = fits.open(backgroundFile)
+        except Exception as e:
+            print(f"Exception occured opening the file {backgroundFile}: {e}")
+            continue
+
+        try:
+            hdu = fits.open(arfFile)
+        except Exception as e:
+            print(f"Exception occured opening the file {arfFile}: {e}")
+            continue
+
+        try:
+            hdu = fits.open(rmfFile)
+        except Exception as e:
+            print(f"Exception occured opening the file {rmfFile}: {e}")
+            continue
+
+        #==========================================================================================
 
         if restartOnce and iteration == 1:
             print("Removing all model files under '" + commonDirectory + "'\n")
@@ -1238,9 +1287,18 @@ for x in range(2):
         # From now on, PyXspec will be utilized for fitting and comparing models
         
         # Set some Xspec settings
-        logFile = open(resultsFile, "w")
+        try:
+            logFile = open(resultsFile, "w")
+        except Exception as e:
+            print(f"Exception occured while opening {logFile}: {e}")
+
         Xset.openLog("xspec_output.log")
-        Xset.abund = "wilm"
+        try:
+            Xset.abund = xspec_abundance
+        except Exception as e:
+            print(f"Exception occured while setting xspec abundance: {e}")
+            quit()
+
         Fit.query = "no"
 
         logFile.write("OBSERVATION ID: " + obsid + "\n\n")
@@ -1453,9 +1511,15 @@ for x in range(2):
             os.system("touch " + outputParameterFile)
 
             # Write the parameter information from list to the parameter file
-            parFile = open(outputParameterFile, "w")
+            try:
+                parFile = open(outputParameterFile, "w")
+            except Exception as e:
+                print(f"Exception occured while opening {outputParameterFile} {e}")
+                continue
+
             for line in parLines:
                 parFile.write(line)
+
             parFile.close()
         #===========================================================================
         # Remove any pre-existing best model files and save a new one
@@ -1497,7 +1561,10 @@ for x in range(2):
         if x == 0:
             print("Restarting the fitting procedure for all observations by fixing the nH parameters...\n")
 
-os.chdir(scriptDir)
+try:
+    os.chdir(scriptDir)
+except Exception as e:
+    print(f"Exception occured while trying to change directory to {scriptDir}: {e}")
 
 # This file is created after importing variables from another python file
 if Path(scriptDir + "/__pycache__").exists():

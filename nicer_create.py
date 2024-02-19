@@ -57,8 +57,8 @@ while (str(createHighResLightCurves) != "True" and str(createHighResLightCurves)
 # Open the txt file located within the same directory as the script.
 try:
     inputFile = open(scriptDir + "/" + inputTxtFile, "r")
-except:
-    print("Could not find the input txt file under " + scriptDir + ". Terminating the script...")
+except Exception as e:
+    print(f"Exception occured while opening {inputTxtFile}: {e}")
     quit()
 #========================================================================================================================
 # Create "commonFiles" directory for storing model files and flux graphs
@@ -136,9 +136,17 @@ for obs in validPaths:
         obsid = pathLocations[-1]
 
     if Path(obs + "/auxil/ni" + obsid + ".mkf").exists():
-        hdu = fits.open(obs + "/auxil/ni" + obsid + ".mkf")
+        try:
+            hdu = fits.open(obs + "/auxil/ni" + obsid + ".mkf")
+        except Exception as e:
+            print(f"Exception occured while opening mkf file: {e}")
+
     elif Path(obs + "/auxil/ni" + obsid + ".mkf.gz").exists():
-        hdu = fits.open(obs + "/auxil/ni" + obsid + ".mkf.gz")
+        try:
+            hdu = fits.open(obs + "/auxil/ni" + obsid + ".mkf.gz")
+        except Exception as e:
+            print(f"Exception occured while opening mkf file: {e}")
+
     else:
         print(f"ERROR: Could not find mkf file under {obs}/auxil")
         print(f"Observation {obsid} will not be processed.")
@@ -158,8 +166,8 @@ for obs in validPaths:
     if time_object > lightleak_object:
         try:
             sunshine = hdu[1].data["SUNSHINE"]
-        except:
-            print(f"Missing 'SUNSHINE' column for observation {obsid}")
+        except Exception as e:
+            print(f"Exception occured while accessing 'SUNSHINE' column in mkf file: {e}")
             continue
 
         dayFlag = False
@@ -263,8 +271,8 @@ for obs in valid_paths_v2:
         try:
             os.system(nicerl2)
             print("Finished nicerl2.\n")
-        except:
-            print("Exception occured while running nicerl2, check pipeline_output.log")
+        except Exception as e:
+            print(f"Exception occured while running nicerl2: {e}")
             continue
 
         # Run nicerl3-spect
@@ -273,8 +281,8 @@ for obs in valid_paths_v2:
         try:
             os.system(nicerl3spect)
             print("Finished nicerl3-spect.\n")
-        except:
-            print("Exception occured while running nicerl3-spect, check pipeline_output.log")
+        except Exception as e:
+            print(f"Exception occured while running nicerl3-spect: {e}")
             continue
         
         # Run nicerl3-lc and create default resolution (1s) light curve
@@ -283,8 +291,8 @@ for obs in valid_paths_v2:
         try:
             os.system(nicerl3lc)
             print("Finished nicerl3-lc.")
-        except:
-            print("Exception occured while running nicerl3-lc, check pipeline_output.log")
+        except Exception as e:
+            print(f"Exception occured while running nicerl3-lc: {e}")
             continue
 
         # Check whether the user wants to create high resolution light curves
@@ -295,7 +303,7 @@ for obs in valid_paths_v2:
                 try:
                     os.system(nicerl3lc)
                 except:
-                    print("Exception occured while running high resolution nicerl3-lc, check pipeline_output.log")
+                    print(f"Exception occured while running high resolution nicerl3-lc: {e}")
                     break
 
             print("Finished nicerl3-lc.\n")
@@ -350,8 +358,8 @@ for obs in valid_paths_v2:
             try:
                 os.system(nicerl2)
                 print("Finished nicerl2.\n")
-            except:
-                print("Exception occured while running nicerl2, check pipeline_output.log")
+            except Exception as e:
+                print(f"Exception occured while running nicerl2: {e}")
                 continue
 
             # Run nicerl3-spect
@@ -360,8 +368,8 @@ for obs in valid_paths_v2:
             try:
                 os.system(nicerl3spect)
                 print("Finished nicerl3-spect.\n")
-            except:
-                print("Exception occured while running nicerl3-spect, check pipeline_output.log")
+            except Exception as e:
+                print(f"Exception occured while running nicerl3-spect: {e}")
                 continue
             
             # Run nicerl3-lc and create default resolution (1s) light curve
@@ -370,8 +378,8 @@ for obs in valid_paths_v2:
             try:
                 os.system(nicerl3lc)
                 print("Finished nicerl3-lc.\n")
-            except:
-                print("Exception occured while running nicerl3-lc, check pipeline_output.log")
+            except Exception as e:
+                print(f"Exception occured while running nicerl3-lc: {e}")
                 continue
 
             # Check whether the user wants to create high resolution light curves
@@ -381,8 +389,8 @@ for obs in valid_paths_v2:
                     nicerl3lc = "nicerl3-lc " + outObsDir + " pirange=" + str(each) + " timebin=" + str(2**highResLcTimeResInPwrTwo) +" suffix=_"+ str(each).replace("-", "_") + "_dt" + str(abs(highResLcTimeResInPwrTwo)).replace(".", "") + " clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
                     try:
                         os.system(nicerl3lc)
-                    except:
-                        print("Exception occured while running high resolution nicerl3-lc, check pipeline_output.log")
+                    except Exception as e:
+                        print(f"Exception occured while running high resolution nicerl3-lc: {e}")
                         break
 
 
@@ -402,13 +410,13 @@ for each_path in processed_paths:
 
     try:
         hdu = fits.open(folder_path + "/ni" + obsid + "mpu7_sr3c50.pha")
-    except:
-        print(f"Exception occured while opening ni{obsid}mpu7_sr3c50.pha")
+    except Exception as e:
+        print(f"Exception occured while opening ni{obsid}mpu7_sr3c50.pha: {e}")
         continue
     try:
         expo = hdu[1].header["EXPOSURE"]
-    except:
-        print(f"Missing column 'EXPOSURE' in ni{obsid}mpu7_sr3c50.pha")
+    except Exception as e:
+        print(f"Missing column 'EXPOSURE' in ni{obsid}mpu7_sr3c50.pha: {e}")
         continue
 
     if expo >= 100:
