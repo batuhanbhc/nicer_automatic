@@ -83,7 +83,7 @@ inputFile.close()
 
 # If there is no valid observation path, do not proceed any further
 if len(validPaths) == 0:
-    print("ERROR: Could not find any observation directory to process.")
+    print("Could not find any observation directory to process.")
     quit()
 
 cwd = os.getcwd()
@@ -99,10 +99,13 @@ except:
     print("Could not find the directory spesified by $GEOMAG_PATH. Please check whether it points to an existing directory.")
     quit()
 
+nigeodownFlag = True
+
 if Path("kp_potsdam.fits").exists() == False:
     print("Running nigeodown...")
     os.system("nigeodown chatter=5")
     print("Finished nigeodown.")
+    nigeodownFlag = False
 
 # Extract file creation date
 hdu = fits.open("kp_potsdam.fits")
@@ -121,7 +124,7 @@ lightleak_observations = {}
 
 processed_paths = []
 
-nigeodownFlag = True
+valid_paths_v2 = []
 
 # Iterate through the filter files of observations, extract date of each observation
 for obs in validPaths:
@@ -132,11 +135,15 @@ for obs in validPaths:
     else:
         obsid = pathLocations[-1]
 
-    try:
+    if Path(obs + "/auxil/ni" + obsid + ".mkf").exists():
         hdu = fits.open(obs + "/auxil/ni" + obsid + ".mkf")
-    except:
+    elif Path(obs + "/auxil/ni" + obsid + ".mkf.gz").exists():
         hdu = fits.open(obs + "/auxil/ni" + obsid + ".mkf.gz")
-    
+    else:
+        print(f"ERROR: Could not find mkf file under {obs}/auxil")
+        print(f"Observation {obsid} will not be processed.")
+        continue
+
     date = hdu[1].header["DATE-OBS"]
     date = date.replace("T", " ")
     time_object = datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
@@ -149,7 +156,12 @@ for obs in validPaths:
         print("Finished nigeodown.")
     
     if time_object > lightleak_object:
-        sunshine = hdu[1].data["SUNSHINE"]
+        try:
+            sunshine = hdu[1].data["SUNSHINE"]
+        except:
+            print(f"Missing 'SUNSHINE' column for observation {obsid}")
+            continue
+
         dayFlag = False
         nightFlag = False
         mixFlag = False
@@ -208,8 +220,11 @@ for obs in validPaths:
             os.system("mkdir " + outputDir + "/" + obsid)
 
         processed_paths.append([outputDir + "/" + obsid, obsid])
+    
+    valid_paths_v2.append(obs)
 
-for obs in validPaths:
+
+for obs in valid_paths_v2:
     #Find observation id (e.g. 6130010120)
     pathLocations = obs.split("/")
     if pathLocations[-1] == "":
@@ -244,29 +259,46 @@ for obs in validPaths:
 
         # Run nicerl2
         print("Running nicerl2...")
-        nicerl2 = "nicerl2 indir=" + obs + " clobber=yes history=yes detlist=launch,-14,-34 filtcolumns=NICERV5 cldir=" + outObsDir + " > " + pipelineLog
-        os.system(nicerl2)
-        print("Finished nicerl2.\n")
+        nicerl2 = "nicerl2 indir=" + obs + " clobber=yes chatter=4 history=yes detlist=launch,-14,-34 filtcolumns=NICERV5 cldir=" + outObsDir + " > " + pipelineLog
+        try:
+            os.system(nicerl2)
+            print("Finished nicerl2.\n")
+        except:
+            print("Exception occured while running nicerl2, check pipeline_output.log")
+            continue
 
         # Run nicerl3-spect
         print("Running nicerl3-spect...")
-        nicerl3spect = "nicerl3-spect " + outObsDir + " grouptype=optmin groupscale=10 bkgmodeltype=3c50 suffix=3c50 clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
-        os.system(nicerl3spect)
-        print("Finished nicerl3-spect.\n")
+        nicerl3spect = "nicerl3-spect " + outObsDir + " grouptype=optmin chatter=4 groupscale=10 bkgmodeltype=3c50 suffix=3c50 clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog     
+        try:
+            os.system(nicerl3spect)
+            print("Finished nicerl3-spect.\n")
+        except:
+            print("Exception occured while running nicerl3-spect, check pipeline_output.log")
+            continue
         
         # Run nicerl3-lc and create default resolution (1s) light curve
         print("Running nicerl3-lc...")
-        nicerl3lc = "nicerl3-lc " + outObsDir + " pirange=50-1000 timebin=1 suffix=_50_1000_dt0 clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
-        os.system(nicerl3lc)
+        nicerl3lc = "nicerl3-lc " + outObsDir + " pirange=50-1000 chatter=4 timebin=1 suffix=_50_1000_dt0 clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog 
+        try:
+            os.system(nicerl3lc)
+            print("Finished nicerl3-lc.")
+        except:
+            print("Exception occured while running nicerl3-lc, check pipeline_output.log")
+            continue
 
         # Check whether the user wants to create high resolution light curves
         if createHighResLightCurves:
             for each in highResLcPiRanges:
                 each = each.replace(" ", "")
                 nicerl3lc = "nicerl3-lc " + outObsDir + " pirange=" + str(each) + " timebin=" + str(2**highResLcTimeResInPwrTwo) +" suffix=_"+ str(each).replace("-", "_") + "_dt" + str(abs(highResLcTimeResInPwrTwo)).replace(".", "") + " clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
-                os.system(nicerl3lc)
+                try:
+                    os.system(nicerl3lc)
+                except:
+                    print("Exception occured while running high resolution nicerl3-lc, check pipeline_output.log")
+                    break
 
-        print("Finished nicerl3-lc.\n")
+            print("Finished nicerl3-lc.\n")
 
         print("Please do not forget to check pipeline log file to detect potential issues that might have occured while creating output files.")
         print("==============================================================================")
@@ -315,28 +347,44 @@ for obs in validPaths:
             # Run nicerl2
             print("Running nicerl2...")
             nicerl2 = "nicerl2 indir=" + obs + " clobber=yes history=yes detlist=launch,-14,-34 thresh_range=" + threshRange + " filtcolumns=NICERV5 cldir=" + outObsDir + " > " + pipelineLog
-            os.system(nicerl2)
-            print("Finished nicerl2.\n")
+            try:
+                os.system(nicerl2)
+                print("Finished nicerl2.\n")
+            except:
+                print("Exception occured while running nicerl2, check pipeline_output.log")
+                continue
 
             # Run nicerl3-spect
             print("Running nicerl3-spect...")
             nicerl3spect = "nicerl3-spect " + outObsDir + " grouptype=optmin groupscale=10 bkgmodeltype=3c50 suffix=3c50 clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
-            os.system(nicerl3spect)
-            print("Finished nicerl3-spect.\n")
+            try:
+                os.system(nicerl3spect)
+                print("Finished nicerl3-spect.\n")
+            except:
+                print("Exception occured while running nicerl3-spect, check pipeline_output.log")
+                continue
             
             # Run nicerl3-lc and create default resolution (1s) light curve
             print("Running nicerl3-lc...")
             nicerl3lc = "nicerl3-lc " + outObsDir + " pirange=50-1000 timebin=1 suffix=_50_1000_dt0 clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
-            os.system(nicerl3lc)
+            try:
+                os.system(nicerl3lc)
+                print("Finished nicerl3-lc.\n")
+            except:
+                print("Exception occured while running nicerl3-lc, check pipeline_output.log")
+                continue
 
             # Check whether the user wants to create high resolution light curves
             if createHighResLightCurves:
                 for each in highResLcPiRanges:
                     each = each.replace(" ", "")
                     nicerl3lc = "nicerl3-lc " + outObsDir + " pirange=" + str(each) + " timebin=" + str(2**highResLcTimeResInPwrTwo) +" suffix=_"+ str(each).replace("-", "_") + "_dt" + str(abs(highResLcTimeResInPwrTwo)).replace(".", "") + " clobber=YES mkfile=" + obs + "/auxil/*.mkf >> " + pipelineLog
-                    os.system(nicerl3lc)
+                    try:
+                        os.system(nicerl3lc)
+                    except:
+                        print("Exception occured while running high resolution nicerl3-lc, check pipeline_output.log")
+                        break
 
-            print("Finished nicerl3-lc.\n")
 
             print("Please do not forget to check pipeline log file to detect potential issues that might have occured while creating output files.")
             print("==============================================================================")
@@ -352,9 +400,16 @@ for each_path in processed_paths:
     folder_path = each_path[0]
     obsid = each_path[1]
 
-    hdu = fits.open(folder_path + "/ni" + obsid + "mpu7_sr3c50.pha")
-
-    expo = hdu[1].header["EXPOSURE"]
+    try:
+        hdu = fits.open(folder_path + "/ni" + obsid + "mpu7_sr3c50.pha")
+    except:
+        print(f"Exception occured while opening ni{obsid}mpu7_sr3c50.pha")
+        continue
+    try:
+        expo = hdu[1].header["EXPOSURE"]
+    except:
+        print(f"Missing column 'EXPOSURE' in ni{obsid}mpu7_sr3c50.pha")
+        continue
 
     if expo >= 100:
         # Filter out observations with exposure less than 100 seconds
