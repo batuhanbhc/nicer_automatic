@@ -1094,9 +1094,13 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
     return False
 
 #===================================================================================================================
-energyLimits = energyFilter.split(" ")
-Emin = energyLimits[0]
-Emax = energyLimits[1]
+try:
+    energyLimits = energyFilter.split(" ")
+    Emin = energyLimits[0]
+    Emax = energyLimits[1]
+except Exception as e:
+    print(f"Exception occured while reading 'energyLimits' variable due to incorrect format: {e}")
+    quit()
 
 allDir = os.listdir(outputDir)
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
@@ -1307,7 +1311,13 @@ for x in range(2):
         s1 = Spectrum(dataFile=spectrumFile, arfFile=arfFile, respFile=rmfFile, backFile=backgroundFile)
         Plot.xAxis = "keV"
         AllData.ignore("bad")
-        AllData(1).ignore("**-" + Emin + " " + Emax +"-**")
+
+        try:
+            AllData(1).ignore("**-" + Emin + " " + Emax +"-**")
+        except Exception as e:
+            print(f"Exception occured while setting the energy filter due to incorrect format: {e}")
+            quit()
+
         saveData()
         
         # Lists that will store parameter values throughout the script

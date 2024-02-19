@@ -2,6 +2,8 @@
 # Authors: Batuhan Bahçeci
 # Contact: batuhan.bahceci@sabanciuniv.edu
 
+from parameter import *
+
 additiveModels = {}
 additiveModelList =  "agauss      c6vmekl     eqpair      nei         rnei        vraymond \
 agnsed      carbatm     eqtherm     nlapec      sedov       vrnei \
@@ -29,14 +31,12 @@ c6mekl      diskpbb     meka        raymond     voigt       zlogpar \
 c6pmekl     diskpn      mekal       redge       vpshock     zpowerlw \
 c6pvmkl     eplogpar    mkcflow     refsch"
 
-test = additiveModelList.split(" ")
-for i in test:
+temp = additiveModelList.split(" ")
+for i in temp:
     if i == "":
         pass
     else:
         additiveModels[i] = 1
-
-from parameter import *
 
 print("==============================================================================")
 print("\t\t\tRunning the file: " + fluxScript + "\n")
@@ -220,27 +220,35 @@ def write_lines_to_file(file_name, line_list):
             file.write(line)
 
 #===================================================================================================================
-energyLimits = energyFilter.split(" ")
-Emin = energyLimits[0]
-Emax = energyLimits[1]
+try:
+    energyLimits = energyFilter.split(" ")
+    Emin = energyLimits[0]
+    Emax = energyLimits[1]
+except Exception as e:
+    print(f"Exception occured while reading 'energyLimits' variable due to incorrect format: {e}")
+    quit()
 
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
 
 searchedObsid = []
-with open(scriptDir + "/" + inputTxtFile, "r") as file:
-    allLines = file.readlines()
-    for line in allLines:
-        line = line.replace(" ", "")
-        line = line.strip("\n")
-        if line != "" and Path(line).exists():
-            if line[-1] != "/":
-                slashIdx = line.rfind("/")
-                obsid = line[slashIdx+1 :]
-            else:
-                slashIdx = line[:-1].rfind("/")
-                obsid = line[slashIdx+1:-1]
-            
-            searchedObsid.append(obsid)
+try:
+    with open(scriptDir + "/" + inputTxtFile, "r") as file:
+        allLines = file.readlines()
+        for line in allLines:
+            line = line.replace(" ", "")
+            line = line.strip("\n")
+            if line != "" and Path(line).exists():
+                if line[-1] != "/":
+                    slashIdx = line.rfind("/")
+                    obsid = line[slashIdx+1 :]
+                else:
+                    slashIdx = line[:-1].rfind("/")
+                    obsid = line[slashIdx+1:-1]
+                
+                searchedObsid.append(obsid)
+except Exception as e:
+    print(f"Exception occured while opening {inputTxtFile}: {e}")
+    quit()
 
 if len(searchedObsid) == 0:
     print("\nCould not find any valid observation path, as given in the obs.txt file.")
@@ -249,20 +257,24 @@ if len(searchedObsid) == 0:
 iterationMax = 0
 searchedObservations = []
 if Path(commonDirectory + "/processed_obs.txt").exists() == False:
-    print("\nERROR: Could not find 'processed_obs.txt' file under the 'commonFiles' directory.")
+    print("\nCould not find 'processed_obs.txt' file under the 'commonFiles' directory.")
     print("Please make sure both the 'commonFiles' directory and the 'processed_obs.txt' files exist and are constructed as intended by nicer_create.py.\n")
     quit()
 else:
-    with open(commonDirectory + "/processed_obs.txt", "r") as filteredFile:
-        allLines = filteredFile.readlines()
-        for eachObsid in searchedObsid:
-            for line in allLines:
-                line = line.strip("\n")
-                lineElements = line.split(" ")
+    try:
+        with open(commonDirectory + "/processed_obs.txt", "r") as filteredFile:
+            allLines = filteredFile.readlines()
+            for eachObsid in searchedObsid:
+                for line in allLines:
+                    line = line.strip("\n")
+                    lineElements = line.split(" ")
 
-                if lineElements[1] == eachObsid:
-                    iterationMax += 1
-                    searchedObservations.append((lineElements[0], lineElements[1], lineElements[2]))
+                    if lineElements[1] == eachObsid:
+                        iterationMax += 1
+                        searchedObservations.append((lineElements[0], lineElements[1], lineElements[2]))
+    except Exception as e:
+        print(f"Exception occured while opening processed_obs.txt: {e}")
+        quit()
 
 if len(searchedObservations) == 0:
     print("\nCould not find the searched observation paths in 'processed_obs.txt', most likely due to having low exposure.")
@@ -277,7 +289,12 @@ for path, obsid, expo in searchedObservations:
     print("Calculating fluxes for observation:", obsid, "\n")
 
     outObsDir = path
-    os.chdir(outObsDir)
+    try:
+        os.chdir(outObsDir)
+    except Exception as e:
+        print(f"Exception occured while changing directory to {outObsDir}: {e}")
+        continue
+
     allFiles = os.listdir(outObsDir)
 
     # Find the data file and the best fitting model file for the current observation
@@ -300,15 +317,19 @@ for path, obsid, expo in searchedObservations:
     fit_file_name = resultsFile
     fit_file_lines = []
 
-    with open("fit_results.log") as fit_file:
-        lines = fit_file.readlines()
+    try:
+        with open("fit_results.log") as fit_file:
+            lines = fit_file.readlines()
 
-        for line in lines:
-            if "Fluxes of model components" in line:
-                fit_file_lines = fit_file_lines[:-1]    # To exclude the "======" line before
-                break
-            else:
-                fit_file_lines.append(line)
+            for line in lines:
+                if "Fluxes of model components" in line:
+                    fit_file_lines = fit_file_lines[:-1]    # To exclude the "======" line before
+                    break
+                else:
+                    fit_file_lines.append(line)
+    except Exception as e:
+        print(f"Exception occured while opening fit_results.log for observation {obsid}: {e}")
+        continue
 
     # Check if there are any missing files
     if missingFiles:
@@ -329,8 +350,13 @@ for path, obsid, expo in searchedObservations:
     print("Model file: ", modFile)
     print("Data file: ", dataFile, "\n")
 
-    Xset.restore(dataFile)
-    Xset.restore(modFile)
+    try:
+        Xset.restore(dataFile)
+        Xset.restore(modFile)
+    except Exception as e:
+        print(f"Exception occured while loading data and model files to PyXspec: {e}")
+        continue
+
     Fit.query = "yes"
 
     parameters = {}
@@ -338,7 +364,13 @@ for path, obsid, expo in searchedObservations:
 
     # Open the parameter file and extract all non_flux lines
     all_lines_file = {}
-    par_file = open("parameters_bestmodel.txt", "r")
+
+    try:
+        par_file = open("parameters_bestmodel.txt", "r")
+    except Exception as e:
+        print(f"Exception occured while opening parameters_bestmodel.txt file for observation {obsid}: {e}")
+        continue
+
     all_lines = par_file.readlines()
     par_file.close()
 

@@ -101,9 +101,13 @@ def transferToNewList(sourceList):
 print("====================================================================")
 print("Running the ", plotScript," file:\n")
 
-energyLimits = energyFilter.split(" ")
-Emin = energyLimits[0]
-Emax = energyLimits[1]
+try:
+    energyLimits = energyFilter.split(" ")
+    Emin = energyLimits[0]
+    Emax = energyLimits[1]
+except Exception as e:
+    print(f"Exception occured while reading 'energyLimits' variable due to incorrect format: {e}")
+    quit()
 
 otherParsDict = {}
 fluxValuesDict = {}
@@ -166,31 +170,44 @@ if delete_previous_files:
 # Check whether enable_versioning is True, update the version file and extract the current version if that is the case.
 current_version = 0
 if enable_versioning:
-    with open(commonDirectory + "/version_counter.txt", "r") as file:
-        all_lines = file.readlines()
-        prev_version = int(all_lines[1].strip("\n"))
-        current_version  = prev_version + 1
+    try:
+        with open(commonDirectory + "/version_counter.txt", "r") as file:
+            all_lines = file.readlines()
+            prev_version = int(all_lines[1].strip("\n"))
+            current_version  = prev_version + 1
+    except Exception as e:
+        print(f"Exception occured while opening version_counter.txt: {e}")
+        quit()
 
-    with open(commonDirectory + "/version_counter.txt", "w") as file:
-        file.write("CREATED BY NICER_PLOT.PY, DO NOT MODIFY, DO NOT CHANGE THE FILE PATH\n")
-        file.write(str(current_version) + "\n")
+    try:
+        with open(commonDirectory + "/version_counter.txt", "w") as file:
+            file.write("CREATED BY NICER_PLOT.PY, DO NOT MODIFY, DO NOT CHANGE THE FILE PATH\n")
+            file.write(str(current_version) + "\n")
+    except Exception as e:
+        print(f"Exception occured while opening version_counter.txt: {e}")
+        quit()
 
 # Open the input txt file, and extract the obsid numbers to a list
 searchedObsid = []
-with open(scriptDir + "/" + inputTxtFile, "r") as file:
-    allLines = file.readlines()
-    for line in allLines:
-        line = line.replace(" ", "")
-        line = line.strip("\n")
-        if line != "" and Path(line).exists():
-            if line[-1] != "/":
-                slashIdx = line.rfind("/")
-                obsid = line[slashIdx+1 :]
-            else:
-                slashIdx = line[:-1].rfind("/")
-                obsid = line[slashIdx+1:-1]
-            
-            searchedObsid.append(obsid)
+
+try:
+    with open(scriptDir + "/" + inputTxtFile, "r") as file:
+        allLines = file.readlines()
+        for line in allLines:
+            line = line.replace(" ", "")
+            line = line.strip("\n")
+            if line != "" and Path(line).exists():
+                if line[-1] != "/":
+                    slashIdx = line.rfind("/")
+                    obsid = line[slashIdx+1 :]
+                else:
+                    slashIdx = line[:-1].rfind("/")
+                    obsid = line[slashIdx+1:-1]
+                
+                searchedObsid.append(obsid)
+except Exception as e:
+    print(f"Exception occured while opening {inputTxtFile}: {e}")
+    quit()
 
 if len(searchedObsid) == 0:
     print("\nCould not find any valid observation path given in the observations.txt file.")
@@ -204,16 +221,20 @@ if Path(commonDirectory + "/processed_obs.txt").exists() == False:
     print("Please make sure both the 'commonFiles' directory and the 'processed_obs.txt' files exist and are constructed as intended by nicer_create.py.\n")
     quit()
 else:
-    with open(commonDirectory + "/processed_obs.txt", "r") as filteredFile:
-        allLines = filteredFile.readlines()
-        for eachObsid in searchedObsid:
-            for line in allLines:
-                line = line.strip("\n")
-                lineElements = line.split(" ")
+    try:
+        with open(commonDirectory + "/processed_obs.txt", "r") as filteredFile:
+            allLines = filteredFile.readlines()
+            for eachObsid in searchedObsid:
+                for line in allLines:
+                    line = line.strip("\n")
+                    lineElements = line.split(" ")
 
-                if lineElements[1] == eachObsid:
-                    iterationMax += 1
-                    searchedObservations.append((lineElements[0], lineElements[1], lineElements[2]))
+                    if lineElements[1] == eachObsid:
+                        iterationMax += 1
+                        searchedObservations.append((lineElements[0], lineElements[1], lineElements[2]))
+    except Exception as e:
+        print(f"Exception occured while opening processed_obs.txt: {e}")
+        quit()
 
 if len(searchedObservations) == 0:
     print("\nCould not find any matching observation paths in 'processed_obs.txt' with those in 'observations.txt', most likely them being filtered out due to having low exposure.")
@@ -223,7 +244,12 @@ if len(searchedObservations) == 0:
 # Iterate through each of the observation data, and extract the necessary data from the parameter files
 for path, obsid, expo in searchedObservations:
     outObsDir = path
-    os.chdir(outObsDir)
+
+    try:
+        os.chdir(outObsDir)
+    except Exception as e:
+        print(f"Exception occured while changing directory to {outObsDir}: {e}")
+        continue
 
     allFiles = os.listdir(outObsDir)
 
@@ -267,20 +293,34 @@ for path, obsid, expo in searchedObservations:
         if foundParameterfile == False:
             print("Missing parameter file")
         continue
-
+    
+    try:
+        hdu = fits.open(spectrumFile)
+    except Exception as e:
+        print(f"Exception occured while opening {spectrumFile}: {e}")
+        continue
+    
     # Extract MJD
-    hdu = fits.open(spectrumFile)
     date = float(format(hdu[1].header["MJD-OBS"], ".3f"))
     hdu.close()
 
     Xset.chatter = 0
-    Xset.restore(modFile)
+    try:
+        Xset.restore(modFile)
+    except Exception as e:
+        print(f"Exception occured while loading {modFile} to PyXspec")
+        continue
     
     # Initialize the values of keys as lists
     fluxValuesDict[dict_key] = []
     otherParsDict[dict_key] = []
 
-    file = open(parFile)
+    try:
+        file = open(parFile)
+    except Exception as e:
+        print(f"Exception occured while opening {parFile}: {e}")
+        continue
+
     allLines = file.readlines()
     for line in allLines[1:]:
         # Extract the parameter values with associated uncertainities
