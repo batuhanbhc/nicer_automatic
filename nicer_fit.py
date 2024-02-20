@@ -863,6 +863,9 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
                 else:
                     searchPremodel(bestModelList)
 
+                if enableFixing[0]:
+                    fixAllParameters(fixedValues)
+                    
                 continue
         except:
             print("Exception occured: Unknown")
