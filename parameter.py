@@ -36,6 +36,11 @@ plotScript = "nicer_plot.py"
 fluxScript = "nicer_flux.py"
 
 #================================================= nicer.create spesific variables =============================================
+# This variable turns on 'clobber' parameter to YES while running nicer headas tasks.
+# Turn this FALSE if you are dealing with READ-ONLY observation files. However, this will delete all the previous files under the output directory.
+# Turn this TRUE if you are dealing with observation files that you have WRITE permission. This may overwrite some files.
+overwrite_files = False
+
 # nicer_create will keep the records of processed file paths in processed_obs.txt and update it when you filter new observations.
 # If you ever want to clean the contents of processed_obs.txt (in cases where certain observations may no longer be valid for spectral analysis), set
 # clean_obs_history to True.
