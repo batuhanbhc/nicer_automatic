@@ -146,7 +146,7 @@ def shakefit(bestModelList, resultsFile):
         # Before proceeding with shakefit, check if powerlaw is in model expression. If so, check whether xspec error for photon index is bigger than 1 or not.
         # If bigger than 1, fix photon index to 1.7 (may change in future) and only then continue with shakefit
         if "powerlaw" in AllModels(1).expression:
-            with open("xspec_output.log", "r") as testfile:
+            with open(xspec_output_file, "r") as testfile:
                 lines = testfile.readlines()[-35:]
             
             print("\nChecking powerlaw xspec error value...\n")
@@ -1180,6 +1180,8 @@ if len(searchedObservations) == 0:
 if iterationMax > sampleSize:
     iterationMax = sampleSize
 
+version_dictionary = {}
+
 for x in range(2):
     iteration = 0
     for path, obsid, exposure in searchedObservations:
@@ -1231,22 +1233,15 @@ for x in range(2):
         
         # Check if there are any missing files
         if missingFiles:
-            f = open(resultsFile, "w")
             print("ERROR: Necessary files for spectral fitting are missing for the observation: " + obsid)
-            f.write("ERROR: Necessary files for spectral fitting are missing for the observation: " + obsid + "\n")
             if foundSpectrum == False:
                 print("Missing spectrum file")
-                f.write("Missing spectrum file\n")
             if foundBackground == False:
                 print("Missing background file")
-                f.write("Missing background file\n")
             if foundArf == False:
                 print("Missing arf file")
-                f.write("Missing arf file\n")
             if foundRmf == False:
                 print("Missing rmf file")
-                f.write("Missing spectrum file\n")
-            f.close()
             continue
         
         print("All the necessary spectral files are found. Please check if the correct files are in use.")
@@ -1254,7 +1249,67 @@ for x in range(2):
         print("Background file:", backgroundFile)
         print("Arf file:", arfFile)
         print("Rmf file:", rmfFile, "\n")
+
+        results_location = ""
+
+        #==========================================================================================
+        # Create the correct version of outputs
+        if outObsDir not in version_dictionary:
+            results_folder = outObsDir + "/results"
+
+            if Path(results_folder).exists() == False:
+                os.system("mkdir " + results_folder)
+
+            if clean_result_history:
+                os.system("rm -r " + results_folder + "/*")
+            
+            if Path(results_folder + "/version_counter.txt").exists() == False:
+                os.system("touch " + results_folder + "/version_counter.txt")
+
+                try:
+                    with open(results_folder + "/version_counter.txt", "w") as version_file:
+                        version_file.write("CREATED BY NICER_FIT.PY, DO NOT MODIFY, DO NOT CHANGE THE FILE PATH\n")
+                        version_file.write("1\n")
+                except Exception as e:
+                    print(f"Exception occured trying to write to file {results_folder}/version_counter.txt: {e}")
+                    continue
+                
+            
+            all_lines = []
+            try:
+                with open(results_folder + "/version_counter.txt") as version_file:
+                    all_lines = version_file.readlines()
+                    version = int(all_lines[1].strip("\n"))
+            except Exception as e:
+                print(f"Exception occured opening the file {results_folder}/version_counter.txt: {e}")
+                continue
+
+            try:
+                with open(results_folder + "/version_counter.txt", "w") as version_file:
+                    version_file.write(all_lines[0])
+                    version_file.write(str(version + 1) + "\n")
+            except Exception as e:
+                print(f"Exception occured trying to write to file {results_folder}/version_counter.txt: {e}")
+                continue
+
+            results_location = results_folder + "/run_" + str(version)
+            if Path(results_location).exists():
+                os.system("rm -r " + results_location)
+
+            os.system("mkdir " + results_location)
+
+            version_dictionary[outObsDir] = results_location
+        else:
+            results_location = version_dictionary[outObsDir]
         
+        # Location of log file that saves fit results
+        fit_file_loc = results_location + "/" + resultsFile
+        xspec_output_file = results_location + "/xspec_output.log"
+
+        os.system("cp " + spectrumFile + " " + results_location)
+        os.system("cp " + backgroundFile + " " + results_location)
+        os.system("cp " + arfFile + " " + results_location)
+        os.system("cp " + rmfFile + " " + results_location)
         #==========================================================================================
         # Check whether the spectral files can be opened successfully or not
         try:
@@ -1290,16 +1345,16 @@ for x in range(2):
             print("Removing all model files under '" + commonDirectory + "'\n")
             os.system("rm " + commonDirectory + "/mod*")
 
-        #-------------------------------------------------------------------------------------    
+        #==========================================================================================  
         # From now on, PyXspec will be utilized for fitting and comparing models
         
         # Set some Xspec settings
         try:
-            logFile = open(resultsFile, "w")
+            logFile = open(fit_file_loc, "w")
         except Exception as e:
-            print(f"Exception occured while opening {logFile}: {e}")
+            print(f"Exception occured while opening {fit_file_loc}: {e}")
 
-        Xset.openLog("xspec_output.log")
+        Xset.openLog(xspec_output_file)
         try:
             Xset.abund = xspec_abundance
         except Exception as e:
@@ -1321,7 +1376,7 @@ for x in range(2):
             print(f"Exception occured while setting the energy filter due to incorrect format: {e}")
             quit()
 
-        saveData()
+        saveData(results_location)
         
         # Lists that will store parameter values throughout the script
         bestModel = [{}, {}]
@@ -1365,7 +1420,7 @@ for x in range(2):
                 if "best_" in eachFile:
                     os.system("rm " + eachFile)
 
-            saveModel("best_" + modFileName)
+            saveModel("best_" + modFileName, results_location)
             closeAllFiles()
 
             print("Parameters from observation '" + obsid + "' have been saved.")
@@ -1454,7 +1509,7 @@ for x in range(2):
                 if "best_" in eachFile:
                     os.system("rm " + eachFile)
 
-            saveModel("best_" + modFileName)
+            saveModel("best_" + modFileName, results_location)
             closeAllFiles()
 
             print("=============================================================================================\n")
@@ -1466,7 +1521,7 @@ for x in range(2):
             shakefit(bestModel, logFile)
 
         # Save the last model
-        print("Writing the best model parameters to " + resultsFile + "...")
+        print("Writing the best model parameters to " + fit_file_loc + "...")
         modFileName = extractModFileName()
         writeBestFittingModel(logFile)
 
@@ -1539,7 +1594,9 @@ for x in range(2):
         for eachFile in allFiles:
             if "best_" in eachFile:
                 os.system("rm " + eachFile)
+        saveModel("best_" + modFileName, results_location)
         saveModel("best_" + modFileName)
+        saveData()
 
         if calculateGaussEquivalentWidth:
             # Calculate and write equivalent widths of gausses to log file
@@ -1551,13 +1608,11 @@ for x in range(2):
 
         # Write an xspec script for analyzing parameter values along with linear-data and residual plots quickly
         if makeXspecScript:
-            if Path("xspec_bestmod_script.xcm").exists():
-                os.system("rm -rf xspec_bestmod_script.xcm")
-            os.system("touch xspec_bestmod_script.xcm")
+            os.system("touch " + results_location + "/xspec_bestmod_script.xcm")
 
-            file = open("xspec_bestmod_script.xcm", "w")
-            file.write("@data_" + obsid + ".xcm\n")
-            file.write("@best_" + modFileName + "\n")
+            file = open(results_location + "/xspec_bestmod_script.xcm", "w")
+            file.write("@" + results_location + "/data_" + obsid + ".xcm\n")
+            file.write("@"+ results_location +"/best_" + modFileName + "\n")
             file.write("cpd /xw\n")
             file.write("setpl e\n")
             file.write("fit\n")

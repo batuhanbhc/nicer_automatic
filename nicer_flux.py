@@ -295,6 +295,16 @@ for path, obsid, expo in searchedObservations:
         print(f"Exception occured while changing directory to {outObsDir}: {e}")
         continue
 
+    version = 0
+    try:
+        with open(outObsDir + "/results/version_counter.txt") as version_file:
+            all_lines = version_file.readlines()
+            version = int(all_lines[1].strip("\n")) - 1
+    except Exception as e:
+        print(f"Exception occured while reading file {outObsDir}/results/version_counter.txt: {e}")
+        continue
+    
+    outObsDir = outObsDir + "/results/run_" + str(version)
     allFiles = os.listdir(outObsDir)
 
     # Find the data file and the best fitting model file for the current observation
@@ -314,11 +324,11 @@ for path, obsid, expo in searchedObservations:
             missingFiles = False
             break
     
-    fit_file_name = resultsFile
+    fit_file_loc = outObsDir + "/" + resultsFile
     fit_file_lines = []
 
     try:
-        with open("fit_results.log") as fit_file:
+        with open(fit_file_loc) as fit_file:
             lines = fit_file.readlines()
 
             for line in lines:
@@ -328,7 +338,7 @@ for path, obsid, expo in searchedObservations:
                 else:
                     fit_file_lines.append(line)
     except Exception as e:
-        print(f"Exception occured while opening fit_results.log for observation {obsid}: {e}")
+        print(f"Exception occured while opening {fit_file_loc} for observation {obsid}: {e}")
         continue
 
     # Check if there are any missing files
@@ -343,7 +353,7 @@ for path, obsid, expo in searchedObservations:
             print("->Missing data file")
             fit_file_lines.append("->Missing data file\n")
         
-        write_lines_to_file(fit_file_name, fit_file_lines)
+        write_lines_to_file(fit_file_loc, fit_file_lines)
         continue
     
     print("All the necessary files for flux calculations are found. Please check if the correct files are in use.")
@@ -405,7 +415,7 @@ for path, obsid, expo in searchedObservations:
         par_file.write(line)
     par_file.close()
 
-    write_lines_to_file(fit_file_name, fit_file_lines)
+    write_lines_to_file(fit_file_loc, fit_file_lines)
 
     AllModels.clear()
     AllData.clear()

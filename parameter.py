@@ -24,7 +24,7 @@ energyFilter = "0.5 10."
 
 #=============================================== nicer.main spesific variables =================================================
 # Script switches
-createSwitch = True
+createSwitch = False
 fitSwitch = True
 fluxSwitch = True
 plotSwitch = True
@@ -54,6 +54,10 @@ highResLcPiRanges = ["50-200", "200-600", "600-1000"]   # Please do not forget t
 highResLcTimeResInPwrTwo = -8    # Enter a value as a power of two smaller or equal than 0. Lc files will be names as such: 2^0 -> dt0.lc, 2^-8 -> dt8.lc etc.
 
 #================================================= nicer.fit spesific variables ================================================
+# Nicer_fit will save all fit results under $output_dir/results directory with versioning.
+# Setting this to True will clear/delete all the previous fit 
+clean_result_history = False
+
 # Xspec abundance to be used
 xspec_abundance = "wilm"
 
@@ -62,7 +66,7 @@ pipelineFile = "models.txt"
 
 # Name of the model pipeline defined in models.txt
 # DO NOT ENTER ANY EMPTY SPACE, USE "_" INSTEAD
-processPipeline = "model_1"
+processPipeline = "model_2"
 
 fixParameters = True
 sampleSize = 15
