@@ -122,7 +122,11 @@ if isinstance(calculateGaussEquivalentWidth, bool) == False:
 #===================================================================================================================================
 # Functions
 def shakefit(bestModelList, resultsFile):
-
+    reduced_chi = Fit.statistic / Fit.dof
+    if reduced_chi > 10:
+        print("==============================================================")
+        print(f"WARNING: Reduced-chi squared is quite large: {reduced_chi}.")
+        print("==============================================================")
     # Shakefit will only be run for these parameters
     parametersToCalculateError = []
 
@@ -210,7 +214,7 @@ def shakefit(bestModelList, resultsFile):
             counter = 0
             while continueError and counter < 100:
                 counter += 1
-                Fit.error("stopat 10 0.1 maximum 100 " + str(delChi) + " " + str(i))
+                Fit.error("stopat 10 0.1 maximum 1000 " + str(delChi) + " " + str(i))
                 errorResult = AllModels(1)(i).error
                 errorString = errorResult[2]
 
