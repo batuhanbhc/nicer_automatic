@@ -125,3 +125,7 @@ enable_versioning = True
 # Setting this variable to True will clear all the previously created files (graphs and tables), and reset the count/version number
 # to 1 if enable_versioning is set to True
 delete_previous_files = False
+
+# Custom name for naming graphs and tables. If you set 'custom_name' = "", then the model name used for fitting will be used for naming
+# e.g: custom_name = "", graph name: model_simpl_edge_1.png OR custom_name = "nH_fixed", graph name = nH_fixed_1.png
+custom_name = ""

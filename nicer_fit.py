@@ -123,9 +123,13 @@ if isinstance(calculateGaussEquivalentWidth, bool) == False:
 # Functions
 def shakefit(bestModelList, resultsFile):
     reduced_chi = Fit.statistic / Fit.dof
-    if reduced_chi > 10:
+    if reduced_chi > 2:
         print("==============================================================")
-        print(f"WARNING: Reduced-chi squared is quite large: {reduced_chi}.")
+        print(f"WARNING: Reduced-chi squared is significantly large: {reduced_chi}.")
+        print("==============================================================")
+    elif reduced_chi > 10:
+        print("==============================================================")
+        print(f"WARNING: Reduced-chi squared is extremely large: {reduced_chi}.")
         print("==============================================================")
     # Shakefit will only be run for these parameters
     parametersToCalculateError = []
@@ -1184,9 +1188,19 @@ if len(searchedObservations) == 0:
 if iterationMax > sampleSize:
     iterationMax = sampleSize
 
+try:
+    chi_file = open(commonDirectory + "/reduced_chi.log", "w")
+    chi_file.write(processPipeline + "\n")
+except Exception as e:
+    print(f"Exception occured while writing to reduced_chi.log file under commonFiles directory: {e}")
+    quit()
+
 version_dictionary = {}
 
 for x in range(2):
+    current_chi = 0
+    current_dof = 0
+
     iteration = 0
     for path, obsid, exposure in searchedObservations:
         iteration += 1
@@ -1318,27 +1332,36 @@ for x in range(2):
         # Check whether the spectral files can be opened successfully or not
         try:
             hdu = fits.open(spectrumFile)
+            hdu.close()
         except Exception as e:
             print(f"Exception occured opening the file {spectrumFile}: {e}")
             continue
 
         try:
             hdu = fits.open(backgroundFile)
+            hdu.close()
         except Exception as e:
             print(f"Exception occured opening the file {backgroundFile}: {e}")
             continue
 
         try:
             hdu = fits.open(arfFile)
+            hdu.close()
         except Exception as e:
             print(f"Exception occured opening the file {arfFile}: {e}")
             continue
 
         try:
             hdu = fits.open(rmfFile)
+            hdu.close()
         except Exception as e:
             print(f"Exception occured opening the file {rmfFile}: {e}")
             continue
+        #==========================================================================================
+
+        # Date of observation in MJD
+        hdu = fits.open(spectrumFile)
+        date = hdu[1].header["MJD-OBS"]
 
         #==========================================================================================
 
@@ -1425,6 +1448,10 @@ for x in range(2):
                     os.system("rm " + eachFile)
 
             saveModel("best_" + modFileName, results_location)
+
+            current_chi = Fit.statistic
+            current_dof = Fit.dof
+
             closeAllFiles()
 
             print("Parameters from observation '" + obsid + "' have been saved.")
@@ -1514,6 +1541,10 @@ for x in range(2):
                     os.system("rm " + eachFile)
 
             saveModel("best_" + modFileName, results_location)
+
+            current_chi = Fit.statistic
+            current_dof = Fit.dof
+
             closeAllFiles()
 
             print("=============================================================================================\n")
@@ -1606,7 +1637,10 @@ for x in range(2):
             # Calculate and write equivalent widths of gausses to log file
             print("Calculating equivalence widths for gaussians in model expression...\n")
             calculateGaussEqw(logFile)
-        
+
+        current_chi = Fit.statistic
+        current_dof = Fit.dof
+
         # Close all log files
         closeAllFiles()
 
@@ -1625,9 +1659,12 @@ for x in range(2):
             file.write("show fit\n")
             file.write("echo OBSID:" + obsid + "\n")
             file.close()
+        
+        chi_file.write(str(date) + " " + str(current_chi / current_dof) + "\n")
+
+    # The whole fitting process is looped twice for refitting purposes. If fixing nH option is False, do not try to refit
 
     if fixParameters == False:
-        # The whole fitting process is looped twice for refitting purposes. If fixing nH option is False, do not try to refit
         break
     else:
         if x == 0:
@@ -1637,6 +1674,8 @@ try:
     os.chdir(scriptDir)
 except Exception as e:
     print(f"Exception occured while trying to change directory to {scriptDir}: {e}")
+
+chi_file.close()
 
 # This file is created after importing variables from another python file
 if Path(scriptDir + "/__pycache__").exists():

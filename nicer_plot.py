@@ -130,6 +130,9 @@ if Path(commonDirectory + "/results/flux_tables").exists() == False:
 if Path(commonDirectory + "/results/model_tables").exists() == False:
     os.system("mkdir " + commonDirectory + "/results/model_tables")
 
+if Path(commonDirectory + "/results/chi_squared_graphs").exists() == False:
+    os.system("mkdir " + commonDirectory + "/results/chi_squared_graphs")
+
 if Path(commonDirectory + "/version_counter.txt").exists() == False:
     os.system("touch " + commonDirectory + "/version_counter.txt")
 
@@ -142,31 +145,22 @@ if Path(commonDirectory + "/version_counter.txt").exists() == False:
 if delete_previous_files:
     print("Deleting all the previous graph and table files under 'results' directory..\n")
 
-    all_files = os.listdir(commonDirectory + "/results/model_graphs")
-    for file in all_files:
-        if "model" in file:
-            os.system("rm " + commonDirectory + "/results/model_graphs/" + file)
+    os.system("rm -r " + commonDirectory + "/results/model_graphs/*")
     
-    all_files = os.listdir(commonDirectory + "/results/model_tables")
-    for file in all_files:
-        if "model" in file:
-            os.system("rm " + commonDirectory + "/results/model_tables/" + file)
+    os.system("rm -r " + commonDirectory + "/results/model_tables/*" )
     
-    all_files = os.listdir(commonDirectory + "/results/flux_graphs")
-    for file in all_files:
-        if "flux" in file:
-            os.system("rm " + commonDirectory + "/results/flux_graphs/" + file)
+    os.system("rm -r " + commonDirectory + "/results/flux_graphs/*")
 
-    all_files = os.listdir(commonDirectory + "/results/flux_tables")
-    for file in all_files:
-        if "flux" in file:
-            os.system("rm " + commonDirectory + "/results/flux_tables/" + file)
+    os.system("rm -r " + commonDirectory + "/results/flux_tables/*")
+
+    os.system("rm -r " + commonDirectory + "/results/chi_squared_graphs/*")
     
     temp_file = open(commonDirectory + "/version_counter.txt", "w")
     temp_file.write("CREATED BY NICER_PLOT.PY, DO NOT MODIFY, DO NOT CHANGE THE FILE PATH\n")
     temp_file.write("0\n")
     temp_file.close()
 
+#===========================================================================================
 # Check whether enable_versioning is True, update the version file and extract the current version if that is the case.
 current_version = 0
 if enable_versioning:
@@ -187,6 +181,35 @@ if enable_versioning:
         print(f"Exception occured while opening version_counter.txt: {e}")
         quit()
 
+#===========================================================================================
+# Name of the output files
+output_save_name = custom_name
+
+# Check whether reduced_chi.log can be opened
+try:
+    chi_file = open(commonDirectory + "/reduced_chi.log", "r")
+except Exception as e:
+    print(f"Exception occured while reading reduced_chi.log file under commonFiles directory: {e}")
+    quit()
+
+# Check the amount of lines in reduced_chi.log
+all_lines = chi_file.readlines()
+if (len(all_lines) <= 1):
+    print("ERROR: reduced_chi.log file under commonFiles does not contain any information about fitted observations.")
+    quit()
+
+# First line of reduced_chi.log is dedicated for model name. If custom name is not provided, set the output file saving name to model name.
+if (output_save_name == ""):
+    output_save_name = all_lines[0].strip()
+
+# Parse the log file and extract date and reduced chi squared values
+chi_sq_dict = {}
+for line in all_lines[1:]:
+    line = line.strip()
+    line = line.split(" ")
+    chi_sq_dict[float(format(float(line[0]), ".1f"))] = float(format(float(line[1]), ".2f"))
+
+#===========================================================================================
 # Open the input txt file, and extract the obsid numbers to a list
 searchedObsid = []
 
@@ -465,9 +488,9 @@ if len(otherParsDict) != 0:
 
     # Construct the file name of the graph
     if enable_versioning:
-        png_name = commonDirectory + "/results/model_graphs/model_graph_" + str(current_version) + ".png"
+        png_name = commonDirectory + "/results/model_graphs/" + output_save_name + "_" + str(current_version) + ".png"
     else:
-        png_name = commonDirectory + "/results/model_graphs/model_graph.png"
+        png_name = commonDirectory + "/results/model_graphs/" + output_save_name + ".png"
 
     # Delete any existing file with the same name, and create a new file
     if Path(png_name).exists():
@@ -535,9 +558,9 @@ if len(otherParsDict) != 0:
     # Set the table file name according to enable_versioning variable
     table_file_name = ""
     if enable_versioning:
-        table_file_name = commonDirectory + "/results/model_tables/model_table_" + str(current_version) + ".txt"
+        table_file_name = commonDirectory + "/results/model_tables/" + output_save_name + "_" + str(current_version) + ".txt"
     else:
-        table_file_name = commonDirectory + "/results/model_tables/model_table.png"
+        table_file_name = commonDirectory + "/results/model_tables/" + output_save_name + ".png"
     
     # Create the table file if it has not been already created
     if Path(table_file_name).exists() == False:
@@ -627,9 +650,9 @@ if len(fluxValuesDict) != 0:
 
     # Construct the file name of the graph
     if enable_versioning:
-        png_name = commonDirectory + "/results/flux_graphs/flux_graph_" + str(current_version) + ".png"
+        png_name = commonDirectory + "/results/flux_graphs/" + output_save_name + "_" + str(current_version) + ".png"
     else:
-        png_name = commonDirectory + "/results/flux_graphs/flux_graph.png"
+        png_name = commonDirectory + "/results/flux_graphs/" + output_save_name + ".png"
 
     # Delete any existing file with the same name, and create a new file
     if Path(png_name).exists():
@@ -699,9 +722,9 @@ if len(fluxValuesDict) != 0:
     # Set the table file name according to enable_versioning variable
     table_file_name = ""
     if enable_versioning:
-        table_file_name = commonDirectory + "/results/flux_tables/flux_table_" + str(current_version) + ".txt"
+        table_file_name = commonDirectory + "/results/flux_tables/" + output_save_name + "_" + str(current_version) + ".txt"
     else:
-        table_file_name = commonDirectory + "/results/flux_tables/flux_table.png"
+        table_file_name = commonDirectory + "/results/flux_tables/" + output_save_name + ".png"
     
     # Create the table file if it has not been already created
     if Path(table_file_name).exists() == False:
@@ -722,3 +745,29 @@ if len(fluxValuesDict) != 0:
     print("Graph and table files for flux values have been successfully created:")
     print("Graph path: " + png_name)
     print("Table path: " + table_file_name + "\n")
+
+#==========================================================================================
+    
+plt.clf()
+
+chi_x = list(chi_sq_dict.keys())
+chi_y = list(chi_sq_dict.values())
+
+# Plot the bar graph
+plt.bar(chi_x, chi_y, bottom=1)
+plt.ylim(0, 5)
+
+# Plot the red dotted line at y=1
+plt.axhline(y=1, color='red', linestyle='dashed')
+
+# Add labels and title
+plt.xlabel('Date (MJD)')
+plt.ylabel("Reduced Chi-Squared Values")
+plt.title('Reduced Chi-Squared Values of all observations (y > 5 not shown on graph)')
+
+if enable_versioning:
+    plt.savefig(commonDirectory + "/results/chi_squared_graphs/" + output_save_name + "_" + str(current_version) + ".png")
+else:
+    plt.savefig(commonDirectory + "/results/chi_squared_graphs/" + output_save_name + ".png")
+
+print("Chi-squared graph has been successfully created under '" + outputDir + "/commonFiles/results/chi_squared_graphs'")
