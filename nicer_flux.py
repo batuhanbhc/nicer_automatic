@@ -304,7 +304,11 @@ for path, obsid, expo in searchedObservations:
         print(f"Exception occured while reading file {outObsDir}/results/version_counter.txt: {e}")
         continue
     
-    outObsDir = outObsDir + "/results/run_" + str(version)
+    output_save_name = custom_name
+    if output_save_name == "":
+        output_save_name = processPipeline
+
+    outObsDir = outObsDir + "/results/" + output_save_name +"_" + str(version)
     allFiles = os.listdir(outObsDir)
 
     # Find the data file and the best fitting model file for the current observation
