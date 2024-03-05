@@ -207,7 +207,7 @@ chi_sq_dict = {}
 for line in all_lines[1:]:
     line = line.strip()
     line = line.split(" ")
-    chi_sq_dict[float(format(float(line[0]), ".1f"))] = float(format(float(line[1]), ".2f"))
+    chi_sq_dict[float(format(float(line[0]), ".1f"))] = float(format(float(line[1]), ".2f")) - 1
 
 #===========================================================================================
 # Open the input txt file, and extract the obsid numbers to a list
