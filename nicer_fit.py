@@ -1309,8 +1309,12 @@ for x in range(2):
             except Exception as e:
                 print(f"Exception occured trying to write to file {results_folder}/version_counter.txt: {e}")
                 continue
+            
+            output_save_name = custom_name
+            if output_save_name == "":
+                output_save_name = processPipeline
 
-            results_location = results_folder + "/run_" + str(version)
+            results_location = results_folder + "/" + output_save_name + "_" + str(version)
             if Path(results_location).exists():
                 os.system("rm -r " + results_location)
 
