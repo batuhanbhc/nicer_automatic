@@ -751,9 +751,10 @@ def calculateComponentOrder(compName, targetName):
 def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
     sourcefile = open(source, "r")
     lines = sourcefile.readlines()
+
+    if_stack = []
+
     currentModel = ""
-    inside_if = False
-    if_evaluation = False
     lastAddedModel = ""
     lastAddedModelNumber = 0
     orderSuffix = ""
@@ -761,7 +762,8 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
     lineCount = 0
     for line in lines:
         lineCount += 1
-        line = line.strip()
+        #===============    Preprocess the line    =======================
+        line = line.strip("\n\t ")
 
         if len(line) == 0:
             continue
@@ -770,10 +772,22 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
             continue
         
         line = line.split(" ")
+
+        # Remove the spaces in the line
+        idx_counter = 0
+        while idx_counter < len(line):
+            if (line[idx_counter] == ""):
+                line.pop(idx_counter)
+            else:
+                idx_counter += 1
+        #=======================================
+                
         try:
             if line[0].lower() == "model":
                 if line[1] == processPipeline:
+                    # Found the target model name
                     if currentModel == "":
+                        # First time encountering that model name, start processing the model
                         currentModel = processPipeline
                         continue
                     else:
@@ -782,10 +796,6 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
 
         except Exception as e:
             print(f"Exception occured: {e}")
-            print("\nERROR: Invalid implementation for a pipeline name in models.txt -> Line: " + str(lineCount))
-            quit()
-        except:
-            print("Exception occured: Unknown")
             print("\nERROR: Invalid implementation for a pipeline name in models.txt -> Line: " + str(lineCount))
             quit()
 
@@ -797,12 +807,23 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
             # End of model pipeline
             return True
         
-        if inside_if:
-            if line[0] == "endif":
-                inside_if = False
+        # Enter if we are currently in an if statement
+        if len(if_stack) != 0:
+            if line[0] == "if":
+                # There is a nested if statement coming up. If current if statement is evaluated to False, no need to check inner if statements.
+                # If that is the case, evaluate all upcoming if statements to False. If not, pass this step and move onto if evaluation block.
+                if if_stack[-1] == False:
+                    if_stack.append(False)
+                    continue
+
+            elif line[0] == "endif":
+                # End of inner if statement is reached.
+                if_stack.pop()
                 continue
+
             else:
-                if if_evaluation == False:
+                # It is another command. If the innermost if statement is evaluated to False, skip it.
+                if if_stack[-1] == False:
                     continue
 
         try:
@@ -813,8 +834,8 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
 
                 loadModel(modelName)
                 continue
-        except:
-            print("Exception occured: Invalid model expression")
+        except Exception as e:
+            print(f"Exception occured while loading model: {e}")
             print("\nERROR: Invalid implementation of 'load' command in models.txt -> Line: " + str(lineCount))
             quit()
           
@@ -860,8 +881,8 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
 
                     continue
 
-        except:
-            print("Exception occured: Unknown")
+        except Exception as e:
+            print(f"Exception occured while running 'assign' command: {e}")
             print("\nERROR: Invalid implementation of 'assign' command in models.txt -> Line: " + str(lineCount))
             quit()
         
@@ -882,8 +903,8 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
                     fixAllParameters(fixedValues)
                     
                 continue
-        except:
-            print("Exception occured: Unknown")
+        except Exception as e:
+            print(f"Exception occured while running 'search' command: {e}")
             print("\nERROR: Invalid implementation of 'search' command in models.txt -> Line: " + str(lineCount))
             quit()               
         
@@ -891,8 +912,8 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
             if line[0] == "fit":
                 fitModel(bestModelList)
                 continue
-        except:
-            print("Exception occured: Unknown")
+        except Exception as e:
+            print(f"Exception occured while running 'fit' command: {e}")
             print("\nERROR: Invalid implementation of 'fit' command in models.txt -> Line: " + str(lineCount))
             quit()
         
@@ -909,11 +930,6 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
 
         except Exception as e:
             print(f"Exception occured: {e}")
-            print("\nERROR: Invalid implementation of 'save' command in models.txt -> Line: " + str(lineCount))
-            quit()
-
-        except:
-            print("Exception occured: Unknown")
             print("\nERROR: Invalid implementation of 'save' command in models.txt -> Line: " + str(lineCount))
             quit()
         
@@ -950,10 +966,6 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
                 
         except Exception as e:
             print(f"Exception occured: {e}")
-            print("\nERROR: Invalid implementation of 'ftest' command in models.txt -> Line: " + str(lineCount))
-            quit()
-        except:
-            print("Exception occured: Unknown")
             print("\nERROR: Invalid implementation of 'ftest' command in models.txt -> Line: " + str(lineCount))
             quit()
         
@@ -999,31 +1011,26 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
             print(f"Exception occured: {e}")
             print("\nERROR: Invalid implementation of 'addcomp' command in models.txt -> Line: " + str(lineCount))
             quit()
-        except:
-            print("Exception occured: Unknown")
-            print("\nERROR: Invalid implementation of 'addcomp' command in models.txt -> Line: " + str(lineCount))
-            quit()
         
         try:
             if line[0] == "if":
-                inside_if = True
-
                 if line[1] == "model":
                     if line[3].lower() == "exists":
                         model_name = line[2]
 
                         if model_name in AllModels(1).componentNames:
-                            if_evaluation = True
+                            if_stack.append(True)
                         else:
-                            if_evaluation = False
+                            if_stack.append(False)
 
                     elif line[3].lower() == "missing":
                         model_name = line[2]
 
                         if model_name in AllModels(1).componentNames:
-                            if_evaluation = False
+                            if_stack.append(False)
                         else:
-                            if_evaluation = True
+                            if_stack.append(True)
+
                     else:
                         raise Exception("Unknown parameter for checking models. Enter either 'missing' or 'exists'.")
                 else:
@@ -1039,17 +1046,13 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
 
                     result = actualOperator(lhs, rhs)
                     if result:
-                        if_evaluation = True
+                        if_stack.append(True)
                     else:
-                        if_evaluation = False
+                        if_stack.append(False)
                     
                 continue
         except Exception as e:
             print(f"Exception occured: {e}")
-            print("\nERROR: Invalid implementation of 'if' command in models.txt -> Line: " + str(lineCount))
-            quit()
-        except:
-            print("Exception occured: Unknown")
             print("\nERROR: Invalid implementation of 'if' command in models.txt -> Line: " + str(lineCount))
             quit()
         
@@ -1064,8 +1067,8 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
 
                 removeComp(line[1], 1, bestModelList)
                 continue
-        except:
-            print("Exception occured: Unknown")
+        except Exception as e:
+            print(f"Exception occured while running 'delcomp' command: {e}")
             print("\nERROR: Invalid implementation of 'delcomp' command in models.txt -> Line: " + str(lineCount))
             quit()
         
@@ -1078,16 +1081,16 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
                         continue
                     else:
                         continue
-        except:
-            print("Exception occured: Unknown")
+        except Exception as e:
+            print(f"Exception occured while running 'setpoint' command: {e}")
             print("\nERROR: Invalid implementation of 'setpoint' command in models.txt -> Line: " + str(lineCount))
             quit()
         
         try:
             if line[0] == "shakefit":
                 shakefit(bestModelList, logFile)
-        except:
-            print("Exception occured: Unknown")
+        except Exception as e:
+            print(f"Exception occured while running 'shakefit' command: {e}")
             print("\nERROR: Invalid implementation of 'shakefit' command in models.txt -> Line: " + str(lineCount))
             quit()
         

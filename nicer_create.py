@@ -256,17 +256,6 @@ for obs in valid_paths_v2:
         if Path(pipelineLog).exists() == False:
             os.system("touch " + pipelineLog)
 
-        """gunzipMkf = True
-        fileList = os.listdir(obs+"/auxil")
-        for each in fileList:
-            each = each.strip("\n")
-            if each == "ni" + obsid + ".mkf":
-                gunzipMkf = False
-                break
-
-        if gunzipMkf:
-            print("Gunzipping the mkf file prior to nicerl2.\n")
-            os.system("gunzip "+obs+"/auxil/ni" + obsid + ".mkf.gz")"""
         
         clobber_parameter = "no"
 
@@ -343,18 +332,6 @@ for obs in valid_paths_v2:
             pipelineLog = outObsDir + "/pipeline_output.log"
             if Path(pipelineLog).exists() == False:
                 os.system("touch " + pipelineLog)
-
-            """gunzipMkf = True
-            fileList = os.listdir(obs+"/auxil")
-            for each in fileList:
-                each = each.strip("\n")
-                if each == "ni" + obsid + ".mkf":
-                    gunzipMkf = False
-                    break
-
-            if gunzipMkf:
-                print("Gunzipping the mkf file prior to nicerl2.\n")
-                os.system("gunzip "+obs+"/auxil/ni" + obsid + ".mkf.gz")"""
             
             clobber_parameter = "no"
 
@@ -451,6 +428,8 @@ for each_path in processed_paths:
     if expo >= 100:
         # Filter out observations with exposure less than 100 seconds
         expo_processed_paths.append([folder_path, obsid, expo])
+    else:
+        print(f"Observation {obsid} has exposure below 100 seconds, spectral fitting will not be applied.")
 
 
 # Create processed_obs.txt that will serve as a log of the previously processed observations
