@@ -333,10 +333,7 @@ for path, obsid, expo in searchedObservations:
     except Exception as e:
         print(f"Exception occured while loading {modFile} to PyXspec")
         continue
-    
-    # Initialize the values of keys as lists
-    fluxValuesDict[dict_key] = []
-    otherParsDict[dict_key] = []
+
 
     try:
         file = open(parFile)
@@ -365,9 +362,15 @@ for path, obsid, expo in searchedObservations:
         par_list = [line[0], line[1], line[2], line[3], line[4], date]
 
         if "flux" in par_list[0]:
-            fluxValuesDict[dict_key].append(par_list)
+            if dict_key in fluxValuesDict:
+                fluxValuesDict[dict_key].append(par_list)
+            else:
+                fluxValuesDict[dict_key] = [par_list]
         else:
-            otherParsDict[dict_key].append(par_list)
+            if dict_key in otherParsDict:
+                otherParsDict[dict_key].append(par_list)
+            else:
+                otherParsDict[dict_key] = [par_list]
 
 otherpars_ref = 0
 fluxes_ref = 0
@@ -398,12 +401,15 @@ else:
 
 #Find the referance point for the x-axis (date) for flux values
 if len(fluxValuesDict) != 0:
+    print(fluxValuesDict.keys())
+    print(fluxValuesDict.values())
     empty_flag = False
     dates = []
 
     # Extract all dates in MJD
     for obs_list in fluxValuesDict.values():
         for value_list in obs_list:
+            print(value_list)
             dates.append(value_list[5])
 
     referanceMjd = round((min(dates) - 5) / 5) * 5
