@@ -97,6 +97,35 @@ def transferToNewList(sourceList):
     
     return newList
 
+def modified_z_score(parameter_dict):
+    for key, all_arrays in parameter_dict.items():
+        data_array = np.array(all_arrays[0])
+        if len(data_array) == 0:
+            continue
+
+        median = np.median(data_array)
+        mean = np.mean(data_array)
+        mad = np.median(np.abs(data_array - median))
+        mean_ad = np.abs(data_array - mean)
+        mean_ad = np.sum(mean_ad) / len(data_array)
+
+        mod_z_scores = []
+        for x in data_array:
+            if mad == 0:
+                mod_z_scores.append((x - median) / (1.253314 * mean_ad))
+            else:
+                mod_z_scores.append((x - median) / (1.486 * mad))
+
+        idx_counter = 0
+        for i in mod_z_scores:
+            if i  <= -3.5 or i >= 3.5:
+                all_arrays[0].pop(idx_counter)
+                all_arrays[1].pop(idx_counter)
+                all_arrays[2].pop(idx_counter)
+                all_arrays[3].pop(idx_counter)
+            else:
+                idx_counter += 1
+        
 #===================================================================================================================
 print("====================================================================")
 print("Running the ", plotScript," file:\n")
@@ -443,6 +472,13 @@ if len(otherParsDict) != 0:
                 parameter_dict[value_list[0]][2].append(value_list[3])  # Error high
                 parameter_dict[value_list[0]][3].append(value_list[5])  # Date
 
+    if use_outlier_detection:
+        print("="*100)
+        print("Modified z-score algorithm will be applied for model parameters")
+        print("="*100, "\n")
+
+        modified_z_score(parameter_dict)
+
 
     fig, axs = plt.subplots(len(parameter_dict), 1, figsize=(8, 14), sharex=True)
 
@@ -605,6 +641,12 @@ if len(fluxValuesDict) != 0:
                 parameter_dict[value_list[0]][2].append(value_list[3])  # Error high
                 parameter_dict[value_list[0]][3].append(value_list[5])  # Date
 
+    if use_outlier_detection:
+        print("="*100)
+        print("Modified z-score algorithm will be applied for flux values")
+        print("="*100, "\n")
+
+        modified_z_score(parameter_dict)
 
     fig, axs = plt.subplots(len(parameter_dict), 1, figsize=(8, 14), sharex=True)
 

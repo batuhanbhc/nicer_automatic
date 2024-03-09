@@ -20,7 +20,7 @@ inputTxtFile = "observations.txt"
 resultsFile = "fit_results.log"
 
 # Write it in XSpec format
-energyFilter = "0.5 10."
+energyFilter = "0.8 10."
 
 #=============================================== nicer.main spesific variables =================================================
 # Script switches
@@ -68,7 +68,7 @@ pipelineFile = "models.txt"
 # DO NOT ENTER ANY EMPTY SPACE, USE "_" INSTEAD
 processPipeline = "model_2"
 
-fixParameters = True
+fixParameters = False
 sampleSize = 15
 
 # If 'fixParameters' variable is set to True, the script will fit certain amount of observations, take average values for parameters and refit all
@@ -90,7 +90,7 @@ makeXspecScript = True      # If set to True, the script will create an .xcm fil
 errorCalculations = True    # If set to True, the script will run "shakefit" function to calculate the error boundaries and possibly converge the
                             # fit to better parameter values.
 
-checkPowerlawErrorAndFreeze = True
+checkPowerlawErrorAndFreeze = False
 powerlawIndexToFreezeAt = 1.7
 
 # Shakefit will only try to calculate errors for below parameters. The keys are xspec modelnames.parameternames, and values are the units.
@@ -102,7 +102,9 @@ parametersForShakefit = {
     "diskbb.Tin": "Tin_(keV)",
     "powerlaw.PhoIndex": "index_(Γ)",
     "powerlaw.norm": "Normalization_(powerlaw)",
-    "TBabs.nH": "TBabs_nH"
+    "TBabs.nH": "TBabs_nH",
+    "edge.edgeE": "Edge_Energy_(keV)",
+    "simpl.Gamma": "Simpl_Gamma"
 }
 
 # If set to True, gaussian equivalent widths will be calculated
@@ -112,7 +114,7 @@ calculateGaussEquivalentWidth = True
 # nicer_flux will add "cflux" component before the spesified models below to calculate flux.
 # unabsorbed is a special keyword that adds cflux right before the paranthesis in the model expression. If there is no paranthesis, it will be skipped.
 # If you want to calculate unabsorbed flux in a model that does not have paranthesis, such as TBabs*diskbb, you should spesify 'diskbb' instead of 'unabsorbed'
-modelsToAddCfluxBefore = ["absorbed", "unabsorbed", "diskbb", "powerlaw"]
+modelsToAddCfluxBefore = ["absorbed", "unabsorbed", "diskbb", "powerlaw", "simpl", "edge"]
 
 writeParValuesAfterCflux = True
 
@@ -129,3 +131,7 @@ delete_previous_files = False
 # Custom name for naming graphs and tables. If you set 'custom_name' = "", then the model name used for fitting will be used for naming
 # e.g: custom_name = "", graph name: model_simpl_edge_1.png OR custom_name = "nH_fixed", graph name = nH_fixed_1.png
 custom_name = ""
+
+# Modified z-score algorithm will be used for outlier detection
+# Possibility of removing "good" data always exists, turn it on or off accordingly
+use_outlier_detection = False
