@@ -430,15 +430,12 @@ else:
 
 #Find the referance point for the x-axis (date) for flux values
 if len(fluxValuesDict) != 0:
-    print(fluxValuesDict.keys())
-    print(fluxValuesDict.values())
     empty_flag = False
     dates = []
 
     # Extract all dates in MJD
     for obs_list in fluxValuesDict.values():
         for value_list in obs_list:
-            print(value_list)
             dates.append(value_list[5])
 
     referanceMjd = round((min(dates) - 5) / 5) * 5
@@ -728,11 +725,11 @@ if len(fluxValuesDict) != 0:
         start_index += 3
 
     # Create the obsid column
-    for obsid in otherParsDict.keys():
+    for obsid in fluxValuesDict.keys():
         table_columns[0].append(obsid)
 
     # Create the date column
-    for val in otherParsDict.values():
+    for val in fluxValuesDict.values():
         table_columns[1].append(val[0][5] + fluxes_ref)
 
     # Create the rest of the columns
