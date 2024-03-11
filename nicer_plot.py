@@ -23,7 +23,19 @@ if outputDir == "":
 #===================================================================================================================================
 # Input check for outputDir
 if Path(outputDir).exists() == False:
-    print("Directory defined by outputDir could not be found. Terminating the script...")
+    print("ERROR: Directory defined by outputDir could not be found. Terminating the script...")
+    quit()
+
+if type(outlier_lower_threshold) != float and type(outlier_lower_threshold) != int:
+    print("ERROR: Incorrect type for 'outlier_lower_threshold' variable in parameter.py")
+    quit()
+
+if type(outlier_upper_threshold) != float and type(outlier_upper_threshold) != int:
+    print("ERROR: Incorrect type for 'outlier_upper_threshold' variable in parameter.py")
+    quit()
+
+if (outlier_lower_threshold >= outlier_upper_threshold):
+    print("ERROR: Lower threshold for outlier detection algorithm is larger than upper threshold")
     quit()
 #===================================================================================================================================
 
@@ -118,7 +130,7 @@ def modified_z_score(parameter_dict):
 
         idx_counter = 0
         for i in mod_z_scores:
-            if i  <= -3.5 or i >= 3.5:
+            if i  <= outlier_lower_threshold  or i >= outlier_upper_threshold:
                 all_arrays[0].pop(idx_counter)
                 all_arrays[1].pop(idx_counter)
                 all_arrays[2].pop(idx_counter)

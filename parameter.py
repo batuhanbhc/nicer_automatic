@@ -11,7 +11,7 @@ import re
 #============================================ Common variables for all scripts =================================================
 
 # The directory where the output files will be created at (Leave it blank [outputDir = ""] if you want output files to be created under the same directory as all scripts)
-outputDir = "/home/bbahceci/NICER/analysis"
+outputDir = ""
 
 # The name of the file that contains paths of the observation folders
 inputTxtFile = "observations.txt"
@@ -56,7 +56,7 @@ highResLcTimeResInPwrTwo = -8    # Enter a value as a power of two smaller or eq
 #================================================= nicer.fit spesific variables ================================================
 # Nicer_fit will save all fit results under $output_dir/results directory with versioning.
 # Setting this to True will clear/delete all the previous fit 
-clean_result_history = False
+clean_result_history = True
 
 # Xspec abundance to be used
 xspec_abundance = "wilm"
@@ -66,7 +66,7 @@ pipelineFile = "models.txt"
 
 # Name of the model pipeline defined in models.txt
 # DO NOT ENTER ANY EMPTY SPACE, USE "_" INSTEAD
-processPipeline = "model_2"
+processPipeline = "model_simpl_edge_fixed"
 
 fixParameters = False
 sampleSize = 15
@@ -114,7 +114,7 @@ calculateGaussEquivalentWidth = True
 # nicer_flux will add "cflux" component before the spesified models below to calculate flux.
 # unabsorbed is a special keyword that adds cflux right before the paranthesis in the model expression. If there is no paranthesis, it will be skipped.
 # If you want to calculate unabsorbed flux in a model that does not have paranthesis, such as TBabs*diskbb, you should spesify 'diskbb' instead of 'unabsorbed'
-modelsToAddCfluxBefore = ["absorbed", "unabsorbed", "diskbb", "powerlaw", "simpl", "edge"]
+modelsToAddCfluxBefore = ["absorbed", "simpl", "diskbb"]
 
 writeParValuesAfterCflux = True
 
@@ -126,12 +126,18 @@ enable_versioning = True
 
 # Setting this variable to True will clear all the previously created files (graphs and tables), and reset the count/version number
 # to 1 if enable_versioning is set to True
-delete_previous_files = False
+delete_previous_files = True
 
 # Custom name for naming graphs and tables. If you set 'custom_name' = "", then the model name used for fitting will be used for naming
 # e.g: custom_name = "", graph name: model_simpl_edge_1.png OR custom_name = "nH_fixed", graph name = nH_fixed_1.png
-custom_name = ""
+custom_name = "soft_to_hard_edgefix"
 
 # Modified z-score algorithm will be used for outlier detection
 # Possibility of removing "good" data always exists, turn it on or off accordingly
 use_outlier_detection = False
+
+# Lower threshold value for modified z-score algorithm (Change it according to your needs)
+outlier_lower_threshold = -100
+
+# Upper threshold value for modified z-score algorithm (Change it according to your needs)
+outlier_upper_threshold = 100
