@@ -611,7 +611,7 @@ if len(otherParsDict) != 0:
     if enable_versioning:
         table_file_name = commonDirectory + "/results/model_tables/" + output_save_name + "_" + str(current_version) + ".txt"
     else:
-        table_file_name = commonDirectory + "/results/model_tables/" + output_save_name + ".png"
+        table_file_name = commonDirectory + "/results/model_tables/" + output_save_name + ".txt"
     
     # Create the table file if it has not been already created
     if Path(table_file_name).exists() == False:
@@ -781,7 +781,7 @@ if len(fluxValuesDict) != 0:
     if enable_versioning:
         table_file_name = commonDirectory + "/results/flux_tables/" + output_save_name + "_" + str(current_version) + ".txt"
     else:
-        table_file_name = commonDirectory + "/results/flux_tables/" + output_save_name + ".png"
+        table_file_name = commonDirectory + "/results/flux_tables/" + output_save_name + ".txt"
     
     # Create the table file if it has not been already created
     if Path(table_file_name).exists() == False:
