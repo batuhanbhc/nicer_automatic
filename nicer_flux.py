@@ -4,8 +4,11 @@
 
 from parameter import *
 
-additiveModels = {}
-additiveModelList =  "agauss      c6vmekl     eqpair      nei         rnei        vraymond \
+additive_models = {}
+convolution_models = {}
+multiplicative_models = {}
+
+additive_model_list =  "agauss      c6vmekl     eqpair      nei         rnei        vraymond \
 agnsed      carbatm     eqtherm     nlapec      sedov       vrnei \
 agnslim     cemekl      equil       npshock     sirf        vsedov \
 apec        cevmkl      expdec      nsa         slimbh      vtapec \
@@ -31,12 +34,45 @@ c6mekl      diskpbb     meka        raymond     voigt       zlogpar \
 c6pmekl     diskpn      mekal       redge       vpshock     zpowerlw \
 c6pvmkl     eplogpar    mkcflow     refsch"
 
-temp = additiveModelList.split(" ")
+multiplicative_model_list = "SSS_ice     constant    ismdust     polpow      wndabs      zphabs \
+TBabs       cyclabs     log10con    pwab        xion        zredden \
+TBfeo       dust        logconst    redden      xscat       zsmdust \
+TBgas       edge        lyman       smedge      zTBabs      zvarabs \
+TBgrain     expabs      notch       spexpcut    zbabs       zvfeabs \
+TBpcf       expfac      olivineabs  spline      zdust       zvphabs \
+TBrel       gabs        pcfabs      swind1      zedge       zwabs \
+TBvarabs    heilin      phabs       uvred       zhighect    zwndabs \
+absori      highecut    plabs       varabs      zigm        zxipab \
+acisabs     hrefl       polconst    vphabs      zpcfabs     zxipcf \
+cabs        ismabs      pollin      wabs"
+
+convolution_model_list = "cflux       gsmooth     kerrconv    rdblur      simpl       xilconv \
+cglumin     ireflect    kyconv      reflect     thcomp      zashift \
+clumin      kdblur      lsmooth     rfxconv     vashift     zmshift \
+cpflux      kdblur2     partcov     rgsxsrc     vmshift"
+
+
+temp = additive_model_list.split(" ")
 for i in temp:
     if i == "":
         pass
     else:
-        additiveModels[i] = 1
+        additive_models[i] = 1
+
+temp = multiplicative_model_list.split(" ")
+for i in temp:
+    if i == "":
+        pass
+    else:
+        multiplicative_models[i] = 1
+
+temp = convolution_model_list.split(" ")
+for i in temp:
+    if i == "":
+        pass
+    else:
+        convolution_models[i] = 1
+
 
 print("==============================================================================")
 print("\t\t\tRunning the file: " + fluxScript + "\n")
@@ -136,11 +172,9 @@ def freezeNorm():
                 parObj.frozen = True
 
             elif comp != "cflux":
-                # Noticed that for some observations, fitting the model after adding cflux componant may change parameter values drastically,
-                # (e.g. nH 8 -> 1.7, Tin 1.4 -> 0.07) which messes up the chi-sq value and a significant change in the model. Here, I force the
-                # already fitted model to not vary at all by limiting parameter values with 0.1 wide intervals from both ends
-                valString = str(parObj.values[0])+","+str(parObj.values[1])+","+str(parObj.values[0]-0.1)+","+str(parObj.values[0]-0.1)+","+str(parObj.values[0]+0.1)+","+str(parObj.values[0]+0.1)
-                AllModels(1)(indx).values = valString
+                if restrict_parameters:
+                    valString = str(parObj.values[0])+","+str(parObj.values[1])+","+str(parObj.values[0]-0.1)+","+str(parObj.values[0]-0.1)+","+str(parObj.values[0]+0.1)+","+str(parObj.values[0]+0.1)
+                    AllModels(1)(indx).values = valString
 
 def findFlux():
     parNums = AllModels(1).nParameters
@@ -149,7 +183,7 @@ def findFlux():
         if name == "lg10Flux":
             # Convert log10(x) flux to x
             flux = 10 ** AllModels(1)(i).values[0]
-            Fit.error("maximum 50 "+ str(i))
+            Fit.error("maximum 100 "+ str(i))
             lowerFlux = 10**AllModels(1)(i).error[0]
             upperFlux = 10**AllModels(1)(i).error[1]
 
@@ -164,44 +198,57 @@ def calculateFlux(component, modelName, parameters):
     addedModelIndex = 1
 
     if component.lower() == "unabsorbed":
-        if modelName.find("(") == -1:
-            counter = 0
-            for eachModel in splittedList:
-                if eachModel in additiveModels:
-                    addedModelIndex = counter + 1
-                    newName = modelName[:modelName.find(eachModel)] + "cflux*" + modelName[modelName.find(eachModel):]
-                    break
-                counter += 1
+        if last_absorption_model in AllModels(1).componentNames:
+            newName = modelName[:modelName.find(last_absorption_model) + len(last_absorption_model)] + "*cflux" + modelName[modelName.find(last_absorption_model) + len(last_absorption_model):]
         else:
-            temp = modelName[:modelName.find("(")]
-            tempSplittedList = re.split(splitOperators, temp)
-            addedModelIndex = len(tempSplittedList)
-
-            newName = modelName[: modelName.find("(")] + "*cflux" + modelName[modelName.find("("):]
+            print("'last_absorption_model' is not in the model expression, unabsorbed flux will not be calculated.")
+            return []
 
     elif component.lower() == "absorbed":
         newName = "cflux*" + modelName
         
     else:
-        counter = 0
-        for eachModel in splittedList:
-            if eachModel.lower() == component.lower():
-                addedModelIndex = counter + 1
-                break
-            counter+=1
+        if component in multiplicative_models:
+            print(f"Cannot the flux of a multiplicative model: {component}")
+        elif component in convolution_models:
 
-        compIndex = modelName.find(component)
-        newName = modelName[:compIndex] + "cflux*" + modelName[compIndex:]
+            cflux_before_conv = modelName[:modelName.find(component)] + "cflux*" + modelName[modelName.find(component):]
+            m = Model(cflux_before_conv)
 
-    m = Model(newName)
+            enterParameters(parameters, {"Emin":Emin, "Emax":Emax})
+            freezeNorm()
+            fitModel()
 
-    enterParameters(parameters, {"Emin":Emin, "Emax":Emax})
-    freezeNorm()
-    fitModel()
+            flux_before_conv = findFlux()
 
-    fluxVals = findFlux()
-    
-    return fluxVals
+            cflux_after_conv = modelName[:modelName.find(component) + len(component)] + "*cflux" + modelName[modelName.find(component) + len(component):]
+            m = Model(cflux_before_conv)
+
+            enterParameters(parameters, {"Emin":Emin, "Emax":Emax})
+            freezeNorm()
+            fitModel()
+
+            flux_after_conv = findFlux()
+
+            conv_flux = []
+            conv_flux.append(flux_before_conv[0] - flux_after_conv[0])
+            conv_flux.append(flux_before_conv[1] + flux_after_conv[1])
+            conv_flux.append(flux_before_conv[2] + flux_after_conv[2])
+
+            return conv_flux
+        
+        else:
+            newName = modelName[:modelName.find(component)] + "cflux*" + modelName[modelName.find(component):]
+
+            m = Model(newName)
+
+            enterParameters(parameters, {"Emin":Emin, "Emax":Emax})
+            freezeNorm()
+            fitModel()
+
+            fluxVals = findFlux()
+            
+            return fluxVals
 
 def writeParsAfterFlux(line_list):
     for comp in AllModels(1).componentNames:
@@ -404,7 +451,10 @@ for path, obsid, expo in searchedObservations:
 
         print("Calculating flux for: " + fluxModel)
         flux = calculateFlux(fluxModel, modelName, parameters)
-        
+        if flux == []:
+            print("Could not calculate flux for :" + fluxModel)
+            continue
+
         # Write flux data to 
         fit_file_lines.append(energyFilter +" keV " + AllModels(1).expression + "\nFlux: " + listToStr(flux) + "\n")
         if writeParValuesAfterCflux:
