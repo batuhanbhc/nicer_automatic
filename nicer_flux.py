@@ -183,7 +183,7 @@ def findFlux():
         if name == "lg10Flux":
             # Convert log10(x) flux to x
             flux = 10 ** AllModels(1)(i).values[0]
-            Fit.error("maximum 100 "+ str(i))
+            Fit.error("maximum 1000 "+ str(i))
             lowerFlux = 10**AllModels(1)(i).error[0]
             upperFlux = 10**AllModels(1)(i).error[1]
 
@@ -209,7 +209,9 @@ def calculateFlux(component, modelName, parameters):
         
     else:
         if component in multiplicative_models:
-            print(f"Cannot the flux of a multiplicative model: {component}")
+            print(f"Cannot calculate the flux of a multiplicative model: {component}")
+            return []
+        
         elif component in convolution_models:
 
             cflux_before_conv = modelName[:modelName.find(component)] + "cflux*" + modelName[modelName.find(component):]
@@ -222,7 +224,7 @@ def calculateFlux(component, modelName, parameters):
             flux_before_conv = findFlux()
 
             cflux_after_conv = modelName[:modelName.find(component) + len(component)] + "*cflux" + modelName[modelName.find(component) + len(component):]
-            m = Model(cflux_before_conv)
+            m = Model(cflux_after_conv)
 
             enterParameters(parameters, {"Emin":Emin, "Emax":Emax})
             freezeNorm()
@@ -232,23 +234,25 @@ def calculateFlux(component, modelName, parameters):
 
             conv_flux = []
             conv_flux.append(flux_before_conv[0] - flux_after_conv[0])
-            conv_flux.append(flux_before_conv[1] + flux_after_conv[1])
-            conv_flux.append(flux_before_conv[2] + flux_after_conv[2])
+            max_upper_error = max(flux_before_conv[1] - flux_before_conv[0], flux_after_conv[1] - flux_after_conv[0])
+            max_lower_error = max(flux_before_conv[0] - flux_before_conv[2], flux_after_conv[0] - flux_after_conv[2])
+            conv_flux.append(flux_before_conv[0] - flux_after_conv[0] + max_upper_error)
+            conv_flux.append(flux_before_conv[0] - flux_after_conv[0] - max_lower_error)
 
             return conv_flux
         
         else:
             newName = modelName[:modelName.find(component)] + "cflux*" + modelName[modelName.find(component):]
 
-            m = Model(newName)
+    m = Model(newName)
 
-            enterParameters(parameters, {"Emin":Emin, "Emax":Emax})
-            freezeNorm()
-            fitModel()
+    enterParameters(parameters, {"Emin":Emin, "Emax":Emax})
+    freezeNorm()
+    fitModel()
 
-            fluxVals = findFlux()
+    fluxVals = findFlux()
             
-            return fluxVals
+    return fluxVals
 
 def writeParsAfterFlux(line_list):
     for comp in AllModels(1).componentNames:

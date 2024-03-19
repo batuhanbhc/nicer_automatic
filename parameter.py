@@ -66,7 +66,7 @@ pipelineFile = "models.txt"
 
 # Name of the model pipeline defined in models.txt
 # DO NOT ENTER ANY EMPTY SPACE, USE "_" INSTEAD
-processPipeline = "model_simpl_edge_fixed"
+processPipeline = "model_simpl_edge_fixable"
 
 fixParameters = False
 sampleSize = 15
@@ -124,21 +124,21 @@ last_absorption_model = "TBabs"
 writeParValuesAfterCflux = True
 
 # If set to true, bottom and top limits of parameters will be set to (value +/- 0.1) before fitting with cflux.
-restrict_parameters = False
+restrict_parameters = True
 
 #================================================ nicer.plot spesific variables =================================================
 # If set to True, the script will create new graphs with a count/version number at the end instead of updating only one file.
 # e.g. model_parameters_1.png, model_parameters_2.png, ... As you continue to run the script, previous files will not be deleted.
 # If set to False, the script will only create one file, and delete the previous one (e.g. model_parameters.png, without a count/version number at the end)
-enable_versioning = True
+enable_versioning = False
 
 # Setting this variable to True will clear all the previously created files (graphs and tables), and reset the count/version number
 # to 1 if enable_versioning is set to True
-delete_previous_files = True
+delete_previous_files = False
 
 # Custom name for naming graphs and tables. If you set 'custom_name' = "", then the model name used for fitting will be used for naming
 # e.g: custom_name = "", graph name: model_simpl_edge_1.png OR custom_name = "nH_fixed", graph name = nH_fixed_1.png
-custom_name = ""
+custom_name = "soft_to_hard_flux_tests"
 
 # Modified z-score algorithm will be used for outlier detection
 # Possibility of removing "good" data always exists, turn it on or off accordingly
