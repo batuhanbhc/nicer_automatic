@@ -4,7 +4,6 @@ from pathlib import Path
 from xspec import *
 import numpy as np
 from astropy.io import fits
-import matplotlib.pyplot as plt
 import numpy as np
 import math
 import re
@@ -24,16 +23,16 @@ energyFilter = "0.8 10."
 
 #=============================================== nicer.main spesific variables =================================================
 # Script switches
-createSwitch = False
-fitSwitch = True
-fluxSwitch = True
-plotSwitch = True
+run_create_script = False
+run_fit_script = True
+run_flux_script = True
+run_plot_script = True
 
 # Script names
-createScript = "nicer_create.py"
-fitScript = "nicer_fit.py"
-plotScript = "nicer_plot.py"
-fluxScript = "nicer_flux.py"
+create_script_name = "nicer_create.py"
+fit_script_name = "nicer_fit.py"
+flux_script_name = "nicer_flux.py"
+plot_script_name = "nicer_plot.py"
 
 #================================================= nicer.create spesific variables =============================================
 # This variable turns on 'clobber' parameter to YES while running nicer headas tasks.
@@ -56,24 +55,23 @@ highResLcTimeResInPwrTwo = -8    # Enter a value as a power of two smaller or eq
 #================================================= nicer.fit spesific variables ================================================
 # Nicer_fit will save all fit results under $output_dir/results directory with versioning.
 # Setting this to True will clear/delete all the previous fit 
-clean_result_history = True
+clean_result_history = False
 
 # Xspec abundance to be used
 xspec_abundance = "wilm"
 
-# Name of the file that contains the definitions of model pipelines
-pipelineFile = "models.txt"
+# Name of the file that contains the definitions of models
+model_file = "models.txt"
 
-# Name of the model pipeline defined in models.txt
+# Name of the model to be used for fitting, defined in models.txt
 # DO NOT ENTER ANY EMPTY SPACE, USE "_" INSTEAD
-processPipeline = "model_simpl_edge_fixable"
+model_pipeline_name = "model_2"
 
-fixParameters = False
-sampleSize = 15
-
-# If 'fixParameters' variable is set to True, the script will fit certain amount of observations, take average values for parameters and refit all
+# If 'fix_parameters_after_sampling' variable is set to True, the script will fit 'fix_sample_size' amount of observations, take average values for parameters and refit all
 # observations while fixing these parameters to their averages.
-parametersToFix = ["TBabs.nH", "pcfabs.nH"]
+fix_parameters_after_sampling = False
+fix_sample_size = 15
+parametersToFix = ["TBabs.nH", "pcfabs.nH"] # Enter each element in string format, seperate them by comma. Each element is in the format component_name.parameter_name
 
 # Set it to True if you have made changes in models, and do not want to use any previous model files for parameter initialization in commonDirectory
 # restartOnce only deletes model files before the first observation, restartAlways deletes model files before all observations
@@ -85,12 +83,10 @@ ftestSignificance = 0.05
 
 chatterOn = False
 
-# If set to True, the script will create an .xcm file that loads model and data files to xspec and creates a plot automatically
-makeXspecScript = True
-
 # If set to True, the script will run "shakefit" function to calculate the error boundaries and possibly converge the fit to better parameter values.
 errorCalculations = True
 
+# If set to True, shakefit function will check whether powerlaw exists; if so, check whether its xspec error is bigger than 1 or not. If so, freeze its value at 'powerlawIndexToFreezeAt'
 checkPowerlawErrorAndFreeze = False
 powerlawIndexToFreezeAt = 1.7
 
@@ -101,27 +97,21 @@ powerlawIndexToFreezeAt = 1.7
 parametersForShakefit = {
     "diskbb.norm": "Normalization_(diskbb)",
     "diskbb.Tin": "Tin_(keV)",
-    "powerlaw.PhoIndex": "index_(Γ)",
+    "powerlaw.PhoIndex": "Powerlaw_index",
     "powerlaw.norm": "Normalization_(powerlaw)",
     "TBabs.nH": "TBabs_nH",
     "edge.edgeE": "Edge_Energy_(keV)",
     "simpl.Gamma": "Simpl_Gamma"
 }
 
-# If set to True, gaussian equivalent widths will be calculated
-calculateGaussEquivalentWidth = True
-
 #================================================ nicer.flux spesific variables =================================================
 # nicer_flux will add "cflux" component before the spesified models below to calculate flux.
 # 'absorbed' keyword adds cflux at the beginning, 'unabsorbed' keyword adds cflux after the last absorption model.
 # Be careful while using 'unabsorbed' keyword, do not use it if the above usage does not give the unabsorbed flux.
-modelsToAddCfluxBefore = ["absorbed", "simpl", "diskbb"]
+fluxes_to_be_calculated = ["absorbed", "unabsorbed", "simpl", "diskbb", "powerlaw"]
 
 # Used for 'unabsorbed' flux.
 last_absorption_model = "TBabs"
-
-# Each parameter value with cflux is written in 'resultFile' defined above.
-writeParValuesAfterCflux = True
 
 # If set to true, bottom and top limits of parameters will be set to (value +/- 0.1) before fitting with cflux.
 restrict_parameters = True
@@ -130,7 +120,7 @@ restrict_parameters = True
 # If set to True, the script will create new graphs with a count/version number at the end instead of updating only one file.
 # e.g. model_parameters_1.png, model_parameters_2.png, ... As you continue to run the script, previous files will not be deleted.
 # If set to False, the script will only create one file, and delete the previous one (e.g. model_parameters.png, without a count/version number at the end)
-enable_versioning = False
+enable_versioning = True
 
 # Setting this variable to True will clear all the previously created files (graphs and tables), and reset the count/version number
 # to 1 if enable_versioning is set to True
@@ -138,7 +128,7 @@ delete_previous_files = False
 
 # Custom name for naming graphs and tables. If you set 'custom_name' = "", then the model name used for fitting will be used for naming
 # e.g: custom_name = "", graph name: model_simpl_edge_1.png OR custom_name = "nH_fixed", graph name = nH_fixed_1.png
-custom_name = "soft_to_hard_flux_tests"
+custom_name = ""
 
 # Modified z-score algorithm will be used for outlier detection
 # Possibility of removing "good" data always exists, turn it on or off accordingly

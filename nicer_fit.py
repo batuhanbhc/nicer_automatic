@@ -15,7 +15,7 @@ operator_mapping = {
 }
 
 print("==============================================================================")
-print("\t\t\tRunning the file: " + fitScript + "\n")
+print("\t\t\tRunning " + fit_script_name + "\n")
 
 # Find the script's own path
 scriptPath = os.path.abspath(__file__)
@@ -33,6 +33,12 @@ if outputDir == "":
 # Input check for outputDir
 if Path(outputDir).exists() == False:
     print("Directory defined by outputDir could not be found. Terminating the script...")
+    quit()
+
+# Input check for commonFiles under outputDir
+if Path(outputDir + "/commonFiles").exists() == False:
+    print(f"Directory {outputDir}/commonFiles could not be found. You need to create output files/directories by running {create_script_name} first.")
+    print("Terminating the script...")
     quit()
 
 # Input check for restartAlways
@@ -68,24 +74,24 @@ if isinstance(ftestSignificance, float) == False or not (0 < ftestSignificance <
             print("\nThe 'fTestSignificance' variable must be a float number between 0 and 1.")
             ftestSignificance = input("Please enter a float number between 0 and 1 for 'ftestSignificance' (0 < x < 1): ")
 
-# Input check for sampleSize
-if str(sampleSize).isnumeric() == False or int(sampleSize) <= 0:
+# Input check for fix_sample_size
+if str(fix_sample_size).isnumeric() == False or int(fix_sample_size) <= 0:
     while True:
-        print("\nEither the 'sampleSize' variable is not of type integer, or it is smaller or equal to 0.")
-        sampleSize = input("Please enter a positive integer value for 'sampleSize' (x > 0): ")
+        print("\nEither the 'fix_sample_size' variable is not of type integer, or it is smaller or equal to 0.")
+        fix_sample_size = input("Please enter a positive integer value for 'fix_sample_size' (x > 0): ")
 
-        if sampleSize.isnumeric() and int(sampleSize) > 0:
-            sampleSize = int(sampleSize)
+        if fix_sample_size.isnumeric() and int(fix_sample_size) > 0:
+            fix_sample_size = int(fix_sample_size)
             break
 
-# Input check for fixParameters
-if isinstance(fixParameters, bool) == False:
+# Input check for fix_parameters_after_sampling
+if isinstance(fix_parameters_after_sampling, bool) == False:
     while True:
-        print("\nThe 'fixParameters' variable is not of type boolean.")
-        fixParameters = input("Please enter a boolean value for 'fixParameters' (True/False): ")
+        print("\nThe 'fix_parameters_after_sampling' variable is not of type boolean.")
+        fix_parameters_after_sampling = input("Please enter a boolean value for 'fix_parameters_after_sampling' (True/False): ")
 
-        if fixParameters == "True" or fixParameters == "False":
-            fixParameters = bool(fixParameters)
+        if fix_parameters_after_sampling == "True" or fix_parameters_after_sampling == "False":
+            fix_parameters_after_sampling = bool(fix_parameters_after_sampling)
             break
 
 # Input check for errorCalculations
@@ -98,25 +104,11 @@ if isinstance(errorCalculations, bool) == False:
             errorCalculations = bool(errorCalculations)
             break
 
-# Input check for makeXspecScript
-if isinstance(makeXspecScript, bool) == False:
-    while True:
-        print("\nThe 'makeXspecScript' variable is not of type boolean.")
-        makeXspecScript = input("Please enter a boolean value for 'makeXspecScript' (True/False): ")
-
-        if makeXspecScript == "True" or makeXspecScript == "False":
-            makeXspecScript = bool(makeXspecScript)
-            break
-
-# Input check for calculateGaussEqw
-if isinstance(calculateGaussEquivalentWidth, bool) == False:
-    while True:
-        print("\nThe 'calculateGaussEquivalentWidth' variable is not of type boolean.")
-        calculateGaussEquivalentWidth = input("Please enter a boolean value for 'calculateGaussEquivalentWidth' (True/False): ")
-
-        if calculateGaussEquivalentWidth == "True" or calculateGaussEquivalentWidth == "False":
-            calculateGaussEquivalentWidth = bool(calculateGaussEquivalentWidth)
-            break
+# Input check for model_pipeline_name
+if model_pipeline_name == "":
+    print("model_pipeline_name is not provided in parameter.py")
+    print("Please provide a valid model name that is defined in models.txt and try running the script again.")
+    quit()
 #===================================================================================================================================
 
 #===================================================================================================================================
@@ -784,11 +776,11 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
                 
         try:
             if line[0].lower() == "model":
-                if line[1] == processPipeline:
+                if line[1] == model_pipeline_name:
                     # Found the target model name
                     if currentModel == "":
                         # First time encountering that model name, start processing the model
-                        currentModel = processPipeline
+                        currentModel = model_pipeline_name
                         continue
                     else:
                         # A model pipeline has been defined before, but the current line tries to define another pipeline
@@ -799,7 +791,7 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
             print("\nERROR: Invalid implementation for a pipeline name in models.txt -> Line: " + str(lineCount))
             quit()
 
-        if currentModel != processPipeline:
+        if currentModel != model_pipeline_name:
             # If the current pipeline does not match
             continue
             
@@ -1076,7 +1068,7 @@ def parseTxt(source, bestModelList, nullhypList, logFile, enableFixing):
             if line[0] == "setpoint":
                 if line[1] == "fix":
                     if enableFixing[0]:
-                        print("\nAll parameters spesified by 'fixParameters' have now been fixed.")
+                        print("\nAll parameters spesified by 'fix_parameters_after_sampling' have now been fixed.")
                         fixAllParameters(fixedValues)
                         continue
                     else:
@@ -1119,11 +1111,11 @@ except Exception as e:
 allDir = os.listdir(outputDir)
 commonDirectory = outputDir + "/commonFiles"   # ~/NICER/analysis/commonFiles
 
-# Initializing required variables/dictionaries in case fixParameters is set to True.
+# Initializing required variables/dictionaries in case fix_parameters_after_sampling is set to True.
 fixedValues = {}
 takeAverages = False
 startFixingParameters = [False]
-if fixParameters:
+if fix_parameters_after_sampling:
     takeAverages = True
 
 # If both restartOnce and restartAlways are set to True, set restartAlways to False.
@@ -1135,8 +1127,8 @@ if chatterOn == False:
     print("Chatter has been disabled.\n") 
     Xset.chatter = 0
 
-# Set the correct path for the pipelineFile
-pipelineFile = scriptDir + "/" + pipelineFile
+# Set the correct path for the model_file
+model_file = scriptDir + "/" + model_file
 
 searchedObsid = []
 try:
@@ -1188,12 +1180,12 @@ if len(searchedObservations) == 0:
     print("\nCould not find the searched observation paths in 'processed_obs.txt', most likely due to having low exposure.")
     quit()
 
-if iterationMax > sampleSize:
-    iterationMax = sampleSize
+if iterationMax > fix_sample_size:
+    iterationMax = fix_sample_size
 
 try:
     chi_file = open(commonDirectory + "/reduced_chi.log", "w")
-    chi_file.write(processPipeline + "\n")
+    chi_file.write(model_pipeline_name + "\n")
 except Exception as e:
     print(f"Exception occured while writing to reduced_chi.log file under commonFiles directory: {e}")
     quit()
@@ -1315,7 +1307,7 @@ for x in range(2):
             
             output_save_name = custom_name
             if output_save_name == "":
-                output_save_name = processPipeline
+                output_save_name = model_pipeline_name
 
             results_location = results_folder + "/" + output_save_name + "_" + str(version)
             if Path(results_location).exists():
@@ -1417,14 +1409,14 @@ for x in range(2):
         nullhypList = [{}, {}]
         
         # Parse the txt file and start processing the commands within
-        foundTargetModel = parseTxt(pipelineFile, bestModel, nullhypList, logFile, startFixingParameters)
+        foundTargetModel = parseTxt(model_file, bestModel, nullhypList, logFile, startFixingParameters)
 
         if foundTargetModel == False:
-            print("\nModel pipeline identifier '" + processPipeline + "' could not be found.")
+            print("\nModel pipeline identifier '" + model_pipeline_name + "' could not be found.")
             quit()
         
         #========================================================================================================================================
-        # Start recording nH values if fixParameters is set to True.
+        # Start recording nH values if fix_parameters_after_sampling is set to True.
         if iteration < iterationMax and takeAverages:
             for eachPar in parametersToFix:
                 fullName = eachPar
@@ -1640,10 +1632,9 @@ for x in range(2):
         saveModel("best_" + modFileName)
         saveData()
 
-        if calculateGaussEquivalentWidth:
-            # Calculate and write equivalent widths of gausses to log file
-            print("Calculating equivalence widths for gaussians in model expression...\n")
-            calculateGaussEqw(logFile)
+        # Calculate and write equivalent widths of gausses to log file
+        print("Calculating equivalence widths for gaussians in model expression...\n")
+        calculateGaussEqw(logFile)
 
         current_chi = Fit.statistic
         current_dof = Fit.dof
@@ -1652,26 +1643,25 @@ for x in range(2):
         closeAllFiles()
 
         # Write an xspec script for analyzing parameter values along with linear-data and residual plots quickly
-        if makeXspecScript:
-            os.system("touch " + results_location + "/xspec_bestmod_script.xcm")
+        os.system("touch " + results_location + "/xspec_bestmod_script.xcm")
 
-            file = open(results_location + "/xspec_bestmod_script.xcm", "w")
-            file.write("@" + results_location + "/data_" + obsid + ".xcm\n")
-            file.write("@"+ results_location +"/best_" + modFileName + "\n")
-            file.write("cpd /xw\n")
-            file.write("setpl e\n")
-            file.write("fit\n")
-            file.write("pl ld chi\n")
-            file.write("show par\n")
-            file.write("show fit\n")
-            file.write("echo OBSID:" + obsid + "\n")
-            file.close()
+        file = open(results_location + "/xspec_bestmod_script.xcm", "w")
+        file.write("@" + results_location + "/data_" + obsid + ".xcm\n")
+        file.write("@"+ results_location +"/best_" + modFileName + "\n")
+        file.write("cpd /xw\n")
+        file.write("setpl e\n")
+        file.write("fit\n")
+        file.write("pl ld chi\n")
+        file.write("show par\n")
+        file.write("show fit\n")
+        file.write("echo OBSID:" + obsid + "\n")
+        file.close()
         
         chi_file.write(str(date) + " " + str(current_chi / current_dof) + "\n")
 
     # The whole fitting process is looped twice for refitting purposes. If fixing nH option is False, do not try to refit
 
-    if fixParameters == False:
+    if fix_parameters_after_sampling == False:
         break
     else:
         if x == 0:

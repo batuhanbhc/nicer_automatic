@@ -1,4 +1,4 @@
-# This is an automatic NICER script for calculating the fluxes of the Xspec models previously fitted by nicer_fit.py
+# This is an automatic NICER script for calculating the fluxes of Xspec models previously fitted by nicer_fit.py
 # Authors: Batuhan Bahçeci
 # Contact: batuhan.bahceci@sabanciuniv.edu
 
@@ -75,7 +75,7 @@ for i in temp:
 
 
 print("==============================================================================")
-print("\t\t\tRunning the file: " + fluxScript + "\n")
+print("\t\t\tRunning " + flux_script_name + "\n")
 
 # Find the script's own path
 scriptPath = os.path.abspath(__file__)
@@ -95,16 +95,17 @@ if Path(outputDir).exists() == False:
     print("Directory defined by outputDir could not be found. Terminating the script...")
     quit()
 
-# Input check for writeParValuesAfterCflux
-if isinstance(writeParValuesAfterCflux, bool) == False:
-    while True:
-        print("\nThe 'writeParValuesAfterCflux' variable is not of type boolean.")
-        writeParValuesAfterCflux = input("Please enter a boolean value for 'writeParValuesAfterCflux' (True/False): ")
+# Input check for commonFiles under outputDir
+if Path(outputDir + "/commonFiles").exists() == False:
+    print(f"Directory {outputDir}/commonFiles could not be found. You need to create output files/directories by running {create_script_name} first.")
+    print("Terminating the script...")
+    quit()
 
-        if writeParValuesAfterCflux == "True" or writeParValuesAfterCflux == "False":
-            writeParValuesAfterCflux = bool(writeParValuesAfterCflux)
-            break
-
+# Input check for model_pipeline_name
+if model_pipeline_name == "":
+    print("model_pipeline_name is not provided in parameter.py")
+    print("Please provide a valid model name that is defined in models.txt and try running the script again.")
+    quit()
 #===================================================================================================================================
 
 #===================================================================================================================================
@@ -357,7 +358,7 @@ for path, obsid, expo in searchedObservations:
     
     output_save_name = custom_name
     if output_save_name == "":
-        output_save_name = processPipeline
+        output_save_name = model_pipeline_name
 
     outObsDir = outObsDir + "/results/" + output_save_name +"_" + str(version)
     allFiles = os.listdir(outObsDir)
@@ -368,10 +369,10 @@ for path, obsid, expo in searchedObservations:
     foundDatafile = False
     for file in allFiles:
         if "best_" in file:
-            modFile = file
+            modFile = outObsDir + "/" + file
             foundModfile = True
         elif "data_" in file:
-            dataFile = file
+            dataFile = outObsDir + "/" + file
             foundDatafile = True
 
         if foundDatafile and foundModfile:
@@ -411,7 +412,7 @@ for path, obsid, expo in searchedObservations:
         write_lines_to_file(fit_file_loc, fit_file_lines)
         continue
     
-    print("All the necessary files for flux calculations are found. Please check if the correct files are in use.")
+    print("All the files required for calculating fluxes are found. Please check if the correct files are in use.")
     print("Model file: ", modFile)
     print("Data file: ", dataFile, "\n")
 
@@ -447,10 +448,10 @@ for path, obsid, expo in searchedObservations:
     fit_file_lines.append("Fluxes of model components (in 10^-9 ergs/cm^2/s) (90% confidence intervals)\n\n")
     modelName = AllModels(1).expression.replace(" ", "")
 
-    for fluxModel in modelsToAddCfluxBefore:
+    for fluxModel in fluxes_to_be_calculated:
         if (fluxModel != "unabsorbed" and fluxModel != "absorbed") and (fluxModel not in modelName):
             print("\nWARNING: Model '" + fluxModel + "' does not exist in current model expression.")
-            print("Skipping current iteration for calculating fluxes..\n")
+            print(f"Flux calculation will be skipped for '{fluxModel}'..\n")
             continue
 
         print("Calculating flux for: " + fluxModel)
@@ -461,8 +462,8 @@ for path, obsid, expo in searchedObservations:
 
         # Write flux data to 
         fit_file_lines.append(energyFilter +" keV " + AllModels(1).expression + "\nFlux: " + listToStr(flux) + "\n")
-        if writeParValuesAfterCflux:
-            writeParsAfterFlux(fit_file_lines)
+
+        writeParsAfterFlux(fit_file_lines)
         
         # Add new flux line to the all_lines_file
         all_lines_file[fluxModel +"_flux " + listToStr(flux)+ " (10^-9_ergs_cm^-2_s^-1)\n"] = 1

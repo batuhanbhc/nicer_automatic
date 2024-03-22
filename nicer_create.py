@@ -4,10 +4,9 @@
 
 from parameter import *
 from datetime import datetime, timezone, timedelta
-import shutil
 
 print("==============================================================================")
-print("\t\t\tRunning the file: " + createScript + "\n")
+print("\t\t\tRunning " + create_script_name + "\n")
 
 # Find the script's own path
 scriptPath = os.path.abspath(__file__)
@@ -52,7 +51,7 @@ if createHighResLightCurves:
         print("Please enter an integer value x <= 0 for the time resolution of high resolution light curves, or enter 'exit' to terminate the script.")
         highResLcTimeResInPwrTwo = input("Enter your input x (x<=0 / exit): ")
         if highResLcTimeResInPwrTwo == "exit":
-            print("Terminating the " + createScript + ": Next scripts to be executed may crash.")
+            print("Terminating " + create_script_name + ": Next scripts to be executed may crash.")
             quit()
         if highResLcTimeResInPwrTwo.lstrip("-").isnumeric() == True and int(highResLcTimeResInPwrTwo) <= 0:
             highResLcTimeResInPwrTwo = int(highResLcTimeResInPwrTwo)

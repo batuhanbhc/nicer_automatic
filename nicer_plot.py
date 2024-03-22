@@ -1,12 +1,13 @@
-# This is an automatic NICER script for plotting comparison graphsof previously found parameter and flux values from multiple observations
+# This is an automatic NICER script for creating parameter graphs and tables using the results of nicer_fit and nicer_flux
 # Authors: Batuhan Bahçeci
 # Contact: batuhan.bahceci@sabanciuniv.edu
 
 from parameter import *
+import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator, AutoMinorLocator
 
 print("==============================================================================")
-print("\t\t\tRunning the file: " + plotScript + "\n")
+print("\t\t\tRunning " + plot_script_name + "\n")
 
 # Find the script's own path
 scriptPath = os.path.abspath(__file__)
@@ -26,16 +27,31 @@ if Path(outputDir).exists() == False:
     print("ERROR: Directory defined by outputDir could not be found. Terminating the script...")
     quit()
 
+# Input check for commonFiles under outputDir
+if Path(outputDir + "/commonFiles").exists() == False:
+    print(f"Directory {outputDir}/commonFiles could not be found. You need to create output files/directories by running {create_script_name} first.")
+    print("Terminating the script...")
+    quit()
+
+# Input check for outlier_lower_threshold
 if type(outlier_lower_threshold) != float and type(outlier_lower_threshold) != int:
     print("ERROR: Incorrect type for 'outlier_lower_threshold' variable in parameter.py")
     quit()
 
+# Input check for outlier_upper_threshold
 if type(outlier_upper_threshold) != float and type(outlier_upper_threshold) != int:
     print("ERROR: Incorrect type for 'outlier_upper_threshold' variable in parameter.py")
     quit()
 
+# Input check for the ranges of outlier_lower_threshold and outlier_upper_threshold
 if (outlier_lower_threshold >= outlier_upper_threshold):
     print("ERROR: Lower threshold for outlier detection algorithm is larger than upper threshold")
+    quit()
+
+# Input check for model_pipeline_name
+if model_pipeline_name == "":
+    print("model_pipeline_name is not provided in parameter.py")
+    print("Please provide a valid model name that is defined in models.txt and try running the script again.")
     quit()
 #===================================================================================================================================
 
@@ -139,8 +155,6 @@ def modified_z_score(parameter_dict):
                 idx_counter += 1
         
 #===================================================================================================================
-print("====================================================================")
-print("Running the ", plotScript," file:\n")
 
 try:
     energyLimits = energyFilter.split(" ")
@@ -602,9 +616,9 @@ if len(otherParsDict) != 0:
             
             # If the flag has not been set to True, it means the current observation does not have the searched parameter of the column. Set values as "-"
             if added_par_flag == False:
-                table_columns[current_index].append("-")
-                table_columns[current_index + 1].append("-")
-                table_columns[current_index + 2].append("-")
+                table_columns[current_index].append("0")
+                table_columns[current_index + 1].append("0")
+                table_columns[current_index + 2].append("0")
 
     # Set the table file name according to enable_versioning variable
     table_file_name = ""
@@ -731,6 +745,7 @@ if len(fluxValuesDict) != 0:
     start_index = 2
     for par in all_parameters:
         par = par.replace(" ", "_")
+
         table_columns[start_index].append(par)
         table_columns[start_index + 1].append(par + "_errlow")
         table_columns[start_index + 2].append(par + "_errhigh")
@@ -770,11 +785,11 @@ if len(fluxValuesDict) != 0:
                     table_columns[current_index + 2].append(val[1] + val[3])
                     break
             
-            # If the flag has not been set to True, it means the current observation does not have the searched parameter of the column. Set values as "-"
+            # If the flag has not been set to True, it means the current observation does not have the searched parameter of the column. Set values as "0"
             if added_par_flag == False:
-                table_columns[current_index].append("-")
-                table_columns[current_index + 1].append("-")
-                table_columns[current_index + 2].append("-")
+                table_columns[current_index].append("0")
+                table_columns[current_index + 1].append("0")
+                table_columns[current_index + 2].append("0")
 
     # Set the table file name according to enable_versioning variable
     table_file_name = ""
